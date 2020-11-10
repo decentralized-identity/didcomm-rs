@@ -91,8 +91,8 @@ impl Message {
         our_sk: &[u8]) 
             -> Result<Self, Error> {
         if let Ok(raw_message_bytes) = decrypter(our_sk, received_message)
-            .map_err(|e| Error::Other(e)){
-                serde_json::from_slice(&raw_message_bytes)?
+            .map_err(|e| Error::Other(e)) {
+                return Ok(serde_json::from_slice(&raw_message_bytes)?);
             }
         Err(Error::PlugCryptoFailure)
     }
