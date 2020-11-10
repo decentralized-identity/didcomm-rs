@@ -11,7 +11,7 @@ use crate::Error;
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 ///
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
     pub id: usize,
     #[serde(rename = "type")]
@@ -95,5 +95,42 @@ impl Message {
                 return Ok(serde_json::from_slice(&raw_message_bytes)?);
             }
         Err(Error::PlugCryptoFailure)
+    }
+}
+
+#[cfg(test)]
+mod crypto_tests {
+    extern crate chacha20poly1305;
+    use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
+    use chacha20poly1305::aead::{Aead, NewAead};
+    use super::*;
+
+    #[test]
+    fn plugin_crypto_test() {
+
+        // Arrange
+        let key = Key::from_slice(b"an example very very secret key.");
+        // Plugable encryptor function to encrypt data
+        let my_crypter = |k: &[u8], m: &[u8]| -> Vec<u8> {
+            let aead = XChaCha20Poly1305::new(k.into());
+            let nonce = XNonce::from_slice(b"extra long unique nonce!");
+            aead.encrypt(nonce, m).expect("encryption failure!")
+        };
+        // Plugable decryptor function to ducrypt data
+        let my_decrypter = |k: &[u8], m: &[u8]| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+            let aead = XChaCha20Poly1305::new(k.into());
+            let nonce = XNonce::from_slice(b"extra long unique nonce!");
+            Ok(aead.decrypt(nonce, m).unwrap())
+        };
+        let m = Message::new()
+            .gen_random_id();
+        let id = m.id;
+
+        // Act + Assert
+        let crypted = m.send(my_crypter, key);
+        assert!(&crypted.is_ok()); // Encryption test
+        let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, key);
+        assert!(&raw_m.is_ok()); // Decryption test
+        assert_eq!(id, raw_m.unwrap().id); // Data consistancy test
     }
 }
