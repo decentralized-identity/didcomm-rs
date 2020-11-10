@@ -2,7 +2,9 @@
 extern crate serde;
 
 mod messages;
+mod error;
 
+pub use error::*;
 pub use messages::Message;
 
 #[cfg(test)]
