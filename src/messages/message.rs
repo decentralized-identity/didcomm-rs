@@ -101,13 +101,15 @@ impl Message {
 #[cfg(test)]
 mod crypto_tests {
     extern crate chacha20poly1305;
+    extern crate sodiumoxide;
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
+    use sodiumoxide::crypto::secretbox;
+    use crate::Error;
     use super::*;
 
     #[test]
     fn plugin_crypto_test() {
-
         // Arrange
         let key = Key::from_slice(b"an example very very secret key.");
         // Plugable encryptor function to encrypt data
@@ -116,7 +118,7 @@ mod crypto_tests {
             let nonce = XNonce::from_slice(b"extra long unique nonce!");
             aead.encrypt(nonce, m).expect("encryption failure!")
         };
-        // Plugable decryptor function to ducrypt data
+        // Plugable decryptor function to decrypt data
         let my_decrypter = |k: &[u8], m: &[u8]| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(b"extra long unique nonce!");
@@ -126,11 +128,40 @@ mod crypto_tests {
             .gen_random_id();
         let id = m.id;
 
-        // Act + Assert
+        // Act and Assert
         let crypted = m.send(my_crypter, key);
-        assert!(&crypted.is_ok()); // Encryption test
+        assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, key);
-        assert!(&raw_m.is_ok()); // Decryption test
-        assert_eq!(id, raw_m.unwrap().id); // Data consistancy test
+        assert!(&raw_m.is_ok()); // Decryption check
+        assert_eq!(id, raw_m.unwrap().id); // Data consistancy check
+    }
+
+    #[test]
+    fn plugin_crypto_test_libsodium_box() {
+        // Arrange
+        // Plugable encryptor function to encrypt data
+        let my_crypter = |k: &[u8], m: &[u8]| -> Vec<u8> {
+            let nonce = secretbox::Nonce::from_slice(b"extra long unique nonce!").unwrap();
+            secretbox::seal(m, &nonce, &secretbox::Key::from_slice( k).unwrap())
+        };
+        // Plugable decryptor function to decrypt data
+        let my_decrypter = |k: &[u8], m: &[u8]| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+            let nonce = secretbox::Nonce::from_slice(b"extra long unique nonce!").unwrap();
+            match secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap()) {
+                Ok(v) => Ok(v),
+                Err(_) => Err(Error::PlugCryptoFailure.into())
+            }
+        };
+        let m = Message::new()
+        .gen_random_id();
+        let id = m.id;
+        let key = secretbox::gen_key();
+
+        // Act and Assert
+        let crypted = m.send(my_crypter, &key.as_ref());
+        assert!(&crypted.is_ok()); // Encryption check
+        let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, &key.as_ref());
+        assert!(&raw_m.is_ok()); // Decryption check
+        assert_eq!(id, raw_m.unwrap().id); // Data consistancy check
     }
 }
