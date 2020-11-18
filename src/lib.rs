@@ -2,15 +2,10 @@
 extern crate serde;
 
 mod messages;
+mod dids;
 mod error;
 
 pub use error::*;
 pub use messages::Message;
+pub use dids::*;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

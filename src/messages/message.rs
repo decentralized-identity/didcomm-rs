@@ -3,7 +3,17 @@ use serde::{
     Serialize,
     Deserialize
 };
-use biscuit::ClaimsSet;
+use biscuit::{
+    jwe::{
+        CekAlgorithmHeader,
+        RegisteredHeader,
+    },
+    ClaimsSet,
+    jwa::{
+        EncryptionOptions,
+        KeyManagementAlgorithm,
+        ContentEncryptionAlgorithm,
+    }, jwe};
 use std::collections::HashMap;
 use super::prior_claims::PriorClaims;
 use crate::Error;
@@ -13,17 +23,8 @@ use crate::Error;
 ///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
-    pub id: usize,
-    #[serde(rename = "type")]
-    pub m_type: String,
-    pub to: Option<Vec<String>>,
-    pub created_time: Option<usize>,
-    pub expires_time: Option<usize>,
-    from: Option<String>,
-    /// A JWT, with sub: new DID and iss: prior DID, 
-    /// with a signature from a key authorized by prior DID.
-    from_prior: Option<ClaimsSet<PriorClaims>>,
-    body: Option<ClaimsSet<HashMap<String, String>>>,
+    headers: Headers,
+    body: Vec<u8>,    
 }
 
 impl Message {
@@ -32,34 +33,27 @@ impl Message {
     ///
     pub fn new() -> Self {
         Message {
-            id: 0,
-            m_type: String::default(),
-            to: None,
-            created_time: None,
-            expires_time: None,
-            from: None,
-            from_prior: None,
-            body: None,
-        }
-    }
-    /// Generates random `id` for existing `Message`
-    /// Consumes it in process and returns new one.
-    ///
-    pub fn gen_random_id(self) -> Self {
-        Message {
-            id: rand::thread_rng().gen(),
-            ..self
+            headers: Headers {
+                id: Headers::gen_random_id(),
+                m_type: String::default(),
+                to: vec!(String::default()),
+                from: String::default(),
+                created_time: None,
+                expires_time: None,
+                from_prior: None,
+            },
+            body: vec!(),
         }
     }
     /// Checks if message is rotation one.
     /// Exposed for explicit checks on sdk level.
     ///
     pub fn is_rotation(&self) -> bool {
-        self.from_prior.is_some()
+        self.headers.from_prior.is_some()
     }
     pub fn get_prior(&self) -> Result<ClaimsSet<PriorClaims>, Error> {
         if self.is_rotation() {
-            let claim_set = self.from_prior.clone().unwrap();
+            let claim_set = self.headers.from_prior.clone().unwrap();
             Ok(ClaimsSet {
                 ..claim_set
             })
@@ -74,8 +68,9 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `Vec<u8>` to be sent to receiver.
     ///
-    pub fn send(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8]) -> Result<Vec<u8>, Error> {
-        Ok(crypter(receiver_pk, serde_json::to_string(&self)?.as_bytes()))
+    pub fn send(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8])
+        -> Result<Vec<u8>, Error> {
+            Ok(crypter(receiver_pk, serde_json::to_string(&self)?.as_bytes()))
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
@@ -129,6 +124,51 @@ impl Message {
             }
         Err(Error::PlugCryptoFailure)
     }
+    // TODO: Incomplete
+    pub fn as_compact_jwe(self) -> Vec<u8> {
+
+        let header = jwe::Header {
+            registered: RegisteredHeader::default(),
+            cek_algorithm: CekAlgorithmHeader {
+                nonce: None,
+                tag: None,
+            },
+            private: { 
+                self.headers
+            },
+        };
+
+        let decrypted = jwe::Compact::new_decrypted(
+            From::from(header),
+            self.body,
+        );
+
+        // TODO: crypto goes here -> Vec<u8>
+
+        vec!()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Headers {
+    pub id: usize,
+    #[serde(rename = "type")]
+    pub m_type: String,
+    pub to: Vec<String>,
+    pub from: String,
+    pub created_time: Option<usize>,
+    pub expires_time: Option<usize>,
+    /// A JWT, with sub: new DID and iss: prior DID, 
+    /// with a signature from a key authorized by prior DID.
+    from_prior: Option<ClaimsSet<PriorClaims>>,
+}
+
+impl Headers {
+    /// Generates random `id`
+    ///
+    pub fn gen_random_id() -> usize {
+            rand::thread_rng().gen()
+    }
 }
 
 #[cfg(test)]
@@ -167,16 +207,15 @@ mod crypto_tests {
             let nonce = XNonce::from_slice(b"extra long unique nonce!");
             Ok(aead.decrypt(nonce, m).unwrap())
         };
-        let m = Message::new()
-            .gen_random_id();
-        let id = m.id;
+        let m = Message::new();
+        let id = m.headers.id;
 
         // Act and Assert
         let crypted = m.send(my_crypter, key);
         assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, key);
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
     }
 
     #[test]
@@ -193,9 +232,8 @@ mod crypto_tests {
             secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap())
                 .map_err(|_| Error::PlugCryptoFailure.into())
         };
-        let m = Message::new()
-        .gen_random_id();
-        let id = m.id;
+        let m = Message::new();
+        let id = m.headers.id;
         let key = secretbox::gen_key();
 
         // Act and Assert
@@ -203,7 +241,7 @@ mod crypto_tests {
         assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, &key.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
     }
 
     #[test]
@@ -213,7 +251,8 @@ mod crypto_tests {
         let (receiver_pk, receiver_sk) = box_::gen_keypair();
         // Plugable encryptor function to encrypt data
         let nonce = box_::Nonce::from_slice(b"extra long unique nonce!").unwrap();
-        let my_crypter = |m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let my_crypter = |m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
+            -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             Ok(box_::seal(m,
                 &box_::Nonce::from_slice(n).unwrap(),
                 &box_::PublicKey::from_slice(pk).unwrap(),
@@ -221,23 +260,28 @@ mod crypto_tests {
             )
         };
         // Plugable decryptor function to decrypt data
-        let my_decrypter = |m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let my_decrypter = |m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
+            -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             Ok(box_::open(m,
                 &box_::Nonce::from_slice(n).unwrap(),
                 &box_::PublicKey::from_slice(pk).unwrap(),
                 &box_::SecretKey::from_slice(sk).unwrap())
                 .map_err(|_| Error::PlugCryptoFailure)?)
         };
-        let m = Message::new()
-            .gen_random_id();
-        let id = m.id;
+        let m = Message::new();
+        let id = m.headers.id;
 
         // Act and Assert
         let crypted = m.send_asymm(my_crypter, &nonce.as_ref(), &receiver_pk.as_ref(), &sender_sk.as_ref());
         assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive_asymm(&crypted.unwrap(), my_decrypter, &nonce.as_ref(), &sender_pk.as_ref(), &receiver_sk.as_ref());
+        let raw_m = Message::receive_asymm(
+            &crypted.unwrap(),
+            my_decrypter,
+            &nonce.as_ref(),
+            &sender_pk.as_ref(),
+            &receiver_sk.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().id);
+        assert_eq!(id, raw_m.unwrap().headers.id);
     }
 
     #[test]
@@ -250,9 +294,8 @@ mod crypto_tests {
         let receiver_pk = PublicKey::from(&receiver_sk);
         let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
-        let m = Message::new()
-            .gen_random_id();
-        let id = m.id;
+        let m = Message::new();
+        let id = m.headers.id;
         // Plugable encryptor function to encrypt data
         let my_crypter = |k: &[u8], m: &[u8]| -> Vec<u8> {
             let aead = XChaCha20Poly1305::new(k.into());
@@ -271,6 +314,6 @@ mod crypto_tests {
         assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, receiver_shared.as_bytes());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
     }
 }
