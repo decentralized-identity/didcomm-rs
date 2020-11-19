@@ -1,3 +1,2 @@
-mod jolo;
-
-use jolo::*;
+pub mod jolo;
+pub mod generic;

@@ -4,17 +4,19 @@ use serde::{
     Deserialize
 };
 use biscuit::{
+    Empty, 
+    ClaimsSet, 
+    jwk::JWK,
     jwe::{
-        CekAlgorithmHeader,
-        RegisteredHeader,
-    },
-    ClaimsSet,
+        self,
+        Compact,
+    }, 
     jwa::{
         EncryptionOptions,
         KeyManagementAlgorithm,
         ContentEncryptionAlgorithm,
-    }, jwe};
-use std::collections::HashMap;
+    },
+};
 use super::prior_claims::PriorClaims;
 use crate::Error;
 
@@ -124,28 +126,45 @@ impl Message {
             }
         Err(Error::PlugCryptoFailure)
     }
-    // TODO: Incomplete
-    pub fn as_compact_jwe(self) -> Vec<u8> {
-
-        let header = jwe::Header {
-            registered: RegisteredHeader::default(),
-            cek_algorithm: CekAlgorithmHeader {
-                nonce: None,
-                tag: None,
-            },
-            private: { 
-                self.headers
-            },
+    /// Packs the message into compact JWE with AES GCM encryption.
+    /// Returns serialized `Compact` JWE representation.
+    ///
+    pub fn pack_compact_jwe(self, key: &[u8]) -> Result<Vec<u8>, Error> {
+        let mut nonce = [0u32; 4];
+        for i in 0..3 {
+            nonce[i] = rand::thread_rng().gen();
+        }
+        let nonce_counter = num::BigUint::from_slice(&nonce);
+        assert!(nonce_counter.bits() <= 96);
+        let mut nonce_bytes = nonce_counter.to_bytes_le();
+        nonce_bytes.resize(96/8, 0);
+        let header = jwe::RegisteredHeader {
+            cek_algorithm: KeyManagementAlgorithm::A256GCMKW,
+            enc_algorithm: ContentEncryptionAlgorithm::A256GCM,
+            ..Default::default()
         };
-
         let decrypted = jwe::Compact::new_decrypted(
             From::from(header),
-            self.body,
-        );
-
-        // TODO: crypto goes here -> Vec<u8>
-
-        vec!()
+            serde_json::to_string(&self)?.as_bytes().to_vec(),
+        );    
+        let options = EncryptionOptions::AES_GCM {nonce: nonce_bytes};
+        let key: JWK<Empty> = JWK::new_octet_key(key, Default::default());
+        let cipher = &decrypted.encrypt(&key, &options)?;
+        let json = serde_json::to_string(cipher)?;
+        Ok(json.as_bytes().to_vec())
+    }
+    /// Unpacks the message from JWE encrypted with AES GCM algorithm.
+    /// Results into `Message` or propagates underlying `Error`
+    ///
+    pub fn unpack_compact_jwe(payload: Vec<u8>, key: &[u8]) -> Result<Self, Error> {
+        let encrypted: Compact<Vec<u8>, Empty> = serde_json::from_slice(&payload)?;
+        let key: JWK<Empty> = JWK::new_octet_key(key, Default::default());
+        let mut decrypted = encrypted.decrypt(
+            &key,
+            KeyManagementAlgorithm::A256GCMKW,
+            ContentEncryptionAlgorithm::A256GCM,
+        )?;
+        Ok(serde_json::from_slice(&decrypted.payload_mut()?)?)
     }
 }
 
@@ -176,6 +195,7 @@ mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
     extern crate x25519_dalek;
+
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
     use sodiumoxide::crypto::{
@@ -315,5 +335,21 @@ mod crypto_tests {
         let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, receiver_shared.as_bytes());
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
+    }
+
+    #[test]
+    fn jwe_aes_gcm() -> Result<(), Error> {
+        // Arrange
+        let payload = b"my presous data!!!";
+        let key: JWK<Empty> = JWK::new_octet_key(&vec![0; 256 / 8], Default::default());
+        let mut m = Message::new();
+        m.body = payload.to_vec();
+        // Act
+        let key = key.octet_key()?;
+        let encrypted = m.pack_compact_jwe(key)?;
+        let decrypted = Message::unpack_compact_jwe(encrypted, key)?;
+        // Assert
+        assert_eq!(payload.to_vec(), decrypted.body);
+        Ok(())
     }
 }
