@@ -13,5 +13,7 @@ pub enum Error {
     #[error(transparent)]
     BisquitError(#[from] biscuit::errors::Error),
     #[error(transparent)]
+    StringConversionError(#[from] std::string::FromUtf8Error),
+    #[error(transparent)]
     Other(Box<dyn std::error::Error>),
 }

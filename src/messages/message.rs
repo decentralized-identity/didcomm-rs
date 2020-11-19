@@ -4,18 +4,25 @@ use serde::{
     Deserialize
 };
 use biscuit::{
-    Empty, 
-    ClaimsSet, 
-    jwk::JWK,
-    jwe::{
-        self,
-        Compact,
-    }, 
+    ClaimsSet,
+    CompactJson,
+    CompactPart,
+    Empty,
+    jwk::JWK, 
     jwa::{
         EncryptionOptions,
         KeyManagementAlgorithm,
         ContentEncryptionAlgorithm,
+        SignatureAlgorithm,
     },
+    jwe::{
+        self,
+        Compact,
+    },
+    jws::{
+        self,
+        Secret,
+    }
 };
 use super::prior_claims::PriorClaims;
 use crate::Error;
@@ -23,7 +30,7 @@ use crate::Error;
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 ///
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Message {
     headers: Headers,
     body: Vec<u8>,    
@@ -127,6 +134,7 @@ impl Message {
         Err(Error::PlugCryptoFailure)
     }
     /// Packs the message into compact JWE with AES GCM encryption.
+    /// Only 256 bit keys are supported.
     /// Returns serialized `Compact` JWE representation.
     ///
     pub fn pack_compact_jwe(self, key: &[u8]) -> Result<Vec<u8>, Error> {
@@ -154,9 +162,10 @@ impl Message {
         Ok(json.as_bytes().to_vec())
     }
     /// Unpacks the message from JWE encrypted with AES GCM algorithm.
+    /// Only 256 bit keys are supported.
     /// Results into `Message` or propagates underlying `Error`
     ///
-    pub fn unpack_compact_jwe(payload: Vec<u8>, key: &[u8]) -> Result<Self, Error> {
+    pub fn from_compact_jwe(payload: Vec<u8>, key: &[u8]) -> Result<Self, Error> {
         let encrypted: Compact<Vec<u8>, Empty> = serde_json::from_slice(&payload)?;
         let key: JWK<Empty> = JWK::new_octet_key(key, Default::default());
         let mut decrypted = encrypted.decrypt(
@@ -166,7 +175,39 @@ impl Message {
         )?;
         Ok(serde_json::from_slice(&decrypted.payload_mut()?)?)
     }
+
+    /// Signs  and packs message as BASE64URL
+    /// Serialized into compact JWS
+    /// Algorythm used - ES256
+    ///
+    pub fn sign_compact_jws(&self, key: &[u8]) -> Result<Vec<u8>, Error> {
+        let header = jws::RegisteredHeader {
+            algorithm: SignatureAlgorithm::ES256,
+            media_type: Some("JWM".into()),
+            content_type: None,
+            web_key_url: None,
+            web_key: None,
+            key_id: Some(String::from_utf8(key.into())?),
+            x509_url: None,
+            x509_chain: None,
+            x509_fingerprint: None,
+            critical: None,
+        };
+        let secret = Secret::Bytes(key.to_vec());
+        Ok(serde_json::to_string(&jws::Compact::new_decoded(
+            jws::Header::from_registered_header(header),
+            self.clone().to_base64()?)
+            .encode(&secret)?)?
+            .as_bytes().to_vec()
+        )
+    }
+
+    pub fn verify_compact_jws() -> bool {
+        todo!()
+    }
 }
+
+impl CompactJson for Message {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Headers {
@@ -347,7 +388,7 @@ mod crypto_tests {
         // Act
         let key = key.octet_key()?;
         let encrypted = m.pack_compact_jwe(key)?;
-        let decrypted = Message::unpack_compact_jwe(encrypted, key)?;
+        let decrypted = Message::from_compact_jwe(encrypted, key)?;
         // Assert
         assert_eq!(payload.to_vec(), decrypted.body);
         Ok(())
