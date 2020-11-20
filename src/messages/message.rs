@@ -250,10 +250,10 @@ mod crypto_tests {
 
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
-    use sodiumoxide::crypto::{
+    use sodiumoxide::{crypto::{
         secretbox,
         box_
-    };
+    }, hex};
     use rand_core::OsRng;
     use x25519_dalek::{
         EphemeralSecret,
@@ -402,6 +402,24 @@ mod crypto_tests {
         let decrypted = Message::from_compact_jwe(encrypted, key)?;
         // Assert
         assert_eq!(payload.to_vec(), decrypted.body);
+        Ok(())
+    }
+
+    #[test]
+    fn jws_sign_validate_es256() -> Result<(), Error> {
+        // Arrange
+        let payload = b"another great payload";
+        let test_sk =
+            hex::decode("a8abababababababababababababababababababababababababababababab6b").unwrap();
+        let expected_pk =
+            hex::decode("e3712d851a0e5d79b831c5e34ab22b41a198171de209b8b8faca23a11c624859").unwrap();
+
+        let mut m = Message::new();
+        m.body = payload.to_vec();
+        // Act
+        let signed = m.sign_compact_jws(&expected_pk)?;
+        // Assert
+        assert!(Message::validate_compact_jws(signed, &test_sk)?);
         Ok(())
     }
 }
