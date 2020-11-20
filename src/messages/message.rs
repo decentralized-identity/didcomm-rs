@@ -4,6 +4,7 @@ use serde::{
     Deserialize
 };
 use biscuit::{
+    Base64Url,
     ClaimsSet,
     CompactJson,
     CompactPart,
@@ -176,7 +177,7 @@ impl Message {
         Ok(serde_json::from_slice(&decrypted.payload_mut()?)?)
     }
 
-    /// Signs  and packs message as BASE64URL
+    /// Signs and packs message as BASE64URL
     /// Serialized into compact JWS
     /// Algorythm used - ES256
     ///
@@ -201,12 +202,22 @@ impl Message {
             .as_bytes().to_vec()
         )
     }
-
-    pub fn verify_compact_jws() -> bool {
-        todo!()
+    /// Decodes provided 'Compact' JWS and validates signature.
+    /// Algorythm used for signing should be 'ES256'
+    /// Returns `Ok(bool)` of validation and `Error` propagation
+    ///     if input was not proper `Compact`
+    ///
+    pub fn validate_compact_jws(jws: Vec<u8>, key: &[u8]) -> Result<bool, Error> {
+        let compact_jws: jws::Compact<Base64Url, Empty> = serde_json::from_slice(&jws)?;
+        let secret = Secret::Bytes(key.to_vec());
+        Ok(match compact_jws.decode(&secret, SignatureAlgorithm::ES256) {
+            Ok(_) => true,
+            Err(_) => false
+        })
     }
 }
 
+// Required to be `Compact` serializable by biscuit crate
 impl CompactJson for Message {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
