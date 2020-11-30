@@ -6,6 +6,8 @@ pub enum Error {
     NoRotationData,
     #[error("malformed DID string")]
     BadDid,
+    #[error("{0}")]
+    Generic(String),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
     #[error(transparent)]
