@@ -79,7 +79,7 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `Vec<u8>` to be sent to receiver.
     ///
-    pub fn send(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8])
+    fn send(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8])
         -> Result<Vec<u8>, Error> {
             Ok(crypter(receiver_pk, serde_json::to_string(&self)?.as_bytes()))
     }
@@ -88,7 +88,7 @@ impl Message {
     /// Returns `Ok(Message)` if decryption / deserialization
     ///     succeded. `Error` othervice.
     ///
-    pub fn receive(
+    fn receive(
         received_message: &[u8],
         decrypter: fn(&[u8], &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>>,
         our_sk: &[u8]) 
@@ -106,7 +106,7 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `Vec<u8>` to be sent to receiver.
     ///
-    pub fn send_asymm(
+    fn send_asymm(
         self,
         crypter: fn(plaintext: &[u8], nonce: &[u8], their_pk: &[u8], our_sk: &[u8])
             -> Result<Vec<u8>, Box<dyn std::error::Error>>,
@@ -121,7 +121,7 @@ impl Message {
     /// Returns `Ok(Message)` if decryption / deserialization
     ///     succeded. `Error` othervice.
     ///
-    pub fn receive_asymm(
+    fn receive_asymm(
         received_message: &[u8],
         decrypter: fn(received_message: &[u8], nonce: &[u8], our_pk: &[u8], their_sk: &[u8])
             -> Result<Vec<u8>, Box<dyn std::error::Error>>,
@@ -139,7 +139,7 @@ impl Message {
     /// Only 256 bit keys are supported.
     /// Returns serialized `Compact` JWE representation.
     ///
-    pub fn pack_compact_jwe(self, key: &[u8]) -> Result<Vec<u8>, Error> {
+    fn pack_compact_jwe(self, key: &[u8]) -> Result<String, Error> {
         let mut nonce = [0u32; 4];
         for i in 0..3 {
             nonce[i] = rand::thread_rng().gen();
@@ -160,15 +160,14 @@ impl Message {
         let options = EncryptionOptions::AES_GCM {nonce: nonce_bytes};
         let key: JWK<Empty> = JWK::new_octet_key(key, Default::default());
         let cipher = &decrypted.encrypt(&key, &options)?;
-        let json = serde_json::to_string(cipher)?;
-        Ok(json.as_bytes().to_vec())
+        Ok(serde_json::to_string(cipher)?)
     }
     /// Unpacks the message from JWE encrypted with AES GCM algorithm.
     /// Only 256 bit keys are supported.
     /// Results into `Message` or propagates underlying `Error`
     ///
-    pub fn from_compact_jwe(payload: Vec<u8>, key: &[u8]) -> Result<Self, Error> {
-        let encrypted: Compact<Vec<u8>, Empty> = serde_json::from_slice(&payload)?;
+    fn from_compact_jwe(payload: String, key: &[u8]) -> Result<Self, Error> {
+        let encrypted: Compact<Vec<u8>, Empty> = serde_json::from_str(&payload)?;
         let key: JWK<Empty> = JWK::new_octet_key(key, Default::default());
         let mut decrypted = encrypted.decrypt(
             &key,
@@ -181,7 +180,7 @@ impl Message {
     /// Serialized into compact JWS
     /// Algorythm used - ES256
     ///
-    pub fn sign_compact_jws(&self, key: &Secret) -> Result<String, Error> {
+    fn sign_compact_jws(&self, key: &Secret) -> Result<String, Error> {
         let pack = |secret: &Secret, bytes: &[u8]| -> Result<String, Error> { // TODO: jwk must be implemented
 
             let claims = ClaimsSet::<Headers> {
@@ -229,7 +228,7 @@ impl Message {
     /// Returns `Ok(bool)` of validation and `Error` propagation
     ///     if input was not proper `Compact`
     ///
-    pub fn validate_compact_jws(jws: &str, key: &Secret, out: &mut Headers) -> Result<bool, Error> {
+    fn validate_compact_jws(jws: &str, key: &Secret, out: &mut Headers) -> Result<bool, Error> {
         let token: CompactJws<ClaimsSet<Headers>, Empty> = JWT::<_, biscuit::Empty>::new_encoded(jws);
 
         *out = token.into_decoded(key, SignatureAlgorithm::ES256)?
@@ -239,6 +238,18 @@ impl Message {
 
         Ok(true)
     }
+
+    pub fn seal(self) -> Result<String, Error> {
+        todo!()
+        // Ok(String::from_utf8(self.pack_compact_jwe(key)?)?)
+    }
+    /// Wrap self to be mediated by some mediator.
+    /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
+    /// This method can be chained any number of times to match all the mediators in the chain.
+    pub fn routed(self, ) -> Self {
+        self
+    }
+
 }
 
 // Required to be `Compact` serializable by biscuit crate
