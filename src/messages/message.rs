@@ -453,7 +453,7 @@ mod crypto_tests {
     fn jws_sign_validate_es256() -> Result<(), Error> {
         // Arrange
         let payload = b"another great payload";
-        let pk = Secret::ecdsa_keypair_from_file(SignatureAlgorithm::ES256, "ecdsa_private_key.p8")?;
+        let pk = Secret::ecdsa_keypair_from_file(SignatureAlgorithm::ES256, "test_resources/ecdsa_private_key.p8")?;
 
         let mut m = Message::new();
         m.body = payload.to_vec();

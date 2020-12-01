@@ -10,7 +10,8 @@ fn test_routing() -> Result<(), Error> {
     // Arrange
     let message = Message::new();
     // Act
-    m.routed()
+    message
+        .routed()
         .routed()
         .routed();
     //Assert
