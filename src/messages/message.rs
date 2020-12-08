@@ -246,7 +246,7 @@ impl Message {
     /// Wrap self to be mediated by some mediator.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
-    pub fn routed(self, ) -> Self {
+    pub fn routed_by(self, ) -> Self {
         self
     }
 
