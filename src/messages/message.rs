@@ -72,6 +72,12 @@ impl Message {
            Err(Error::NoRotationData)
         }
     }
+    pub fn get_headers(&self) -> &Headers {
+        &self.headers
+    }
+    pub fn get_body(&self) -> &Vec<u8> {
+        &self.body
+    }
     /// Encrypts current message by consuming it.
     /// Uses provided cryptography function to perform
     ///     the encryption. Agnostic of actual algorythm used.
@@ -79,7 +85,7 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `Vec<u8>` to be sent to receiver.
     ///
-    fn send(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8])
+    fn send_raw(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8])
         -> Result<Vec<u8>, Error> {
             Ok(crypter(receiver_pk, serde_json::to_string(&self)?.as_bytes()))
     }
@@ -88,7 +94,7 @@ impl Message {
     /// Returns `Ok(Message)` if decryption / deserialization
     ///     succeded. `Error` othervice.
     ///
-    fn receive(
+    fn receive_raw(
         received_message: &[u8],
         decrypter: fn(&[u8], &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>>,
         our_sk: &[u8]) 
@@ -246,8 +252,14 @@ impl Message {
     /// Wrap self to be mediated by some mediator.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
-    pub fn routed_by(self, ) -> Self {
+    pub fn routed_by(self, ek: Vec<u8>) -> Self {
+        Message::new()
         self
+    }
+
+    pub fn receive(jwm: String, pk: Vec<u8>) -> Result<Self, Error> {
+        // todo!()
+        Ok(Message::from_compact_jwe(jwm, &pk)?)
     }
 
 }

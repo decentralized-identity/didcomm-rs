@@ -158,8 +158,5 @@ pub const TEST_DID_ENCRYPT_2: &'static str = r#"{
       controller: 'did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ',
       publicKeyBase64: 'SFgdHTP5cCCKY7p1GQY5h7C29htmbcVyX1a3ryqT3hM='
     }
-  ]
-}"#;
-
-
+  ]}"#;
 }
