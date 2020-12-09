@@ -14,6 +14,10 @@ pub enum MessageType {
     ZipArchive,
     #[serde(rename = "application/octet-stream")]
     BinaryData,
+    #[serde(rename = "dodcomm/jwe")]
+    DidcommJwe,
+    #[serde(rename = "dodcomm/jws")]
+    DidcommJwm,
     #[serde(rename = "didcomm/unknown")]
     DidcommUnknown,
 }

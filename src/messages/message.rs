@@ -257,6 +257,23 @@ impl Message {
     pub fn seal(self, ek: Vec<u8>) -> Result<String, Error> {
         self.pack_compact_jwe(&ek)
     }
+    /// Signs raw message and then packs it to encrypted envelope
+    /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
+    ///
+    /// # Parameters
+    ///
+    /// `ek` - encryption key for inner message payload JWE encryption
+    ///
+    /// `sk` - signing key for enveloped message JWS encryption
+    /// TODO: Adde example[s]
+    pub fn seal_signed(self, ek: Vec<u8>, sk: Vec<u8>) -> Result<String, Error> {
+        let signing_secret = Secret::Bytes(sk);
+        let mut crypto_envelope = Message {
+            headers: Headers::encrypt_jws(self.headers.clone())?,
+            body: self.sign_compact_jws(&signing_secret)?.as_bytes().to_vec()
+        };
+        crypto_envelope.pack_compact_jwe(&ek)
+    }
     /// Wrap self to be mediated by some mediator.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
@@ -280,9 +297,9 @@ impl Message {
         expires_time: Option<usize>)
         -> Result<Self, Error> {
         let payload = self.pack_compact_jwe(&ek)?;
-        let forward_headers = Headers::forward(to, from, expires_time);
+        let forward_headers = Headers::forward(to, from, expires_time)?;
         let mut packed = Message::new();
-        packed.headers = forward_headers?;
+        packed.headers = forward_headers;
         packed.body = payload.as_bytes().to_vec();
         Ok(packed)
     }
@@ -295,7 +312,14 @@ impl Message {
     /// `pk` - encryption key for JWE decryption
     /// TODO: Add example[s]
     pub fn receive(jwm: String, pk: Vec<u8>) -> Result<Self, Error> {
-        Ok(Message::from_compact_jwe(jwm, &pk)?)
+        // match Message::parse_type(jwm)? {
+        //     Ok(MessageType::Jwe) => {},
+        //     Ok(MessageType::Jws) => {},
+        //     Ok(MessageType::JwsJwe) => {},
+        //     Ok(MessageType::PlainText) => {},
+        //     Err(_) => Error::FailedToIdentifyMessageType(),
+        // }
+        Message::from_compact_jwe(jwm, &pk)
     }
 
 }

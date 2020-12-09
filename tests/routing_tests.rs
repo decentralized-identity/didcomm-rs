@@ -16,7 +16,8 @@ fn test_routing() -> Result<(), Error> {
     let ready_to_send = message
         .routed_by(did_doc_bobs_mediator) // Mediator 3
         .routed_by(did_doc_other_mediator)  // Mediator 2
-        .routed_by(did_doc_alice_mediator); // Mediator 1
+        .routed_by(did_doc_alice_mediator)
+        .seal(b"key_goes_here"); // Mediator 1
     //Assert recieve and unpack
 
     // Mediator 1 received
