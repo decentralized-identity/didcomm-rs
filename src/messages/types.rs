@@ -1,4 +1,4 @@
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageType {
     #[serde(rename = "forward")]
     Forward,
@@ -14,4 +14,6 @@ pub enum MessageType {
     ZipArchive,
     #[serde(rename = "application/octet-stream")]
     BinaryData,
+    #[serde(rename = "didcomm/unknown")]
+    DidcommUnknown,
 }

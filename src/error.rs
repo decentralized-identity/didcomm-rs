@@ -17,5 +17,7 @@ pub enum Error {
     #[error(transparent)]
     StringConversionError(#[from] std::string::FromUtf8Error),
     #[error(transparent)]
+    SystemTimeError(#[from] std::time::SystemTimeError),
+    #[error(transparent)]
     Other(Box<dyn std::error::Error>),
 }

@@ -3,7 +3,7 @@ use serde::{
     Serialize,
     Deserialize
 };
-use biscuit::{Base64Url,
+use biscuit::{
     ClaimsSet,
     CompactJson,
     Empty,
@@ -26,7 +26,11 @@ use biscuit::{Base64Url,
     }
 };
 use ring::signature::KeyPair;
-use super::prior_claims::PriorClaims;
+use super::{
+    headers::Headers,
+    types::MessageType,
+    prior_claims::PriorClaims,
+    };
 use crate::Error;
 
 /// DIDComm message structure.
@@ -46,7 +50,7 @@ impl Message {
         Message {
             headers: Headers {
                 id: Headers::gen_random_id(),
-                m_type: String::default(),
+                m_type: MessageType::DidcommUnknown,
                 to: vec!(String::default()),
                 from: String::default(),
                 created_time: None,
@@ -60,11 +64,11 @@ impl Message {
     /// Exposed for explicit checks on sdk level.
     ///
     pub fn is_rotation(&self) -> bool {
-        self.headers.from_prior.is_some()
+        self.headers.from_prior().is_some()
     }
     pub fn get_prior(&self) -> Result<ClaimsSet<PriorClaims>, Error> {
         if self.is_rotation() {
-            let claim_set = self.headers.from_prior.clone().unwrap();
+            let claim_set = self.headers.from_prior().clone().unwrap();
             Ok(ClaimsSet {
                 ..claim_set
             })
@@ -244,21 +248,53 @@ impl Message {
 
         Ok(true)
     }
-
-    pub fn seal(self) -> Result<String, Error> {
-        todo!()
-        // Ok(String::from_utf8(self.pack_compact_jwe(key)?)?)
+    /// Seals self and returns ready to send JWE
+    ///
+    /// # Parameters
+    ///
+    /// `ek` - encryption key for inner message payload JWE encryption
+    /// TODO: Add example[s]
+    pub fn seal(self, ek: Vec<u8>) -> Result<String, Error> {
+        self.pack_compact_jwe(&ek)
     }
     /// Wrap self to be mediated by some mediator.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
-    pub fn routed_by(self, ek: Vec<u8>) -> Self {
-        Message::new()
-        self
+    ///
+    /// # Parameters
+    ///
+    /// `ek` - encryption key for inner message payload JWE encryption
+    ///
+    /// `to` - list of destination recepients. can be empty (Optional) `String::default()`
+    ///
+    /// `form` - sender identifyer `String`
+    ///
+    /// `expires_time` - `Option<usize>` seconds from the UTC Epoch seconds,
+    ///     signals when the message is no longer valid, and is to be used by
+    ///     the recipient to discard expired messages on receipt
+    /// TODO: Add example[s]
+    pub fn routed_by(self,
+        ek: Vec<u8>,
+        to: Vec<String>,
+        from: String,
+        expires_time: Option<usize>)
+        -> Result<Self, Error> {
+        let payload = self.pack_compact_jwe(&ek)?;
+        let forward_headers = Headers::forward(to, from, expires_time);
+        let mut packed = Message::new();
+        packed.headers = forward_headers?;
+        packed.body = payload.as_bytes().to_vec();
+        Ok(packed)
     }
-
+    /// Unseals sealed message and returns raw instance af the Message
+    ///
+    /// # Parameters
+    ///
+    /// `jwm` - `String` of Message sealed with `.seal()` method
+    ///
+    /// `pk` - encryption key for JWE decryption
+    /// TODO: Add example[s]
     pub fn receive(jwm: String, pk: Vec<u8>) -> Result<Self, Error> {
-        // todo!()
         Ok(Message::from_compact_jwe(jwm, &pk)?)
     }
 
@@ -266,28 +302,6 @@ impl Message {
 
 // Required to be `Compact` serializable by biscuit crate
 impl CompactJson for Message {}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Headers {
-    pub id: usize,
-    #[serde(rename = "type")]
-    pub m_type: String,
-    pub to: Vec<String>,
-    pub from: String,
-    pub created_time: Option<usize>,
-    pub expires_time: Option<usize>,
-    /// A JWT, with sub: new DID and iss: prior DID, 
-    /// with a signature from a key authorized by prior DID.
-    from_prior: Option<ClaimsSet<PriorClaims>>,
-}
-
-impl Headers {
-    /// Generates random `id`
-    ///
-    pub fn gen_random_id() -> usize {
-            rand::thread_rng().gen()
-    }
-}
 
 #[cfg(test)]
 mod crypto_tests {
@@ -330,7 +344,7 @@ mod crypto_tests {
         let id = m.headers.id;
 
         // Act and Assert
-        let crypted = m.send(my_crypter, key);
+        let crypted = m.send_raw(my_crypter, key);
         assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, key);
         assert!(&raw_m.is_ok()); // Decryption check
