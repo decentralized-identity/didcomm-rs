@@ -19,6 +19,18 @@ pub struct Headers {
 }
 
 impl Headers {
+    /// Constructor function with ~default values.
+    pub fn new() -> Self {
+        Headers {
+            id: Headers::gen_random_id(),
+            m_type: MessageType::DidcommUnknown,
+            to: vec!(String::default()),
+            from: String::default(),
+            created_time: None,
+            expires_time: None,
+            from_prior: None,
+        }
+    }
     /// Generates random `id`
     /// TODO: Should this be public?
     pub fn gen_random_id() -> usize {

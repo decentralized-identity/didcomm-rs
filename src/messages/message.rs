@@ -25,10 +25,8 @@ use biscuit::{
         RegisteredHeader,
     }
 };
-use ring::signature::KeyPair;
 use super::{
     headers::Headers,
-    types::MessageType,
     prior_claims::PriorClaims,
     };
 use crate::Error;
@@ -48,15 +46,7 @@ impl Message {
     ///
     pub fn new() -> Self {
         Message {
-            headers: Headers {
-                id: Headers::gen_random_id(),
-                m_type: MessageType::DidcommUnknown,
-                to: vec!(String::default()),
-                from: String::default(),
-                created_time: None,
-                expires_time: None,
-                from_prior: None,
-            },
+            headers: Headers::new(),
             body: vec!(),
         }
     }
@@ -81,69 +71,6 @@ impl Message {
     }
     pub fn get_body(&self) -> &Vec<u8> {
         &self.body
-    }
-    /// Encrypts current message by consuming it.
-    /// Uses provided cryptography function to perform
-    ///     the encryption. Agnostic of actual algorythm used.
-    /// Consuming is to make sure no changes are
-    ///     possible post packaging / sending.
-    /// Returns `Vec<u8>` to be sent to receiver.
-    ///
-    fn send_raw(self, crypter: fn(&[u8], &[u8]) -> Vec<u8>, receiver_pk: &[u8])
-        -> Result<Vec<u8>, Error> {
-            Ok(crypter(receiver_pk, serde_json::to_string(&self)?.as_bytes()))
-    }
-    /// Decrypts received cypher into instance of `Message`.
-    /// Received message should be encrypted with our pub key.
-    /// Returns `Ok(Message)` if decryption / deserialization
-    ///     succeded. `Error` othervice.
-    ///
-    fn receive_raw(
-        received_message: &[u8],
-        decrypter: fn(&[u8], &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>>,
-        our_sk: &[u8]) 
-            -> Result<Self, Error> {
-        if let Ok(raw_message_bytes) = decrypter(our_sk, received_message)
-            .map_err(|e| Error::Other(e)) {
-                return Ok(serde_json::from_slice(&raw_message_bytes)?);
-            }
-        Err(Error::PlugCryptoFailure)
-    }
-    /// Encrypts current message by consuming it.
-    /// Uses provided cryptography function to perform
-    ///     the asymmentric encryption. Agnostic of actual algorythm used.
-    /// Consuming is to make sure no changes are
-    ///     possible post packaging / sending.
-    /// Returns `Vec<u8>` to be sent to receiver.
-    ///
-    fn send_asymm(
-        self,
-        crypter: fn(plaintext: &[u8], nonce: &[u8], their_pk: &[u8], our_sk: &[u8])
-            -> Result<Vec<u8>, Box<dyn std::error::Error>>,
-        nonce: &[u8],
-        their_pk: &[u8],
-        our_sk: &[u8]
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        crypter(&serde_json::to_string(&self)?.as_bytes(), nonce, their_pk, our_sk)
-    }
-    /// Decrypts received cypher into instance of `Message`.
-    /// Asymmetric crypto algorythm is expected.
-    /// Returns `Ok(Message)` if decryption / deserialization
-    ///     succeded. `Error` othervice.
-    ///
-    fn receive_asymm(
-        received_message: &[u8],
-        decrypter: fn(received_message: &[u8], nonce: &[u8], our_pk: &[u8], their_sk: &[u8])
-            -> Result<Vec<u8>, Box<dyn std::error::Error>>,
-        nonce: &[u8],
-        our_pk: &[u8],
-        their_sk: &[u8]
-    ) -> Result<Self, Error> {
-        if let Ok(raw_message_bytes) = decrypter(received_message, nonce, our_pk, their_sk)
-            .map_err(|e| Error::Other(e)) {
-                return Ok(serde_json::from_slice(&raw_message_bytes)?);
-            }
-        Err(Error::PlugCryptoFailure)
     }
     /// Packs the message into compact JWE with AES GCM encryption.
     /// Only 256 bit keys are supported.
@@ -176,8 +103,9 @@ impl Message {
     /// Only 256 bit keys are supported.
     /// Results into `Message` or propagates underlying `Error`
     ///
-    fn from_compact_jwe(payload: String, key: &[u8]) -> Result<Self, Error> {
-        let encrypted: Compact<Vec<u8>, Empty> = serde_json::from_str(&payload)?;
+    /// FIXME: Use Compact::decode() instead of serde
+    fn from_compact_jwe(payload: &str, key: &[u8]) -> Result<Self, Error> {
+        let encrypted: Compact<Vec<u8>, Empty> = serde_json::from_str(payload)?;
         let key: JWK<Empty> = JWK::new_octet_key(key, Default::default());
         let mut decrypted = encrypted.decrypt(
             &key,
@@ -191,16 +119,15 @@ impl Message {
     /// Algorythm used - ES256
     ///
     fn sign_compact_jws(&self, key: &Secret) -> Result<String, Error> {
-        let pack = |secret: &Secret, bytes: &[u8]| -> Result<String, Error> { // TODO: jwk must be implemented
-
-            let claims = ClaimsSet::<Headers> {
+        let pack = |secret: Secret| -> Result<String, Error> { // TODO: jwk must be implemented
+            let claims = ClaimsSet::<Message> {
                 registered: RegisteredClaims {
                     issuer: Some("http://jolocom.com".to_string()),
                     subject: Some("Did goes here?".to_string()),
                     audience: Some(SingleOrMultiple::Single("Target did can be here".to_string())),
                     ..Default::default()
                 },
-                private: self.headers.clone()
+                private: self.clone()
             };
 
             Ok(JWT::new_decoded(From::from(
@@ -209,26 +136,21 @@ impl Message {
                     ..Default::default()
                 }),
                 claims)
-                .into_encoded(secret)?
+                .into_encoded(&secret)?
                 .unwrap_encoded()
                 .to_string())
         };
         match key {
-            Secret::None => Err(Error::Generic("Empty key is not supported".into())),
             Secret::Bytes(i) => {
-                let secret = Secret::Bytes(i.to_vec());
-                pack(&secret, &i)
+                pack(Secret::Bytes(i.to_vec()))
             }
             Secret::RsaKeyPair(kp) => {
-                let pk = kp.public_key().as_ref();
-                let inner = Secret::RsaKeyPair(kp.clone());
-                pack(&inner, pk)
+                pack(Secret::RsaKeyPair(kp.clone()))
             },
             Secret::EcdsaKeyPair(ekp) => {
-                let pk = ekp.public_key().as_ref();
-                let inner = Secret::EcdsaKeyPair(ekp.clone());
-                pack(&inner, pk)
+                pack(Secret::EcdsaKeyPair(ekp.clone()))
             },
+            Secret::None => Err(Error::Generic("Empty key is not supported".into())),
             // Secret::PublicKey(b) => {},
             _ => Err(Error::Generic("Unsupported JWS option!".into()))
         }
@@ -238,8 +160,13 @@ impl Message {
     /// Returns `Ok(bool)` of validation and `Error` propagation
     ///     if input was not proper `Compact`
     ///
-    fn validate_compact_jws(jws: &str, key: &Secret, out: &mut Headers) -> Result<bool, Error> {
-        let token: CompactJws<ClaimsSet<Headers>, Empty> = JWT::<_, biscuit::Empty>::new_encoded(jws);
+    /// WARNING: This method validates JWS ONLY!
+    ///     To fully comply with DIDComm specifications additional validation of key
+    /// used for signing is allowed to do so in the Document resolved form DID in the
+    /// `from` attribute!
+    ///
+    fn validate_compact_jws(jws: &str, key: &Secret, out: &mut Self) -> Result<bool, Error> {
+        let token: CompactJws<ClaimsSet<Self>, Empty> = JWT::<Self, biscuit::Empty>::new_encoded(jws);
 
         *out = token.into_decoded(key, SignatureAlgorithm::ES256)?
             .unwrap_decoded()
@@ -266,11 +193,10 @@ impl Message {
     ///
     /// `sk` - signing key for enveloped message JWS encryption
     /// TODO: Adde example[s]
-    pub fn seal_signed(self, ek: Vec<u8>, sk: Vec<u8>) -> Result<String, Error> {
-        let signing_secret = Secret::Bytes(sk);
+    pub fn seal_signed(self, ek: Vec<u8>, sk: &Secret) -> Result<String, Error> {
         let mut crypto_envelope = Message {
             headers: Headers::encrypt_jws(self.headers.clone())?,
-            body: self.sign_compact_jws(&signing_secret)?.as_bytes().to_vec()
+            body: self.sign_compact_jws(&sk)?.as_bytes().to_vec()
         };
         crypto_envelope.pack_compact_jwe(&ek)
     }
@@ -311,7 +237,7 @@ impl Message {
     ///
     /// `pk` - encryption key for JWE decryption
     /// TODO: Add example[s]
-    pub fn receive(jwm: String, pk: Vec<u8>) -> Result<Self, Error> {
+    pub fn receive(jwm: &str, pk: Vec<u8>) -> Result<Self, Error> {
         // match Message::parse_type(jwm)? {
         //     Ok(MessageType::Jwe) => {},
         //     Ok(MessageType::Jws) => {},
@@ -321,7 +247,12 @@ impl Message {
         // }
         Message::from_compact_jwe(jwm, &pk)
     }
+}
 
+impl Into<Message> for &ClaimsSet<Message> {
+    fn into(self) -> Message {
+        self.private.to_owned()
+    }
 }
 
 // Required to be `Compact` serializable by biscuit crate
@@ -333,155 +264,8 @@ mod crypto_tests {
     extern crate sodiumoxide;
     extern crate x25519_dalek;
 
-    use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
-    use chacha20poly1305::aead::{Aead, NewAead};
-    use sodiumoxide::crypto::{
-        secretbox,
-        box_
-    };
-    use rand_core::OsRng;
-    use x25519_dalek::{
-        EphemeralSecret,
-        PublicKey,
-    };
     use crate::Error;
     use super::*;
-
-    #[test]
-    #[allow(non_snake_case)]
-    fn plugin_crypto_xChaCha20Paly1305_dummy_key() {
-        // Arrange
-        let key = Key::from_slice(b"an example very very secret key.");
-        // Plugable encryptor function to encrypt data
-        let my_crypter = |k: &[u8], m: &[u8]| -> Vec<u8> {
-            let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
-            aead.encrypt(nonce, m).expect("encryption failure!")
-        };
-        // Plugable decryptor function to decrypt data
-        let my_decrypter = |k: &[u8], m: &[u8]| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-            let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
-            Ok(aead.decrypt(nonce, m).unwrap())
-        };
-        let m = Message::new();
-        let id = m.headers.id;
-
-        // Act and Assert
-        let crypted = m.send_raw(my_crypter, key);
-        assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, key);
-        assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
-    }
-
-    #[test]
-    fn plugin_crypto_libsodium_box() {
-        // Arrange
-        // Plugable encryptor function to encrypt data
-        let my_crypter = |k: &[u8], m: &[u8]|
-            -> Vec<u8> {
-            let nonce = secretbox::Nonce::from_slice(b"extra long unique nonce!").unwrap();
-            secretbox::seal(m, &nonce, &secretbox::Key::from_slice( k).unwrap())
-        };
-        // Plugable decryptor function to decrypt data
-        let my_decrypter = |k: &[u8], m: &[u8]|
-            -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-            let nonce = secretbox::Nonce::from_slice(b"extra long unique nonce!").unwrap();
-            secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap())
-                .map_err(|_| Error::PlugCryptoFailure.into())
-        };
-        let m = Message::new();
-        let id = m.headers.id;
-        let key = secretbox::gen_key();
-
-        // Act and Assert
-        let crypted = m.send(my_crypter, &key.as_ref());
-        assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive(&crypted.unwrap(), my_decrypter, &key.as_ref());
-        assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
-    }
-
-    #[test]
-    fn plugin_crypto_asymm_libsodium_box() {
-        // Arrange
-        let (sender_pk, sender_sk) = box_::gen_keypair();
-        let (receiver_pk, receiver_sk) = box_::gen_keypair();
-        // Plugable encryptor function to encrypt data
-        let nonce = box_::Nonce::from_slice(b"extra long unique nonce!").unwrap();
-        let my_crypter = |m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
-            -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-            Ok(box_::seal(m,
-                &box_::Nonce::from_slice(n).unwrap(),
-                &box_::PublicKey::from_slice(pk).unwrap(),
-                &box_::SecretKey::from_slice(sk).unwrap())
-            )
-        };
-        // Plugable decryptor function to decrypt data
-        let my_decrypter = |m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
-            -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-            Ok(box_::open(m,
-                &box_::Nonce::from_slice(n).unwrap(),
-                &box_::PublicKey::from_slice(pk).unwrap(),
-                &box_::SecretKey::from_slice(sk).unwrap())
-                .map_err(|_| Error::PlugCryptoFailure)?)
-        };
-        let m = Message::new();
-        let id = m.headers.id;
-
-        // Act and Assert
-        let crypted =
-            m.send_asymm(my_crypter,
-            &nonce.as_ref(),
-            &receiver_pk.as_ref(),
-            &sender_sk.as_ref()
-        );
-        assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive_asymm(
-            &crypted.unwrap(),
-            my_decrypter,
-            &nonce.as_ref(),
-            &sender_pk.as_ref(),
-            &receiver_sk.as_ref());
-        assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id);
-    }
-
-    #[test]
-    #[allow(non_snake_case)]
-    fn plugin_crypto_xChaCha20Paly1305_x25519_dalek_shared_secret() {
-        // Arrange
-        let sender_sk = EphemeralSecret::new(OsRng);
-        let sender_pk = PublicKey::from(&sender_sk);
-        let receiver_sk = EphemeralSecret::new(OsRng);
-        let receiver_pk = PublicKey::from(&receiver_sk);
-        let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
-        let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
-        let m = Message::new();
-        let id = m.headers.id;
-        // Plugable encryptor function to encrypt data
-        let my_crypter = |k: &[u8], m: &[u8]| -> Vec<u8> {
-            let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
-            aead.encrypt(nonce, m).expect("encryption failure!")
-        };
-        // Plugable decryptor function to decrypt data
-        let my_decrypter = |k: &[u8], m: &[u8]|
-            -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-            let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
-            Ok(aead.decrypt(nonce, m).unwrap())
-        };
-
-        // Act and Assert
-        let crypted = m.send(my_crypter, sender_shared.as_bytes());
-        assert!(&crypted.is_ok()); // Encryption check
-        let raw_m =
-            Message::receive(&crypted.unwrap(), my_decrypter, receiver_shared.as_bytes());
-        assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
-    }
 
     #[test]
     fn jwe_aes_gcm() -> Result<(), Error> {
@@ -493,7 +277,7 @@ mod crypto_tests {
         // Act
         let key = key.octet_key()?;
         let encrypted = m.pack_compact_jwe(key)?;
-        let decrypted = Message::from_compact_jwe(encrypted, key)?;
+        let decrypted = Message::from_compact_jwe(&encrypted, key)?;
         // Assert
         assert_eq!(payload.to_vec(), decrypted.body);
         Ok(())
@@ -512,8 +296,31 @@ mod crypto_tests {
         let signed = m.sign_compact_jws(&pk)?;
         // Assert
         let mut second_m = Message::new();
-        assert!(Message::validate_compact_jws(&signed, &pk, &mut second_m.headers)?);
+        assert!(Message::validate_compact_jws(&signed, &pk, &mut second_m)?);
         assert_eq!(m.headers.from, second_m.headers.from);
+        Ok(())
+    }
+
+    #[test]
+    fn jwe_of_jws_unwrapping_es256() -> Result<(), Error> {
+        // Arrange
+        use biscuit::JWT;
+        use biscuit::jwa::*;
+        
+        let mut m = Message::new();
+        let data = b"super secret message";
+        m.body = data.to_vec();
+        let pk = Secret::ecdsa_keypair_from_file(SignatureAlgorithm::ES256, "test_resources/ecdsa_private_key.p8")?;
+        // Act
+        let ready_to_send = m.sign_compact_jws(&pk)?;//seal_signed(ek.octet_key()?.to_vec(), &pk)?;
+        let decoded: JWT<Message, biscuit::Empty> = JWT::new_encoded(&ready_to_send);
+        let decoded = decoded.into_decoded(&pk, SignatureAlgorithm::ES256)?;
+        let mut from_signed_jws = Message::new();
+        // let headers = decoded.header()?;
+        let payload: Message = decoded.payload()?.into();
+        // Assert
+        assert_eq!("super secret message", std::str::from_utf8(&payload.body).unwrap());
+        assert!(Message::validate_compact_jws(&ready_to_send, &pk, &mut from_signed_jws)?);
         Ok(())
     }
 }
