@@ -1,11 +1,10 @@
 use rand::Rng;
-use biscuit::ClaimsSet;
 use std::time::SystemTime;
 use crate::Error;
 use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Headers {
+pub struct DidcommHeader {
     pub id: usize,
     #[serde(rename = "type")]
     pub m_type: MessageType,
@@ -15,14 +14,14 @@ pub struct Headers {
     pub expires_time: Option<usize>,
     /// A JWT, with sub: new DID and iss: prior DID, 
     /// with a signature from a key authorized by prior DID.
-    from_prior: Option<ClaimsSet<PriorClaims>>,
+    from_prior: Option<PriorClaims>,
 }
 
-impl Headers {
+impl DidcommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
-        Headers {
-            id: Headers::gen_random_id(),
+        DidcommHeader {
+            id: DidcommHeader::gen_random_id(),
             m_type: MessageType::DidcommUnknown,
             to: vec!(String::default()),
             from: String::default(),
@@ -38,13 +37,13 @@ impl Headers {
     }
     /// Getter method for `from_prior` retreival
     ///
-    pub fn from_prior(&self) -> &Option<ClaimsSet<PriorClaims>> {
+    pub fn from_prior(&self) -> &Option<PriorClaims> {
         &self.from_prior
     }
     /// Creates set of DIDComm related headers with the static forward type
     ///
     pub fn forward(to: Vec<String>, from: String, expires_time: Option<usize>) -> Result<Self, Error> {
-        Ok(Headers {
+        Ok(DidcommHeader {
             id: rand::thread_rng().gen(),
             m_type: MessageType::Forward,
             to,
@@ -54,15 +53,46 @@ impl Headers {
             from_prior: None,
         })
     }
+}
+
+/// JWM Header as specifiead in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
+/// With single deviation - allows raw text JWM to support DIDComm spec
+///
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct JwmHeader {
+    typ: String,
+    // Some(String) if JWM is JWE encrypted.
+    enc: Option<String>,
+    // None if raw text message, Some(key ID) otherwise.
+    kid: Option<String>,
+    // None if raw text message, Some(String) for
+    //  both JWE and/or JWS.
+    alg: Option<String>,
+    // Some(String) - serialized ephemeral public key.
+    // TODO: implement proper struct for it:
+    // https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+    epk: Option<String>,
+}
+
+impl JwmHeader {
     /// Creates set of DIDComm related headers for the JWE envelope over JWS
-    ///
-    pub fn encrypt_jws(wrapped: Headers)
-        -> Result<Self, Error> {
-        Ok(Headers {
-            id: rand::thread_rng().gen(),
-            m_type: MessageType::DidcommJwe,
-            created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as usize),
-            ..wrapped
+    /// TODO: complete implementation
+    pub fn as_jws() -> Result<Self, Error> {
+        Ok(JwmHeader {
+            enc: Some("A256GCM".into()),
+            kid: Some("".into()),
+            epk: Some("".into()),
+            alg: Some("ECDH-ES+A256KW".into()),
+            ..Default::default()
         })
+    }
+}
+
+impl Default for JwmHeader {
+    fn default() -> Self {
+        JwmHeader {
+            typ: "JWM".into(),
+            ..Default::default()
+        }
     }
 }

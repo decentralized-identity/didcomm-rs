@@ -1,3 +1,6 @@
+use crate::error::Error;
+use super::Message;
+
 #[cfg(feature = "raw-crypto")]
 impl Message {
     /// Encrypts current message by consuming it.
@@ -65,7 +68,7 @@ impl Message {
     }
 }
 
-#[cfg(test, feature = "raw-crypto")] 
+#[cfg(test)] 
 mod raw_tests {
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
@@ -77,6 +80,10 @@ mod raw_tests {
     use x25519_dalek::{
         EphemeralSecret,
         PublicKey,
+    };
+    use super::{
+        Message,
+        Error,
     };
     
     #[test]
@@ -98,14 +105,14 @@ mod raw_tests {
             Ok(aead.decrypt(nonce, m).unwrap())
         };
         let m = Message::new();
-        let id = m.headers.id;
+        let id = m.get_headers().id;
 
         // Act and Assert
         let crypted = m.send_raw(my_crypter, key);
         assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive_raw(&crypted.unwrap(), my_decrypter, key);
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().get_headers().id); // Data consistancy check
     }
 
     #[test]
@@ -126,7 +133,7 @@ mod raw_tests {
                 .map_err(|_| Error::PlugCryptoFailure.into())
         };
         let m = Message::new();
-        let id = m.headers.id;
+        let id = m.get_headers().id;
         let key = secretbox::gen_key();
 
         // Act and Assert
@@ -134,7 +141,7 @@ mod raw_tests {
         assert!(&crypted.is_ok()); // Encryption check
         let raw_m = Message::receive_raw(&crypted.unwrap(), my_decrypter, &key.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().get_headers().id); // Data consistancy check
     }
 
     #[test]
@@ -163,7 +170,7 @@ mod raw_tests {
                 .map_err(|_| Error::PlugCryptoFailure)?)
         };
         let m = Message::new();
-        let id = m.headers.id;
+        let id = m.get_headers().id;
 
         // Act and Assert
         let crypted =
@@ -180,7 +187,7 @@ mod raw_tests {
             &sender_pk.as_ref(),
             &receiver_sk.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id);
+        assert_eq!(id, raw_m.unwrap().get_headers().id);
     }
 
     #[test]
@@ -195,7 +202,7 @@ mod raw_tests {
         let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
         let m = Message::new();
-        let id = m.headers.id;
+        let id = m.get_headers().id;
         // Plugable encryptor function to encrypt data
         let my_crypter = |k: &[u8], m: &[u8]| -> Vec<u8> {
             let aead = XChaCha20Poly1305::new(k.into());
@@ -216,7 +223,7 @@ mod raw_tests {
         let raw_m =
             Message::receive_raw(&crypted.unwrap(), my_decrypter, receiver_shared.as_bytes());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().headers.id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().get_headers().id); // Data consistancy check
     }
 }
 
