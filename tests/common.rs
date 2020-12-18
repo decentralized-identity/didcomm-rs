@@ -16,7 +16,6 @@ pub use did_doc::{
 };
 pub use std::str::FromStr;
 
-
 #[allow(dead_code)]
 pub mod sample_dids {
 pub const TEST_DID_SIGN_1: &str = r#"{

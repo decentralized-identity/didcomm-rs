@@ -72,20 +72,9 @@ pub struct JwmHeader {
     // TODO: implement proper struct for it:
     // https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
     epk: Option<String>,
-}
-
-impl JwmHeader {
-    /// Creates set of DIDComm related headers for the JWE envelope over JWS
-    /// TODO: complete implementation
-    pub fn as_jws() -> Result<Self, Error> {
-        Ok(JwmHeader {
-            enc: Some("A256GCM".into()),
-            kid: Some("".into()),
-            epk: Some("".into()),
-            alg: Some("ECDH-ES+A256KW".into()),
-            ..Default::default()
-        })
-    }
+    // Some("JWM") should be used if nested JWS inside JWE.
+    // None otherwise is *STRONGLY RECOMMENDED* by RFC.
+    cty: Option<String>,
 }
 
 impl Default for JwmHeader {

@@ -12,6 +12,7 @@ pub enum Error {
     SerdeError(#[from] serde_json::Error),
     #[error(transparent)]
     RegexError(#[from] regex::Error),
+    #[cfg(feature = "jose-biscuit")]
     #[error(transparent)]
     BisquitError(#[from] biscuit::errors::Error),
     #[error(transparent)]

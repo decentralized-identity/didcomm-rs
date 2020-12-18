@@ -62,6 +62,39 @@ impl Message {
     pub fn get_body(&self) -> &Vec<u8> {
         &self.body
     }
+    /// Creates set of Jwm related headers for the JWE
+    /// Modifies JWM related header portion to match
+    ///     encryption implementation and leaves other
+    ///     parts unchanged.
+    /// TODO: complete implementation
+    pub fn as_jws(self) -> Self {
+        Self { 
+            jwm_header: JwmHeader {
+                enc: Some("A256GCM".into()),
+                kid: Some("".into()),
+                epk: Some("".into()),
+                alg: Some("ECDH-ES+A256KW".into()),
+                ..self.jwm_header
+            },
+            ..self
+        }
+    }
+    /// Creates set of Jwm related headers for the JWS
+    /// Modifies JWM related header portion to match
+    ///     signature implementation and leaves Other
+    ///     parts unchanged.
+    /// TODO: complete implementation
+    pub fn as_jwe(self) -> Self {
+        Self {
+            jwm_header: JwmHeader {
+                enc: None,
+                kid: Some("".into()),
+                alg: Some("ES256".into()),
+                ..self.jwm_header
+            },
+            ..self
+        }
+    }
     /// Seals self and returns ready to send JWE
     ///
     /// # Parameters
