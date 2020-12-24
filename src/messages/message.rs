@@ -65,17 +65,10 @@ impl Message {
     /// Creates set of Jwm related headers for the JWE
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
-    ///     parts unchanged.
-    /// TODO: complete implementation
+    ///     parts unchanged.  TODO + FIXME: complete implementation
     pub fn as_jws(self) -> Self {
         Self { 
-            jwm_header: JwmHeader {
-                enc: Some("A256GCM".into()),
-                kid: Some("".into()),
-                epk: Some("".into()),
-                alg: Some("ECDH-ES+A256KW".into()),
-                ..self.jwm_header
-            },
+            jwm_header: self.jwm_header.as_a256_gcm(None, None), 
             ..self
         }
     }
@@ -83,15 +76,10 @@ impl Message {
     /// Modifies JWM related header portion to match
     ///     signature implementation and leaves Other
     ///     parts unchanged.
-    /// TODO: complete implementation
+    /// TODO + FIXME: complete implementation
     pub fn as_jwe(self) -> Self {
         Self {
-            jwm_header: JwmHeader {
-                enc: None,
-                kid: Some("".into()),
-                alg: Some("ES256".into()),
-                ..self.jwm_header
-            },
+            jwm_header: self.jwm_header.as_es256(None, None),
             ..self
         }
     }
@@ -102,7 +90,7 @@ impl Message {
     /// `ek` - encryption key for inner message payload JWE encryption
     /// TODO: Add example[s]
     pub fn seal(self, ek: Vec<u8>) -> Result<String, Error> {
-        self.pack_compact_jwe(&ek)
+        todo!()
     }
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
@@ -113,12 +101,13 @@ impl Message {
     ///
     /// `sk` - signing key for enveloped message JWS encryption
     /// TODO: Adde example[s]
-    pub fn seal_signed(self, ek: Vec<u8>, sk: &Secret) -> Result<String, Error> {
-        let mut crypto_envelope = Message {
-            headers: Headers::encrypt_jws(self.headers.clone())?,
-            body: self.sign_compact_jws(&sk)?.as_bytes().to_vec()
-        };
-        crypto_envelope.pack_compact_jwe(&ek)
+    pub fn seal_signed(self, ek: &[u8], sk: &[u8]) -> Result<String, Error> {
+        todo!()
+        //let mut crypto_envelope = Message {
+        //    headers: Headers::encrypt_jws(self.headers.clone())?,
+        //    body: self.sign_compact_jws(&sk)?.as_bytes().to_vec()
+        //};
+        //crypto_envelope.pack_compact_jwe(&ek)
     }
     /// Wrap self to be mediated by some mediator.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
@@ -142,12 +131,67 @@ impl Message {
         from: String,
         expires_time: Option<usize>)
         -> Result<Self, Error> {
-        let payload = self.pack_compact_jwe(&ek)?;
-        let forward_headers = DidcommHeader::forward(to, from, expires_time)?;
-        let mut packed = Message::new();
-        packed.headers = forward_headers;
-        packed.body = payload.as_bytes().to_vec();
-        Ok(packed)
+            todo!()
+       // let payload = self.pack_compact_jwe(&ek)?;
+       // let forward_headers = DidcommHeader::forward(to, from, expires_time)?;
+       // let mut packed = Message::new();
+       // packed.headers = forward_headers;
+       // packed.body = payload.as_bytes().to_vec();
+       // Ok(packed)
+    }
+}
+
+/// Associated functions implementations.
+impl Message {
+    pub fn get_iv(received: &[u8]) -> Result<Vec<u8>, Error> {
+        // parse from compact
+        let as_str = String::from_utf8(received.to_vec())?;
+        let json: serde_json::Value =
+            if let Some(header_end) = as_str.find('.') {
+                    serde_json::from_str(&String::from_utf8(base64_url::decode(&as_str[..header_end])?)?)?
+            } else {
+                serde_json::from_str(&as_str)?
+            };
+        if let Some(iv) = json.get("iv") {
+            if let Some(t) = iv.as_str() {
+                let bytes = base64_url::decode(t)?; 
+                if bytes.len() != 24usize {
+                    Err(Error::Generic(format!("wrong nonce (iv) size: {}", bytes.len())))
+                } else {
+                    Ok(bytes)
+                }
+            } else { Err(Error::Other("wrong nonce format".into())) }
+        } else {
+            Err(Error::Generic("failed to parse iv from JOSE header".into()))
+        }
+    }
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::*;
+    use crate::Error;
+
+    #[test]
+    fn iv_from_json_test() -> Result<(), Error> {
+        // Arrange
+        let h = JwmHeader::default();
+        // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+        let raw_json = r#" { "protected": "eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiLU5oN1NoUkJfeGFDQlpSZElpVkN1bDNTb1IwWXc0VEdFUXFxR2lqMXZKcyIsInkiOiI5dEx4ODFQTWZRa3JPdzh5dUkyWXdJMG83TXROemFDR2ZDQmJaQlc1WXJNIn19",
+                "recipients": [
+                  {
+                    "encrypted_key": "J1Fs9JaDjOT_5481ORQWfEZmHy7OjE3pTNKccnK7hlqjxbPalQWWLg"
+                  }
+                ],
+                "iv": "u5kIzo0m_d2PjI4mu5kIzo0m_d2PjI4m",
+                "ciphertext": "qGuFFoHy7HBmkf2BaY6eREwzEjn6O_FnRoXj2H-DAXo1PgQdfON-_1QbxtnT8e8z_M6Gown7s8fLtYNmIHAuixqFQnSA4fdMcMSi02z1MYEn2JC-1EkVbWr4TqQgFP1EyymB6XjCWDiwTYd2xpKoUshu8WW601HLSgFIRUG3-cK_ZSdFaoWosIgAH5EQ2ayJkRB_7dXuo9Bi1MK6TYGZKezc6rpCK_VRSnLXhFwa1C3T0QBes",
+                "tag": "doeAoagwJe9BwKayfcduiw"
+            }"#;
+        // Act
+        let iv = Message::get_iv(raw_json.as_bytes())?;
+        println!("{:?}", iv);
+        // Assert
+        Ok(())
     }
 }
 
@@ -157,7 +201,7 @@ mod crypto_tests {
     extern crate sodiumoxide;
     extern crate x25519_dalek;
 
-    use crate::Error;
-    use super::*;
+   // use crate::Error;
+   // use super::*;
 
 }

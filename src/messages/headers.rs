@@ -1,5 +1,5 @@
-use rand::Rng;
-use std::time::SystemTime;
+use rand::{Rng, thread_rng};
+use std::{time::SystemTime, vec};
 use crate::Error;
 use super::{MessageType, PriorClaims};
 
@@ -57,6 +57,8 @@ impl DidcommHeader {
 
 /// JWM Header as specifiead in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
+/// `iv` property is not explicitly listed in the registered properties on the RFC but is present
+///     within example lists - used here as DIDComm crypto nonce sharing property.
 ///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JwmHeader {
@@ -75,13 +77,60 @@ pub struct JwmHeader {
     // Some("JWM") should be used if nested JWS inside JWE.
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
     cty: Option<String>,
+    // Nonce!
+    iv: Vec<u8>,
+}
+
+impl JwmHeader {
+    pub fn get_iv(&self) -> &[u8] {
+        &self.iv
+    }
+    pub fn as_a256_gcm(self, kid: Option<String>, epk: Option<String>) -> Self {
+        JwmHeader {
+           enc: Some("A256GCM".into()),
+           kid,
+           epk,
+           alg: Some("ECDH-ES+A256KW".into()),
+           ..self
+        }
+    }
+    pub fn as_es256(self, kid: Option<String>, alg: Option<String>) -> Self {
+        JwmHeader {
+           enc: None,
+           kid, 
+           alg,
+           ..self
+       }
+    }
 }
 
 impl Default for JwmHeader {
+    // Need to make sure nonce is 192 bytes long unigue for each message.
+    // fill() does not have overload/optimizations for 192 bytes - split in two.
+    //
     fn default() -> Self {
+        let mut a: Vec<u8> = vec![0; 24];
+        for v in &mut a {
+            *v = rand::thread_rng().gen();
+        }
         JwmHeader {
             typ: "JWM".into(),
-            ..Default::default()
+            iv: a,
+            enc: None,
+            kid: None,
+            epk: None,
+            alg: None,
+            cty: None,
         }
     }
+}
+
+#[test]
+fn default_jwm_header_with_random_iv() {
+    // Arrange
+    let not_expected: Vec<u8> = vec![0; 24];
+    // Act
+    let h = JwmHeader::default();
+    // Assert
+    assert_ne!(not_expected, h.iv);
 }

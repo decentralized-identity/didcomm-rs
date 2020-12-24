@@ -25,10 +25,10 @@ impl CryptoModule {
         }
     }
     pub fn encryptor(self) -> SymmetricCypherMethod {
-       match self.alg {
-           CryptoAlgorithm::XC20P(byte_nonce) => {
-               Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
-                    let nonce = XNonce::from_slice(&byte_nonce);
+        match self.alg {
+           CryptoAlgorithm::XC20P => {
+               Box::new(|nonce: &[u8], key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
+                    let nonce = XNonce::from_slice(nonce);
                     let aead = XChaCha20Poly1305::new(key.into());
                     aead.encrypt(nonce, message).map_err(|e| Error::Generic(e.to_string()))
                })
@@ -38,12 +38,12 @@ impl CryptoModule {
            }
        }
     }
-    pub fn decryptor(&self, key: &[u8], message: &[u8]) -> SymmetricCypherMethod {
+    pub fn decryptor(&self) -> SymmetricCypherMethod {
        match self.alg {
-           CryptoAlgorithm::XC20P(byte_nonce) => {
-               Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
+           CryptoAlgorithm::XC20P => {
+               Box::new(|nonce: &[u8], key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
                let aead = XChaCha20Poly1305::new(key.into());
-               let nonce = XNonce::from_slice(&byte_nonce);
+               let nonce = XNonce::from_slice(&nonce);
                aead.decrypt(nonce, message).map_err(|e| Error::Generic(e.to_string()))
                })
            },
@@ -54,10 +54,11 @@ impl CryptoModule {
     }
     pub fn assymetric_encryptor(self) -> AssymetricCyptherMethod {
         match self.alg {
-            CryptoAlgorithm::XC20P(byte_nonce) => {
-                Box::new(|m: &[u8], pk: &[u8], sk: &[u8] -> Result<Vec<u8>, Error> {
-
-                })
+            CryptoAlgorithm::XC20P => {
+//                Box::new(|m: &[u8], pk: &[u8], sk: &[u8]| -> Result<Vec<u8>, Error> {
+//                   todo!() 
+//                })
+                todo!()
             },
             CryptoAlgorithm::A256GCM => {
                 todo!()
@@ -72,7 +73,7 @@ pub enum CryptoKeyType {
 }
 
 pub enum CryptoAlgorithm {
-    XC20P(Vec<u8>),
+    XC20P,
     A256GCM,
 }
 
@@ -85,8 +86,8 @@ mod batteries_tests {
     fn xc20p_test() -> Result<(), Error> {
         // Arrange
         let m = Message::new();
-        let module = CryptoModule::new(CryptoKeyType::X25519, CryptoAlgorithm::XC20P(m.get_didcomm_header().id.to_ne_bytes().to_vec()));
-        let r = m.send_raw(
+        let module = CryptoModule::new(CryptoKeyType::X25519, CryptoAlgorithm::XC20P);
+        let r = m.send_raw(//m.get_didcomm_header().id.to_ne_bytes().to_vec(),
             module.encryptor(),
             b"super duper key"
         )?;

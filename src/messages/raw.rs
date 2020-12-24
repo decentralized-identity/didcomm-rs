@@ -1,7 +1,8 @@
 use crate::error::Error;
 use super::Message;
 
-pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8]) -> Result<Vec<u8>, Error>>;
+// Arguments sequence: Nonce, Key, Message.
+pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
 pub type AssymetricCyptherMethod = Box<dyn Fn(&[u8], &[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
 
 #[cfg(feature = "raw-crypto")]
@@ -15,7 +16,7 @@ impl Message {
     ///
     pub fn send_raw(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
         -> Result<Vec<u8>, Error> {
-            crypter(receiver_pk, serde_json::to_string(&self)?.as_bytes())
+            crypter(&Message::get_jwm_header(&self).get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
@@ -27,7 +28,7 @@ impl Message {
         decrypter: SymmetricCypherMethod,
         our_sk: &[u8]) 
             -> Result<Self, Error> {
-        if let Ok(raw_message_bytes) = decrypter(our_sk, received_message) {
+        if let Ok(raw_message_bytes) = decrypter(&b"".to_vec(), our_sk, received_message) {
             serde_json::from_slice(&raw_message_bytes).map_err(|e| Error::SerdeError(e))
         } else {
             Err(Error::PlugCryptoFailure)
@@ -94,15 +95,15 @@ mod raw_tests {
         // Arrange
         let key = Key::from_slice(b"an example very very secret key.");
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
+            let nonce = XNonce::from_slice(n);
             aead.encrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
+            let nonce = XNonce::from_slice(n);
             Ok(aead.decrypt(nonce, m).unwrap())
         });
         let m = Message::new();
@@ -121,15 +122,15 @@ mod raw_tests {
     fn plugin_crypto_libsodium_box() {
         // Arrange
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|k: &[u8], m: &[u8]|
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
             -> Result<Vec<u8>, Error> {
-            let nonce = secretbox::Nonce::from_slice(b"extra long unique nonce!").unwrap();
+            let nonce = secretbox::Nonce::from_slice(n).unwrap();
             Ok(secretbox::seal(m, &nonce, &secretbox::Key::from_slice( k).unwrap()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|k: &[u8], m: &[u8]|
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
             -> Result<Vec<u8>, Error> {
-            let nonce = secretbox::Nonce::from_slice(b"extra long unique nonce!").unwrap();
+            let nonce = secretbox::Nonce::from_slice(n).unwrap();
             Ok(secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap())
                 .unwrap())
         });
@@ -205,16 +206,16 @@ mod raw_tests {
         let m = Message::new();
         let id = m.get_didcomm_header().id;
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
+            let nonce = XNonce::from_slice(n);
             aead.encrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|k: &[u8], m: &[u8]|
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
             -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
-            let nonce = XNonce::from_slice(b"extra long unique nonce!");
+            let nonce = XNonce::from_slice(n);
             aead.decrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
         });
 
