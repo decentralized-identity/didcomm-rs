@@ -28,7 +28,7 @@ impl Message {
         decrypter: SymmetricCypherMethod,
         our_sk: &[u8]) 
             -> Result<Self, Error> {
-        if let Ok(raw_message_bytes) = decrypter(&b"".to_vec(), our_sk, received_message) {
+        if let Ok(raw_message_bytes) = decrypter(&Message::get_iv(&received_message)?, our_sk, received_message) {
             serde_json::from_slice(&raw_message_bytes).map_err(|e| Error::SerdeError(e))
         } else {
             Err(Error::PlugCryptoFailure)
@@ -205,6 +205,8 @@ mod raw_tests {
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
         let m = Message::new();
         let id = m.get_didcomm_header().id;
+        let iv = m.get_jwm_header().get_iv().clone();
+        println!("got IV: {:?}", &iv);
         // Plugable encryptor function to encrypt data
         let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());

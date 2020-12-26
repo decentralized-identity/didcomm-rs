@@ -143,26 +143,35 @@ impl Message {
 
 /// Associated functions implementations.
 impl Message {
+    /// Parses `iv` value as `Vec<u8>` from public header.
+    /// Both regular JSON and Compact representations are accepted.
+    /// Returns `Error` on failure.
+    /// TODO: Add examples
     pub fn get_iv(received: &[u8]) -> Result<Vec<u8>, Error> {
         // parse from compact
         let as_str = String::from_utf8(received.to_vec())?;
         let json: serde_json::Value =
             if let Some(header_end) = as_str.find('.') {
-                    serde_json::from_str(&String::from_utf8(base64_url::decode(&as_str[..header_end])?)?)?
+                    serde_json::from_str(
+                        &String::from_utf8(
+                            base64_url::decode(&as_str[..header_end])?
+                        )?
+                    )?
             } else {
                 serde_json::from_str(&as_str)?
             };
         if let Some(iv) = json.get("iv") {
             if let Some(t) = iv.as_str() {
-                let bytes = base64_url::decode(t)?; 
-                if bytes.len() != 24usize {
-                    Err(Error::Generic(format!("wrong nonce (iv) size: {}", bytes.len())))
-                } else {
-                    Ok(bytes)
-                }
-            } else { Err(Error::Other("wrong nonce format".into())) }
+            if t.len() != 24 {
+                Err(Error::Generic(format!("IV [nonce] size is incorrect: {}", t.len())))
+            } else {
+                Ok(t.as_bytes().to_vec())
+            }
+            } else { 
+                Err(Error::Generic("wrong nonce format".into()))
+            }
         } else {
-            Err(Error::Generic("failed to parse iv from JOSE header".into()))
+            Err(Error::Generic("iv is not found in JOSE header".into()))
         }
     }
 }
@@ -173,25 +182,36 @@ mod parse_tests {
     use crate::Error;
 
     #[test]
-    fn iv_from_json_test() -> Result<(), Error> {
+    fn iv_from_json_test() {
         // Arrange
-        let h = JwmHeader::default();
         // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+        // Extendet twice to be 192bit (24byte) nonce.
         let raw_json = r#" { "protected": "eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiLU5oN1NoUkJfeGFDQlpSZElpVkN1bDNTb1IwWXc0VEdFUXFxR2lqMXZKcyIsInkiOiI5dEx4ODFQTWZRa3JPdzh5dUkyWXdJMG83TXROemFDR2ZDQmJaQlc1WXJNIn19",
                 "recipients": [
                   {
                     "encrypted_key": "J1Fs9JaDjOT_5481ORQWfEZmHy7OjE3pTNKccnK7hlqjxbPalQWWLg"
                   }
                 ],
-                "iv": "u5kIzo0m_d2PjI4mu5kIzo0m_d2PjI4m",
+                "iv": "u5kIzo0m_d2PjI4mu5kIzo0m",
                 "ciphertext": "qGuFFoHy7HBmkf2BaY6eREwzEjn6O_FnRoXj2H-DAXo1PgQdfON-_1QbxtnT8e8z_M6Gown7s8fLtYNmIHAuixqFQnSA4fdMcMSi02z1MYEn2JC-1EkVbWr4TqQgFP1EyymB6XjCWDiwTYd2xpKoUshu8WW601HLSgFIRUG3-cK_ZSdFaoWosIgAH5EQ2ayJkRB_7dXuo9Bi1MK6TYGZKezc6rpCK_VRSnLXhFwa1C3T0QBes",
                 "tag": "doeAoagwJe9BwKayfcduiw"
             }"#;
         // Act
-        let iv = Message::get_iv(raw_json.as_bytes())?;
-        println!("{:?}", iv);
+        let iv = Message::get_iv(raw_json.as_bytes());
         // Assert
-        Ok(())
+        assert!(iv.is_ok());
+        assert_eq!("u5kIzo0m_d2PjI4mu5kIzo0m", &String::from_utf8(iv.unwrap()).unwrap());
+    }
+    #[test]
+    fn iv_from_compact_json_test() {
+        // Arrange
+        // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+        let compact = r#"eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiaXYiOiAidTVrSXpvMG1fZDJQakk0bXU1a0l6bzBtIn0."#;
+        // Act
+        let iv = Message::get_iv(compact.as_bytes());
+        // Assert
+        assert!(iv.is_ok());
+        assert_eq!("u5kIzo0m_d2PjI4mu5kIzo0m", &String::from_utf8(iv.unwrap()).unwrap());
     }
 }
 
