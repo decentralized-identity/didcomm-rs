@@ -1,6 +1,6 @@
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageType {
-    #[serde(rename = "forward")]
+    #[serde(rename = "didcomm/forward")]
     Forward,
     #[serde(rename = "application/pdf")]
     MediaPdf,

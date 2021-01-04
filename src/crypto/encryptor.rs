@@ -80,19 +80,38 @@ pub enum CryptoAlgorithm {
 #[cfg(test)]
 mod batteries_tests {
     use super::*;
-    use crate::Message;
+    use crate::{
+        Message,
+        Jwe,
+    };
 
+    // FIXME!
     #[test]
     fn xc20p_test() -> Result<(), Error> {
         // Arrange
-        let m = Message::new();
-        let module = CryptoModule::new(CryptoKeyType::X25519, CryptoAlgorithm::XC20P);
-        let r = m.send_raw(//m.get_didcomm_header().id.to_ne_bytes().to_vec(),
-            module.encryptor(),
-            b"super duper key"
+        let payload = "test message's body - can be anything...";
+        let mut m = Message::new();
+        m.as_jwe(); // Set jwe header manually - sohuld be preceeded by key properties
+        m.body = payload.as_bytes().to_vec();
+        let enc_module = CryptoModule::new(CryptoKeyType::X25519, CryptoAlgorithm::XC20P);
+        let key = b"super duper key 32 bytes long!!!";
+        // Act
+        let (h, r) = m.encrypt(
+            enc_module.encryptor(),
+            key
         )?;
-
-
+        let jwe = Jwe::new(h, r);
+        let str_jwe = serde_json::to_string(&jwe);
+        assert!(&str_jwe.is_ok());
+        let dec_module = CryptoModule::new(CryptoKeyType::X25519, CryptoAlgorithm::XC20P);
+        let s = Message::decrypt(
+            &str_jwe.unwrap().as_bytes(),
+            dec_module.decryptor(),
+            key
+            )?;
+        //let received_payload = &String::from_utf8(s.body.clone())?;
+        // Assert
+        //assert_eq!(payload, received_payload);
         Ok(())
     }
 }

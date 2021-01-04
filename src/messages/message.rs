@@ -1,3 +1,5 @@
+use std::todo;
+
 use serde::{
     Serialize,
     Deserialize
@@ -14,10 +16,10 @@ use crate::Error;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Message {
     #[serde(flatten)]
-    jwm_header: JwmHeader,
+    pub jwm_header: JwmHeader,
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
-    body: Vec<u8>,    
+    pub body: Vec<u8>,
 }
 
 impl Message {
@@ -57,31 +59,20 @@ impl Message {
     pub fn get_jwm_header(&self) -> &JwmHeader {
         &self.jwm_header
     }
-    /// `&Vec<u8>` of `Message`'s body.
-    ///
-    pub fn get_body(&self) -> &Vec<u8> {
-        &self.body
-    }
     /// Creates set of Jwm related headers for the JWE
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
-    pub fn as_jws(self) -> Self {
-        Self { 
-            jwm_header: self.jwm_header.as_a256_gcm(None, None), 
-            ..self
-        }
+    pub fn as_jws(&mut self) {
+        todo!()
     }
     /// Creates set of Jwm related headers for the JWS
     /// Modifies JWM related header portion to match
     ///     signature implementation and leaves Other
     ///     parts unchanged.
     /// TODO + FIXME: complete implementation
-    pub fn as_jwe(self) -> Self {
-        Self {
-            jwm_header: self.jwm_header.as_es256(None, None),
-            ..self
-        }
+    pub fn as_jwe(&mut self) {
+        self.jwm_header.as_a256_gcm();
     }
     /// Seals self and returns ready to send JWE
     ///
@@ -179,7 +170,6 @@ impl Message {
 #[cfg(test)]
 mod parse_tests {
     use super::*;
-    use crate::Error;
 
     #[test]
     fn iv_from_json_test() {

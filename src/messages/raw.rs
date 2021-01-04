@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::{JwmHeader, error::Error, Jwe};
 use super::Message;
 
 // Arguments sequence: Nonce, Key, Message.
@@ -12,23 +12,26 @@ impl Message {
     ///     the encryption. Agnostic of actual algorythm used.
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
-    /// Returns `Vec<u8>` to be sent to receiver.
+    /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
     ///
-    pub fn send_raw(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
-        -> Result<Vec<u8>, Error> {
-            crypter(&Message::get_jwm_header(&self).get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())
+    pub fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
+        -> Result<(JwmHeader, Vec<u8>), Error> {
+            let header = self.jwm_header.clone();
+            let cyphertext = crypter(&Message::get_jwm_header(&self).get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
+            Ok((header, cyphertext))
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
     /// Returns `Ok(Message)` if decryption / deserialization
     ///     succeded. `Error` othervice.
     ///
-    pub fn receive_raw(
+    pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
         our_sk: &[u8]) 
             -> Result<Self, Error> {
-        if let Ok(raw_message_bytes) = decrypter(&Message::get_iv(&received_message)?, our_sk, received_message) {
+        let jwe: Jwe = serde_json::from_slice(received_message)?;
+        if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), our_sk, &jwe.payload()) {
             serde_json::from_slice(&raw_message_bytes).map_err(|e| Error::SerdeError(e))
         } else {
             Err(Error::PlugCryptoFailure)
@@ -86,6 +89,7 @@ mod raw_tests {
     use super::{
         Message,
         Error,
+        Jwe,
     };
     
     #[test]
@@ -110,9 +114,11 @@ mod raw_tests {
         let id = m.get_didcomm_header().id;
 
         // Act and Assert
-        let crypted = m.send_raw(my_crypter, key);
+        let crypted = m.encrypt(my_crypter, key);
         assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive_raw(&crypted.unwrap(), my_decrypter, key);
+        let (h, b) = crypted.unwrap();
+        let jwe = serde_json::to_string(&Jwe::new(h, b)).unwrap();
+        let raw_m = Message::decrypt(&jwe.as_bytes(), my_decrypter, key);
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
     }
@@ -139,9 +145,11 @@ mod raw_tests {
         let key = secretbox::gen_key();
 
         // Act and Assert
-        let crypted = m.send_raw(my_crypter, &key.as_ref());
+        let crypted = m.encrypt(my_crypter, &key.as_ref());
         assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive_raw(&crypted.unwrap(), my_decrypter, &key.as_ref());
+        let (h, b) = crypted.unwrap();
+        let jwe = serde_json::to_string(&Jwe::new(h, b)).unwrap();
+        let raw_m = Message::decrypt(&jwe.as_bytes(), my_decrypter, &key.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
     }
@@ -222,10 +230,12 @@ mod raw_tests {
         });
 
         // Act and Assert
-        let crypted = m.send_raw(my_crypter, sender_shared.as_bytes());
+        let crypted = m.encrypt(my_crypter, sender_shared.as_bytes());
         assert!(&crypted.is_ok()); // Encryption check
+        let (h, b) = crypted.unwrap();
+        let jwe = serde_json::to_string(&Jwe::new(h, b)).unwrap();
         let raw_m =
-            Message::receive_raw(&crypted.unwrap(), my_decrypter, receiver_shared.as_bytes());
+            Message::decrypt(&jwe.as_bytes(), my_decrypter, receiver_shared.as_bytes());
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
     }

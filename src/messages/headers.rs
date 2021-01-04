@@ -1,4 +1,7 @@
-use rand::{Rng, thread_rng};
+use rand::{
+    Rng,
+    seq::SliceRandom,
+};
 use std::{time::SystemTime, vec};
 use crate::Error;
 use super::{MessageType, PriorClaims};
@@ -62,21 +65,21 @@ impl DidcommHeader {
 ///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct JwmHeader {
-    typ: String,
+    pub typ: String,
     // Some(String) if JWM is JWE encrypted.
-    enc: Option<String>,
+    pub enc: Option<String>,
     // None if raw text message, Some(key ID) otherwise.
-    kid: Option<String>,
+    pub kid: Option<String>,
     // None if raw text message, Some(String) for
     //  both JWE and/or JWS.
-    alg: Option<String>,
+    pub alg: Option<String>,
     // Some(String) - serialized ephemeral public key.
     // TODO: implement proper struct for it:
     // https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
-    epk: Option<String>,
+    pub epk: Option<String>,
     // Some("JWM") should be used if nested JWS inside JWE.
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
-    cty: Option<String>,
+    pub cty: Option<String>,
     // Nonce!
     iv: Vec<u8>,
 }
@@ -85,34 +88,18 @@ impl JwmHeader {
     pub fn get_iv(&self) -> &[u8] {
         &self.iv
     }
-    pub fn as_a256_gcm(self, kid: Option<String>, epk: Option<String>) -> Self {
-        JwmHeader {
-           enc: Some("A256GCM".into()),
-           kid,
-           epk,
-           alg: Some("ECDH-ES+A256KW".into()),
-           ..self
-        }
-    }
-    pub fn as_es256(self, kid: Option<String>, alg: Option<String>) -> Self {
-        JwmHeader {
-           enc: None,
-           kid, 
-           alg,
-           ..self
-       }
+    pub fn as_a256_gcm(&mut self) {
+           self.enc = Some("A256GCM".into());
+           self.alg = Some("ECDH-ES+A256KW".into());
     }
 }
 
 impl Default for JwmHeader {
-    // Need to make sure nonce is 192 bytes long unigue for each message.
-    // fill() does not have overload/optimizations for 192 bytes - split in two.
-    //
+    // Need to make sure nonce is 192 bit long unigue for each message.
     fn default() -> Self {
-        let mut a: Vec<u8> = vec![0; 24];
-        for v in &mut a {
-            *v = rand::thread_rng().gen();
-        }
+        let mut rng = rand::thread_rng();
+        let mut a = rng.gen::<[u8; 24]>().to_vec();
+        a.shuffle(&mut rng);
         JwmHeader {
             typ: "JWM".into(),
             iv: a,
