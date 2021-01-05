@@ -32,9 +32,12 @@ impl SignatureAlgorithm {
     /// Builds signer FnOnce, which performs signing.
     ///
     /// # Examples
-    /// #fn main() {
-    ///    let signer = SignatureAlgorithm::Es256k.signer();
-    /// #}
+    /// ```
+    /// # fn main() {
+    /// use didcomm_rs::crypto::signer::SignatureAlgorithm;
+    /// let signer = SignatureAlgorithm::Es256k.signer();
+    /// # }
+    ///```
     ///
     pub fn signer(&self) -> SigningMethod {
         match self {
@@ -57,9 +60,12 @@ impl SignatureAlgorithm {
     /// Builds validator FnOnce, which performs signature validation.
     ///
     /// # Examples
-    /// #fn main() {
-    ///    let validator = SignatureAlgorithm::Es256k.validator();
-    /// #}
+    /// ```
+    /// # fn main() {
+    /// use didcomm_rs::crypto::signer::SignatureAlgorithm;
+    /// let validator = SignatureAlgorithm::Es256k.validator();
+    /// # }
+    /// ```
     ///
     pub fn validator(&self) -> ValidationMethod {
         match self {
