@@ -6,6 +6,10 @@ pub enum Error {
     NoRotationData,
     #[error("malformed DID string")]
     BadDid,
+    #[error("not a JWE compact representation")]
+    JweCompactParseError,
+    #[error("not a JWS compact representation")]
+    JwsCompactParseError,
     #[error("{0}")]
     Generic(String),
     #[error(transparent)]
