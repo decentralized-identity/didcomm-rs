@@ -209,7 +209,6 @@ mod parse_tests {
 mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
-    extern crate x25519_dalek;
 
    // use crate::Error;
    // use super::*;
