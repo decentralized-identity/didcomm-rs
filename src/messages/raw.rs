@@ -4,6 +4,10 @@ use super::Message;
 // Arguments sequence: Nonce, Key, Message.
 pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
 pub type AssymetricCyptherMethod = Box<dyn Fn(&[u8], &[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
+/// .0 == `key: &[u8]`; .1 == `message`;
+pub type SigningMethod = Box<dyn Fn(&[u8], &[u8]) -> Result<Vec<u8>, Error>>;
+/// .0 == `key: &[u8]`; .1 == `message`; .2 == `signature`;
+pub type ValidationMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<bool, Error>>;
 
 #[cfg(feature = "raw-crypto")]
 impl Message {

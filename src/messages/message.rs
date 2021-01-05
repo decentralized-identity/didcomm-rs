@@ -7,7 +7,7 @@ use serde::{
 use super::{
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
-    };
+};
 use crate::Error;
 
 /// DIDComm message structure.
@@ -133,6 +133,8 @@ impl Message {
 }
 
 /// Associated functions implementations.
+/// Possibly not required as Jwe serialization covers this.
+///
 impl Message {
     /// Parses `iv` value as `Vec<u8>` from public header.
     /// Both regular JSON and Compact representations are accepted.

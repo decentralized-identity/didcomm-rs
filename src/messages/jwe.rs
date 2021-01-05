@@ -1,5 +1,3 @@
-use aes_gcm::aead::generic_array::typenum::assert_type;
-
 use crate::{
     Error,
     JwmHeader,

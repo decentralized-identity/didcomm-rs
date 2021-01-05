@@ -118,7 +118,7 @@ impl CryptoModule {
         }
     }
 }
-
+// inner helper function
 fn check_nonce(nonce: &[u8], expected_len: usize) -> Result<(), Error> {
     if nonce.len() < expected_len {
         return Err(Error::PlugCryptoFailure);

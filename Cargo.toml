@@ -19,6 +19,7 @@ ring = { version = "0.16", optional = true }
 # Raw crypto dependancies
 chacha20poly1305 = { version = "0.7", optional = true }
 aes-gcm = { version = "0.8", optional = true }
+k256 = { version = "0.7", optional = true, features = ["ecdsa", "sha256"] }
 # cbor = "0.4"
 
 # Other
@@ -32,10 +33,9 @@ base64 = "0.13"
 sodiumoxide = "0.2.6"
 rand_core = "0.5"
 did_doc = { git = "https://github.com/chunningham/did" }
-hex = "0.4.2"
 x25519-dalek = "1.1"
 
 [features]
 default = ["raw-crypto"]
-raw-crypto = ["chacha20poly1305", "aes-gcm"]
+raw-crypto = ["chacha20poly1305", "aes-gcm", "k256"]
 jose-biscuit = ["biscuit", "ring"]
