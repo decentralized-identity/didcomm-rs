@@ -1,5 +1,3 @@
-use std::todo;
-
 use serde::{
     Serialize,
     Deserialize
@@ -15,8 +13,10 @@ use crate::Error;
 ///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Message {
+    /// JOSE header, which is sent as public part with JWE.
     #[serde(flatten)]
     pub jwm_header: JwmHeader,
+    /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
     pub body: Vec<u8>,
@@ -58,6 +58,19 @@ impl Message {
     ///
     pub fn get_jwm_header(&self) -> &JwmHeader {
         &self.jwm_header
+    }
+    /// Adds (or updates) custom unique header key-value pair to the header.
+    /// This portion of header is not sent as JOSE header.
+    ///
+    pub fn add_header_field(mut self, key: String, value: String) -> Self {
+        if key.len() == 0 {
+            return self;
+        }
+        self.didcomm_header.instantiate_other_headers();
+        if let Some(h) = &mut self.didcomm_header.other {
+            h.insert(key, value);
+        }
+        self
     }
     /// Creates set of Jwm related headers for the JWE
     /// Modifies JWM related header portion to match

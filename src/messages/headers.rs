@@ -2,7 +2,10 @@ use rand::{
     Rng,
     seq::SliceRandom,
 };
-use std::{time::SystemTime, vec};
+use std::{
+    time::SystemTime,
+    collections::HashMap,
+};
 use crate::Error;
 use super::{MessageType, PriorClaims};
 
@@ -15,6 +18,8 @@ pub struct DidcommHeader {
     pub from: String,
     pub created_time: Option<usize>,
     pub expires_time: Option<usize>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub(crate) other: Option<HashMap<String, String>>,
     /// A JWT, with sub: new DID and iss: prior DID, 
     /// with a signature from a key authorized by prior DID.
     from_prior: Option<PriorClaims>,
@@ -31,6 +36,7 @@ impl DidcommHeader {
             created_time: None,
             expires_time: None,
             from_prior: None,
+            other: None,
         }
     }
     /// Generates random `id`
@@ -43,6 +49,13 @@ impl DidcommHeader {
     pub fn from_prior(&self) -> &Option<PriorClaims> {
         &self.from_prior
     }
+    /// Instantiates new `HashSet` for other header fields on demand.
+    ///
+    pub(crate) fn instantiate_other_headers(&mut self) {
+        if self.other.is_none() {
+            self.other = Some(HashMap::new());
+        }
+    }
     /// Creates set of DIDComm related headers with the static forward type
     ///
     pub fn forward(to: Vec<String>, from: String, expires_time: Option<usize>) -> Result<Self, Error> {
@@ -54,6 +67,7 @@ impl DidcommHeader {
             created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as usize),
             expires_time,
             from_prior: None,
+            other: None,
         })
     }
 }
