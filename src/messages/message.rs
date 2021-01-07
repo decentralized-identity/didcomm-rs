@@ -92,10 +92,23 @@ impl Message {
     /// `ek` - encryption key for inner message payload JWE encryption
     // TODO: Feature-gate this?
     // TODO: Add example[s]
-    pub fn seal(self, ek: &[u8], alg: CryptoAlgorithm) -> Result<String, Error> {
+    pub fn seal(self, ek: &[u8]) -> Result<String, Error> {
+        let alg = crypter_from_header(&self.jwm_header.clone())?;
         let (h, b) = self.encrypt(alg.encryptor(), ek)?;
         serde_json::to_string(&Jwe::new(h, b))
             .map_err(|e| Error::SerdeError(e))
+    }
+    /// Seals self and returns ready to send JWE as compact representation
+    ///
+    /// # Parameters
+    ///
+    /// `ek` - encryption key for inner message payload JWE encryption
+    // TODO: Feature-gate this?
+    // TODO: Add example[s]
+    pub fn seal_compact(self, ek: &[u8]) -> Result<String, Error> {
+        let alg = crypter_from_header(&self.jwm_header.clone())?;
+        let (h, b) = self.encrypt(alg.encryptor(), ek)?;
+        Jwe::new(h, b).as_compact()
     }
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
@@ -146,6 +159,13 @@ impl Message {
     }
 }
 
+fn crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgorithm, Error> {
+    match &header.alg {
+        None => Err(Error::JweParseError),
+        Some(alg) => alg.try_into()
+    }
+}
+
 /// Associated functions implementations.
 /// Possibly not required as Jwe serialization covers this.
 ///
@@ -182,8 +202,8 @@ impl Message {
         }
     }
     /// Construct a message from received data.
-    /// Should process anything (raw, JWE, JWS [compact and JSON])
-    ///
+    /// Raw, JWE or JWS payload is accepted.
+    /// FIXME: JWS not implemented
     pub fn receive(incomming: &str, pk: Option<&[u8]>) -> Result<Self, Error> {
         match pk {
             None => serde_json::from_str(incomming)
@@ -201,8 +221,14 @@ impl Message {
             }
         }
     }
+    /// Construct a message from compact representation of received data.
+    /// Raw, JWE or JWS payload is accepted.
+    /// FIXME: NOT IMPLEMENTED
+    /// TODO: Add examples
+    pub fn receive_compact(incomming: &str, pk: &[u8]) -> Result<Self, Error> {
+        todo!()
+    }
 }
-
 
 #[cfg(test)]
 mod parse_tests {

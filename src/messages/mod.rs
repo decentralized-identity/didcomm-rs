@@ -2,7 +2,6 @@ mod message;
 mod prior_claims;
 mod headers;
 mod types;
-mod into;
 mod jwe;
 
 #[cfg(feature = "jose-biscuit")]
