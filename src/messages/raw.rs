@@ -32,10 +32,10 @@ impl Message {
     pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
-        our_sk: &[u8]) 
+        key: &[u8]) 
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
-        if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), our_sk, &jwe.payload()) {
+        if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), key, &jwe.payload()) {
             serde_json::from_slice(&raw_message_bytes).map_err(|e| Error::SerdeError(e))
         } else {
             Err(Error::PlugCryptoFailure)

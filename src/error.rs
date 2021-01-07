@@ -10,6 +10,8 @@ pub enum Error {
     JweCompactParseError,
     #[error("not a JWS compact representation")]
     JwsCompactParseError,
+    #[error("failed to parse as JWE")]
+    JweParseError,
     #[error("{0}")]
     Generic(String),
     #[error(transparent)]

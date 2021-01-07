@@ -6,7 +6,7 @@ use std::{
     time::SystemTime,
     collections::HashMap,
 };
-use crate::Error;
+use crate::{Error, crypto::encryptor::CryptoAlgorithm};
 use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -102,9 +102,17 @@ impl JwmHeader {
     pub fn get_iv(&self) -> &[u8] {
         &self.iv
     }
-    pub fn as_a256_gcm(&mut self) {
-           self.enc = Some("A256GCM".into());
-           self.alg = Some("ECDH-ES+A256KW".into());
+    pub fn as_encrypted(&mut self, alg: CryptoAlgorithm) {
+        match alg {
+            CryptoAlgorithm::A256GCM => { 
+                self.enc = Some("A256GCM".into());
+                self.alg = Some("ECDH-ES+A256KW".into());
+            },
+            CryptoAlgorithm::XC20P => {
+                self.enc = Some("XC20P".into());
+                self.alg = Some("ECDH-ES+A256KW".into());
+            }
+        }
     }
 }
 

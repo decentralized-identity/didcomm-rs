@@ -1,38 +1,33 @@
 
+use std::convert::TryFrom;
 use crate::{
     SymmetricCypherMethod,
     AssymetricCyptherMethod,
     Error,
 };
 
-/// Plugable closure generator type, which creates instance of crypto function
-///     based on selected key and algorythm types.
+/// Plugable closure generator enum, which creates instance of crypto function
+///     based on selected algorythm types.
 /// # Attention:
 /// Immutable by design and should be instance per invocation to make sure no
 ///     sensitive data is been stored in memory longer than necessary.
 /// Underlying algorithms are implemented by Rust-crypto crate family.
 ///
-pub struct CryptoModule {
-    key_type: Curve,
-    alg: CryptoAlgorithm,
+/// Allowed (and implemented) cryptographical algorithms (JWA).
+/// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
+///
+#[derive(Copy, Clone)]
+pub enum CryptoAlgorithm {
+    XC20P,
+    A256GCM,
 }
 
-impl CryptoModule {
-    /// Constructor function
-    /// After CryptoModule is constructed it cannot be modified
-    /// Use single instance per invocation to be sure that proper type is used
-    ///
-    pub fn new(key_type: Curve, alg: CryptoAlgorithm) -> Self {
-        Self {
-            key_type,
-            alg
-        }
-    }
+impl CryptoAlgorithm {
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms encryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
     ///
     pub fn encryptor(self) -> SymmetricCypherMethod {
-        match self.alg {
+        match self {
            CryptoAlgorithm::XC20P => {
                Box::new(|nonce: &[u8], key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
                    check_nonce(nonce, 24)?;
@@ -71,7 +66,7 @@ impl CryptoModule {
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
     ///
     pub fn decryptor(&self) -> SymmetricCypherMethod {
-        match self.alg {
+        match self {
             CryptoAlgorithm::XC20P => {
                 Box::new(|nonce: &[u8], key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
                     check_nonce(nonce, 24)?;
@@ -108,7 +103,7 @@ impl CryptoModule {
     }
     /// Not implemented - no usecase atm...
     pub fn assymetric_encryptor(self) -> AssymetricCyptherMethod {
-        match self.alg {
+        match self {
             CryptoAlgorithm::XC20P => {
                 todo!()
             },
@@ -118,26 +113,23 @@ impl CryptoModule {
         }
     }
 }
+
+impl TryFrom<&String> for CryptoAlgorithm {
+    type Error = Error;
+    fn try_from(incomming: &String) -> Result<Self, Error> {
+        Ok(match &incomming[..] {
+            "A256GCM" => Self::A256GCM,
+            "ECDH-ES+A256KW" => Self::XC20P,
+            _ => return Err(Error::JweParseError),
+        })
+    }
+}
 // inner helper function
 fn check_nonce(nonce: &[u8], expected_len: usize) -> Result<(), Error> {
     if nonce.len() < expected_len {
         return Err(Error::PlugCryptoFailure);
     }
     Ok(())
-}
-/// Allowed (and implemented) curves for the keys.
-/// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
-///
-pub enum Curve {
-    X25519,
-    P256,
-}
-/// Allowed (and implemented) cryptographical algorithms (JWA).
-/// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
-///
-pub enum CryptoAlgorithm {
-    XC20P,
-    A256GCM,
 }
 
 #[cfg(test)]
@@ -153,23 +145,21 @@ mod batteries_tests {
         // Arrange
         let payload = "test message's body - can be anything...";
         let mut m = Message::new();
-        m.as_jwe(); // Set jwe header manually - sohuld be preceeded by key properties
+        m.as_jwe(CryptoAlgorithm::XC20P); // Set jwe header manually - sohuld be preceeded by key properties
         m.body = payload.as_bytes().to_vec();
         let original_header = m.get_jwm_header().clone();
-        let enc_module = CryptoModule::new(Curve::X25519, CryptoAlgorithm::XC20P);
         let key = b"super duper key 32 bytes long!!!";
         // Act
         let (h, r) = m.encrypt(
-            enc_module.encryptor(),
+            CryptoAlgorithm::XC20P.encryptor(),
             key
         )?;
         let jwe = Jwe::new(h, r);
         let str_jwe = serde_json::to_string(&jwe);
         assert!(&str_jwe.is_ok());
-        let dec_module = CryptoModule::new(Curve::X25519, CryptoAlgorithm::XC20P);
         let s = Message::decrypt(
             &str_jwe.unwrap().as_bytes(),
-            dec_module.decryptor(),
+            CryptoAlgorithm::XC20P.decryptor(),
             key
             )?;
         let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.
@@ -183,23 +173,21 @@ mod batteries_tests {
         // Arrange
         let payload = "test message's body - can be anything...";
         let mut m = Message::new();
-        m.as_jwe(); // Set jwe header manually - sohuld be preceeded by key properties
+        m.as_jwe(CryptoAlgorithm::A256GCM); // Set jwe header manually - sohuld be preceeded by key properties
         m.body = payload.as_bytes().to_vec();
         let original_header = m.get_jwm_header().clone();
-        let enc_module = CryptoModule::new(Curve::X25519, CryptoAlgorithm::A256GCM);
         let key = b"super duper key 32 bytes long!!!";
         // Act
         let (h, r) = m.encrypt(
-            enc_module.encryptor(),
+            CryptoAlgorithm::A256GCM.encryptor(),
             key
         )?;
         let jwe = Jwe::new(h, r);
         let str_jwe = serde_json::to_string(&jwe);
         assert!(&str_jwe.is_ok());
-        let dec_module = CryptoModule::new(Curve::X25519, CryptoAlgorithm::A256GCM);
         let s = Message::decrypt(
             &str_jwe.unwrap().as_bytes(),
-            dec_module.decryptor(),
+            CryptoAlgorithm::A256GCM.decryptor(),
             key
             )?;
         let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.

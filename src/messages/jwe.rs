@@ -1,8 +1,4 @@
-use crate::{
-    Error,
-    JwmHeader,
-    util::*,
-};
+use crate::{Error, JwmHeader, util::*};
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
 ///
@@ -21,7 +17,7 @@ impl Jwe {
     }
     /// Constructor to build instance from received Compact representation.
     ///
-    pub fn from_compact(data: String) -> Result<Self, Error> {
+    pub fn from_compact(data: &str) -> Result<Self, Error> {
         if data.chars().fold(0, |counter, c| if c == '.' {counter+ 1} else { counter }) != 1 {
             return Err(Error::JweCompactParseError);
         }
@@ -56,7 +52,7 @@ fn compact_serialization_test() {
     let mut h = JwmHeader::default();
     let b = b"some sort of a message";
     // Act
-    h.as_a256_gcm();
+    h.as_encrypted(crate::crypto::encryptor::CryptoAlgorithm::A256GCM);
     let b_encoded = to_base64(&String::from_utf8_lossy(b));
     let h_encoded = to_base64(&serde_json::to_string(&h).unwrap());
     let jwe = Jwe::new(h.clone(), b.clone().to_vec());
@@ -66,7 +62,7 @@ fn compact_serialization_test() {
     assert!(&compact.contains(&b_encoded));
     assert!(&compact.contains(&h_encoded));
     println!("{}", &compact);
-    let deserialized = Jwe::from_compact(compact);
+    let deserialized = Jwe::from_compact(&compact);
     // Assert
     assert!(&deserialized.is_ok());
     let deserialized = deserialized.unwrap();
