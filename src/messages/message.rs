@@ -17,6 +17,8 @@ pub struct Message {
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
+    /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
+    ///     as bytes of data.
     pub body: Vec<u8>,
 }
 
@@ -32,7 +34,7 @@ impl Message {
         }
     }
     /// Checks if message is rotation one.
-    /// Exposed for explicit checks on sdk level.
+    /// Exposed for explicit checks on calling code level.
     ///
     pub fn is_rotation(&self) -> bool {
         self.didcomm_header.from_prior().is_some()
@@ -90,8 +92,8 @@ impl Message {
     /// # Parameters
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
-    // TODO: Feature-gate this?
-    // TODO: Add example[s]
+    // TODO: Feature-gate(split) this ("raw-crypto" / "jose-biscuit")?
+    // TODO: Add examples
     pub fn seal(self, ek: &[u8]) -> Result<String, Error> {
         let alg = crypter_from_header(&self.jwm_header.clone())?;
         let (h, b) = self.encrypt(alg.encryptor(), ek)?;
@@ -104,7 +106,7 @@ impl Message {
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
     // TODO: Feature-gate this?
-    // TODO: Add example[s]
+    // TODO: Add examples
     pub fn seal_compact(self, ek: &[u8]) -> Result<String, Error> {
         let alg = crypter_from_header(&self.jwm_header.clone())?;
         let (h, b) = self.encrypt(alg.encryptor(), ek)?;
@@ -118,7 +120,7 @@ impl Message {
     /// `ek` - encryption key for inner message payload JWE encryption
     ///
     /// `sk` - signing key for enveloped message JWS encryption
-    // TODO: Adde example[s]
+    // TODO: Adde examples
     pub fn seal_signed(self, ek: &[u8], sk: &[u8]) -> Result<String, Error> {
         todo!()
         //let mut crypto_envelope = Message {
@@ -142,7 +144,7 @@ impl Message {
     /// `expires_time` - `Option<usize>` seconds from the UTC Epoch seconds,
     ///     signals when the message is no longer valid, and is to be used by
     ///     the recipient to discard expired messages on receipt
-    /// TODO: Add example[s]
+    /// TODO: Add examples
     pub fn routed_by(self,
         ek: Vec<u8>,
         to: Vec<String>,

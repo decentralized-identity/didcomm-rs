@@ -8,8 +8,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
 # Examples of usage
 
-- Prepare message for direct send
-    - Assuming encryption key (Base64 bits): "MTMwLCAxMTAsIDkzLCAxMTMsIDEwNSwgMTI3LCA0LCAyMTAsIDY1LCAyMzQsIDExMiwgOTAsIDE1MCwgMTIwLCAxODksIDI1MiwgMjEyLCAxNjUsIDMwLCAyMDksIDE5NCwgMjEzLCA4MSwgMzgsIDI1MCwgMTg3LCAyMTYsIDE0LCAyNDYsIDI1MCwgMTY2LCA5Mg"
+## Prepare message for direct send
     - Assuming `kid`: "Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"
 
 ```rust

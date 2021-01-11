@@ -142,7 +142,7 @@ impl Message {
     /// `jwm` - `String` of Message sealed with `.seal()` method
     ///
     /// `pk` - encryption key for JWE decryption
-    /// TODO: Add example[s]
+    /// TODO: Add examples
     pub fn receive(incomming_message: &str, key: Secret) -> Result<Self, Error> {
         match key {
             Secret::None => {
