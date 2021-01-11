@@ -144,10 +144,10 @@ mod batteries_tests {
     fn xc20p_test() -> Result<(), Error> {
         // Arrange
         let payload = "test message's body - can be anything...";
-        let mut m = Message::new();
-        m.as_jwe(CryptoAlgorithm::XC20P); // Set jwe header manually - sohuld be preceeded by key properties
-        m.body = payload.as_bytes().to_vec();
-        let original_header = m.get_jwm_header().clone();
+        let m = Message::new()
+            .as_jwe(CryptoAlgorithm::XC20P) // Set jwe header manually - sohuld be preceeded by key properties
+            .body(payload.as_bytes());
+        let original_header = m.jwm_header.clone().unwrap();
         let key = b"super duper key 32 bytes long!!!";
         // Act
         let (h, r) = m.encrypt(
@@ -164,7 +164,7 @@ mod batteries_tests {
             )?;
         let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.
         // Assert
-        assert_eq!(*s.get_jwm_header(), original_header);
+        assert_eq!(s.jwm_header.unwrap(), original_header);
         assert_eq!(payload, received_payload);
         Ok(())
     }
@@ -172,10 +172,10 @@ mod batteries_tests {
     fn a256gcm_test() -> Result<(), Error> {
         // Arrange
         let payload = "test message's body - can be anything...";
-        let mut m = Message::new();
-        m.as_jwe(CryptoAlgorithm::A256GCM); // Set jwe header manually - sohuld be preceeded by key properties
-        m.body = payload.as_bytes().to_vec();
-        let original_header = m.get_jwm_header().clone();
+        let m = Message::new()
+            .as_jwe(CryptoAlgorithm::A256GCM) // Set jwe header manually - sohuld be preceeded by key properties
+            .body(payload.as_bytes());
+        let original_header = m.jwm_header.clone().unwrap();
         let key = b"super duper key 32 bytes long!!!";
         // Act
         let (h, r) = m.encrypt(
@@ -192,7 +192,7 @@ mod batteries_tests {
             )?;
         let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.
         // Assert
-        assert_eq!(*s.get_jwm_header(), original_header);
+        assert_eq!(s.jwm_header.unwrap(), original_header);
         assert_eq!(payload, received_payload);
         Ok(())
     }

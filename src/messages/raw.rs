@@ -17,12 +17,17 @@ impl Message {
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
+    /// TODO: Improve error here
     ///
     pub fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
         -> Result<(JwmHeader, Vec<u8>), Error> {
-            let header = self.jwm_header.clone();
-            let cyphertext = crypter(&Message::get_jwm_header(&self).get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
-            Ok((header, cyphertext))
+            if let Some(h) = &self.jwm_header {
+                let header = h.clone();
+                let cyphertext = crypter(h.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
+                Ok((header, cyphertext))
+            } else {
+                Err(Error::JweParseError)
+            }
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
@@ -95,6 +100,7 @@ mod raw_tests {
         Error,
         Jwe,
     };
+    use crate::crypto::CryptoAlgorithm;
     
     #[test]
     #[allow(non_snake_case)]
@@ -114,7 +120,8 @@ mod raw_tests {
             let nonce = XNonce::from_slice(n);
             Ok(aead.decrypt(nonce, m).unwrap())
         });
-        let m = Message::new();
+        let m = Message::new()
+            .as_jwe(CryptoAlgorithm::A256GCM);
         let id = m.get_didcomm_header().id;
 
         // Act and Assert
@@ -144,7 +151,8 @@ mod raw_tests {
             Ok(secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap())
                 .unwrap())
         });
-        let m = Message::new();
+        let m = Message::new()
+            .as_jwe(CryptoAlgorithm::A256GCM);
         let id = m.get_didcomm_header().id;
         let key = secretbox::gen_key();
 
@@ -215,9 +223,11 @@ mod raw_tests {
         let receiver_pk = PublicKey::from(&receiver_sk);
         let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
-        let m = Message::new();
+        let m = Message::new()
+            .as_jwe(CryptoAlgorithm::XC20P);
         let id = m.get_didcomm_header().id;
-        let iv = m.get_jwm_header().get_iv().clone();
+        let h = m.jwm_header.clone().unwrap();
+        let iv = h.get_iv().clone();
         println!("got IV: {:?}", &iv);
         // Plugable encryptor function to encrypt data
         let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {

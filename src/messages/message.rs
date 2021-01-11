@@ -1,5 +1,6 @@
 use std::convert::TryInto;
-use serde::{Serialize,Deserialize};
+use aes_gcm::aead::generic_array::sequence;
+use serde::{Serialize, Deserialize};
 use super::{
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
@@ -9,11 +10,11 @@ use crate::{Error, Jwe, crypto::encryptor::CryptoAlgorithm};
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 ///
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Message {
     /// JOSE header, which is sent as public part with JWE.
-    #[serde(flatten)]
-    pub jwm_header: JwmHeader,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub jwm_header: Option<JwmHeader>,
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
@@ -28,10 +29,50 @@ impl Message {
     ///
     pub fn new() -> Self {
         Message {
-            jwm_header: JwmHeader::default(),
+            jwm_header: None,
             didcomm_header: DidcommHeader::new(),
             body: vec!(),
         }
+    }
+    // Setter of `from` header
+    // Helper method.
+    //
+    pub fn from(mut self, from: &str) -> Self {
+        self.didcomm_header.from = String::from(from);
+        self
+    }
+    // Setter of `to` header
+    // Helper method.
+    //
+    pub fn to(mut self, to: Vec<&str>) -> Self {
+        for s in to {
+            self.didcomm_header.to.push(String::from(s));
+        }
+        while let Some(a) = self.didcomm_header.to.iter().position(|e| e == &String::default()) {
+            self.didcomm_header.to.remove(a);
+        }
+        self
+    }
+    // Setter of the `body`
+    // Helper method.
+    //
+    pub fn body(mut self, body: &[u8]) -> Self {
+        self.body = body.to_vec();
+        self
+    }
+    // Setter of the `kid` header
+    // Helper method.
+    //
+    pub fn kid(self, kid: String) -> Self {
+        let mut inner = self;
+        match &mut inner.jwm_header {
+            Some(h) => h.kid = Some(kid),
+            None => {
+                inner.jwm_header = Some(JwmHeader::default());
+                inner = inner.kid(kid);
+            }
+        }
+        inner
     }
     /// Checks if message is rotation one.
     /// Exposed for explicit checks on calling code level.
@@ -54,11 +95,6 @@ impl Message {
     pub fn get_didcomm_header(&self) -> &DidcommHeader {
         &self.didcomm_header
     }
-    /// `&JwmHeader` getter.
-    ///
-    pub fn get_jwm_header(&self) -> &JwmHeader {
-        &self.jwm_header
-    }
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     ///
@@ -66,10 +102,7 @@ impl Message {
         if key.len() == 0 {
             return self;
         }
-        self.didcomm_header.instantiate_other_headers();
-        if let Some(h) = &mut self.didcomm_header.other {
-            h.insert(key, value);
-        }
+        self.didcomm_header.other.insert(key, value);
         self
     }
     /// Creates set of Jwm related headers for the JWE
@@ -84,8 +117,21 @@ impl Message {
     ///     signature implementation and leaves Other
     ///     parts unchanged.
     //
-    pub fn as_jwe(&mut self, alg: CryptoAlgorithm) {
-        self.jwm_header.as_encrypted(alg);
+    pub fn as_jwe(self, alg: CryptoAlgorithm) -> Self {
+        let mut out = self;
+        if let Some(h) = &mut out.jwm_header {
+            h.as_encrypted(alg);
+        } else {
+                out.jwm_header = Some(JwmHeader::default());
+                out = out.as_jwe(alg);
+        }
+        out
+    }
+    /// Serializez current state of the message into json.
+    /// Consumes original message - use as raw sealing of envelope.
+    ///
+    pub fn as_raw_json(self) -> Result<String, Error> {
+        Ok(serde_json::to_string(&self)?)
     }
     /// Seals self and returns ready to send JWE
     ///
@@ -95,10 +141,14 @@ impl Message {
     // TODO: Feature-gate(split) this ("raw-crypto" / "jose-biscuit")?
     // TODO: Add examples
     pub fn seal(self, ek: &[u8]) -> Result<String, Error> {
-        let alg = crypter_from_header(&self.jwm_header.clone())?;
-        let (h, b) = self.encrypt(alg.encryptor(), ek)?;
-        serde_json::to_string(&Jwe::new(h, b))
-            .map_err(|e| Error::SerdeError(e))
+        if let Some(h) = &self.jwm_header {
+            let alg = crypter_from_header(h)?;
+            let (h, b) = self.encrypt(alg.encryptor(), ek)?;
+            serde_json::to_string(&Jwe::new(h, b))
+                .map_err(|e| Error::SerdeError(e))
+        } else {
+            Err(Error::JweParseError)
+        }
     }
     /// Seals self and returns ready to send JWE as compact representation
     ///
@@ -108,9 +158,13 @@ impl Message {
     // TODO: Feature-gate this?
     // TODO: Add examples
     pub fn seal_compact(self, ek: &[u8]) -> Result<String, Error> {
-        let alg = crypter_from_header(&self.jwm_header.clone())?;
-        let (h, b) = self.encrypt(alg.encryptor(), ek)?;
-        Jwe::new(h, b).as_compact()
+        if let Some(h) = &self.jwm_header {
+            let alg = crypter_from_header(h)?;
+            let (h, b) = self.encrypt(alg.encryptor(), ek)?;
+            Jwe::new(h, b).as_compact()
+        } else {
+            Err(Error::JweCompactParseError)
+        }
     }
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)

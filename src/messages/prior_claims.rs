@@ -1,6 +1,6 @@
 use crate::Error;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct PriorClaims {
     sub: String,
     iss: String,

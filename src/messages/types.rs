@@ -1,4 +1,4 @@
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum MessageType {
     #[serde(rename = "didcomm/forward")]
     Forward,

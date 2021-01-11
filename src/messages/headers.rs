@@ -9,19 +9,22 @@ use std::{
 use crate::{Error, crypto::encryptor::CryptoAlgorithm};
 use super::{MessageType, PriorClaims};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
     pub id: usize,
     #[serde(rename = "type")]
     pub m_type: MessageType,
     pub to: Vec<String>,
     pub from: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub created_time: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_time: Option<usize>,
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub(crate) other: Option<HashMap<String, String>>,
+    #[serde(flatten)]
+    pub(crate) other: HashMap<String, String>,
     /// A JWT, with sub: new DID and iss: prior DID, 
     /// with a signature from a key authorized by prior DID.
+    #[serde(skip_serializing_if = "Option::is_none")]
     from_prior: Option<PriorClaims>,
 }
 
@@ -36,7 +39,7 @@ impl DidcommHeader {
             created_time: None,
             expires_time: None,
             from_prior: None,
-            other: None,
+            other: HashMap::new(),
         }
     }
     /// Generates random `id`
@@ -49,13 +52,6 @@ impl DidcommHeader {
     pub fn from_prior(&self) -> &Option<PriorClaims> {
         &self.from_prior
     }
-    /// Instantiates new `HashSet` for other header fields on demand.
-    ///
-    pub(crate) fn instantiate_other_headers(&mut self) {
-        if self.other.is_none() {
-            self.other = Some(HashMap::new());
-        }
-    }
     /// Creates set of DIDComm related headers with the static forward type
     ///
     pub fn forward(to: Vec<String>, from: String, expires_time: Option<usize>) -> Result<Self, Error> {
@@ -66,9 +62,14 @@ impl DidcommHeader {
             from,
             created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as usize),
             expires_time,
-            from_prior: None,
-            other: None,
+            ..DidcommHeader::new()
         })
+    }
+}
+
+impl Default for DidcommHeader {
+    fn default() -> Self {
+        DidcommHeader::new()
     }
 }
 
@@ -81,20 +82,26 @@ impl DidcommHeader {
 pub struct JwmHeader {
     pub typ: String,
     // Some(String) if JWM is JWE encrypted.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub enc: Option<String>,
     // None if raw text message, Some(key ID) otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<String>,
     // None if raw text message, Some(String) for
     //  both JWE and/or JWS.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alg: Option<String>,
     // Some(String) - serialized ephemeral public key.
     // TODO: implement proper struct for it:
     // https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub epk: Option<String>,
     // Some("JWM") should be used if nested JWS inside JWE.
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<String>,
     // Nonce!
+    // FIXME: should this be optional?
     iv: Vec<u8>,
 }
 
@@ -113,6 +120,9 @@ impl JwmHeader {
                 self.alg = Some("ECDH-ES+A256KW".into());
             }
         }
+    }
+    pub fn kid(&mut self, kid: Option<String>) {
+        self.kid = kid;
     }
 }
 
