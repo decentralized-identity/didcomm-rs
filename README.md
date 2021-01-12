@@ -8,8 +8,29 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
 # Examples of usage
 
-## Prepare message for direct send
-    - Assuming `kid`: "Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"
+## 1. Prepare raw message for send and receive
+
+```rust
+    // Message construction
+    let m = Message::new()
+        // setting `from` header (sender) - Optional
+        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
+        // setting `to` header (recepients) - Optional
+        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"))
+        // populating body with some data - `Vec<bytes>`
+        .body(some_payload.as_bytes());
+
+    // Serialize message into JWM json (SENDER action)
+    let ready_to_send = m.clone().as_raw_json().unwrap();
+
+    //... transport is happening here ...
+
+    // On receival deserialize from json into Message (RECEIVER action)
+    // Error handling recommended here
+    let received = Message::receive(&ready_to_send, None).unwrap();
+```
+
+## 2. Prepare JWE message for direct send
 
 ```rust
     // decide which [Algorithm](crypto::encryptor::CryptoAlgorithm) is used (based on key)
@@ -35,6 +56,57 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     // alternatively use compact JWE format
     let ready_to_send = message.seal_compact(ek.as_bytes())?;
     // use transport of choice to send `ready_to_send` data to the receiver!
+
+    //... transport is happening here ...
+
+```
+
+## 3. Prepare JWE message to be mediated -> mediate -> receive
+* Message should be encrypted by destination key first in `.routed_by()` method call using key for the recepient;
+* Next it should be encrypted by mediator key in `.seal()` method call - this can be done multiple times - once for each mediator in chain but should be strictly sequentual to match mediators sequence in the chain.
+* Method call `.seal()` **MUST** be preceeded by  `.as_jwe(CryptoAlgorithm)` as mediators may use different algorithms and key types than destination and this is not automatically predicted or populated.
+* Keys used for encryption should be used in reverse order - final destination - last mediator - second to last mediator - etc. Onion style.
+
+```rust
+    // Message construction
+    let message = Message::new()
+        // setting from
+        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
+        // setting to
+        .to(vec!("did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"))
+        // packing in some payload
+        .body(some_payload.as_bytes())
+        // set JOSE header for XC20P algorithm
+        .as_jwe(CryptoAlgorithm::XC20P)
+        // custom header
+        .add_header_field("my_custom_key".into(), "my_custom_value".into())
+        // another coustom header
+        .add_header_field("another_key".into(), "another_value".into())
+        // set kid header
+        .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#))
+        // here we use destination key to bob and `to` header of mediator - 
+        //**THISH MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
+        // `ek_to_bob` - destination targeted encryption key
+        .routed_by(ek_to_bob.as_bytes(), vec!("did:mediator:suetcpl23pt23rp2teu995t98u"));
+
+    // Message envelope to mediator
+    let ready_to_send = message
+        .unwrap() // **ERROR HANDLE** here is recommended
+        .as_jwe(CryptoAlgorithm::XC20P) // here this method call is crucial as mediator and end receiver may use different algorithms.
+        // `ek_to_mediator` - mediator targeted encryption key
+        .seal(ek_to_mediator.as_bytes()); // this would've failed without previous method call.
+
+    //... transport to mediator is happening here ...
+
+    // Received by mediator
+    // `rk_mediator` - key to decrypt mediated message
+    let received_mediated = Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()));
+
+    //... transport to destination is happening here ...
+
+    // Received by Bob
+    // `rk_bob` - key to decrypt final message
+    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()));
 ```
 
 # Status

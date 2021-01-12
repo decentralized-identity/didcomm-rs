@@ -1,3 +1,6 @@
+/// Integration tests of full cycles of message lifetime.
+///
+
 mod common;
 
 use common::*;
@@ -34,14 +37,13 @@ fn send_receive_encrypted_xc20p_json_test() {
     let bob_public = PublicKey::from(&bob_secret);
     // DIDComm related setup
     let ek = alice_secret.diffie_hellman(&bob_public);
-    let alg = CryptoAlgorithm::XC20P; // decide which alg is used (based on key)
 
     // Message construction
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
-        .as_jwe(alg) // set JOSE header for XC20P algorithm
+        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
@@ -72,15 +74,13 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     // DIDComm related setup
     let ek_to_bob = alice_secret.diffie_hellman(&bob_public);
     let ek_to_mediator = alice_secret_2.diffie_hellman(&bob_mediator_public);
-    let alg = CryptoAlgorithm::XC20P; // decide which alg is used (based on key)
-
 
     // Message construction
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(vec!("did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
-        .as_jwe(alg) // set JOSE header for XC20P algorithm
+        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)) // set kid header
