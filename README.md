@@ -21,7 +21,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         .body(some_payload.as_bytes());
 
     // Serialize message into JWM json (SENDER action)
-    let ready_to_send = m.clone().as_raw_json().unwrap();
+    let ready_to_send = m.as_raw_json().unwrap();
 
     //... transport is happening here ...
 
@@ -62,7 +62,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 3. Prepare JWE message to be mediated -> mediate -> receive
-* Message should be encrypted by destination key first in `.routed_by()` method call using key for the recepient;
+* Message should be encrypted by destination key first in `.routed_by()` method call using key for the recepient.
 * Next it should be encrypted by mediator key in `.seal()` method call - this can be done multiple times - once for each mediator in chain but should be strictly sequentual to match mediators sequence in the chain.
 * Method call `.seal()` **MUST** be preceeded by  `.as_jwe(CryptoAlgorithm)` as mediators may use different algorithms and key types than destination and this is not automatically predicted or populated.
 * Keys used for encryption should be used in reverse order - final destination - last mediator - second to last mediator - etc. Onion style.
