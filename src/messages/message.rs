@@ -1,11 +1,10 @@
 use std::convert::TryInto;
-use aes_gcm::aead::generic_array::sequence;
 use serde::{Serialize, Deserialize};
 use super::{
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
 };
-use crate::{Error, Jwe, crypto::encryptor::CryptoAlgorithm};
+use crate::{Error, Jwe, MessageType, crypto::encryptor::CryptoAlgorithm};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -34,16 +33,16 @@ impl Message {
             body: vec!(),
         }
     }
-    // Setter of `from` header
-    // Helper method.
-    //
+    /// Setter of `from` header
+    /// Helper method.
+    ///
     pub fn from(mut self, from: &str) -> Self {
         self.didcomm_header.from = String::from(from);
         self
     }
-    // Setter of `to` header
-    // Helper method.
-    //
+    /// Setter of `to` header
+    /// Helper method.
+    ///
     pub fn to(mut self, to: Vec<&str>) -> Self {
         for s in to {
             self.didcomm_header.to.push(String::from(s));
@@ -53,9 +52,16 @@ impl Message {
         }
         self
     }
-    // Setter of the `body`
-    // Helper method.
-    //
+    /// Setter of `m_type` @type header
+    /// Helper method.
+    ///
+    pub fn m_type(mut self, m_type: MessageType) -> Self {
+        self.didcomm_header.m_type = m_type;
+        self
+    }
+    /// Setter of the `body`
+    /// Helper method.
+    ///
     pub fn body(mut self, body: &[u8]) -> Self {
         self.body = body.to_vec();
         self
@@ -175,6 +181,7 @@ impl Message {
     ///
     /// `sk` - signing key for enveloped message JWS encryption
     // TODO: Adde examples
+    // FIXME: Complete implementation!
     pub fn seal_signed(self, ek: &[u8], sk: &[u8]) -> Result<String, Error> {
         todo!()
         //let mut crypto_envelope = Message {
@@ -184,6 +191,9 @@ impl Message {
         //crypto_envelope.pack_compact_jwe(&ek)
     }
     /// Wrap self to be mediated by some mediator.
+    /// Warning: Should be called on a `Message` instance which is ready to be sent!
+    /// If message is not properly set up for crypto - this method will propogate error from
+    ///     called `.seal()` method.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
     ///
@@ -193,25 +203,18 @@ impl Message {
     ///
     /// `to` - list of destination recepients. can be empty (Optional) `String::default()`
     ///
-    /// `form` - sender identifyer `String`
+    /// `form` - used same as in wrapped message.
     ///
-    /// `expires_time` - `Option<usize>` seconds from the UTC Epoch seconds,
-    ///     signals when the message is no longer valid, and is to be used by
-    ///     the recipient to discard expired messages on receipt
     /// TODO: Add examples
-    pub fn routed_by(self,
-        ek: Vec<u8>,
-        to: Vec<String>,
-        from: String,
-        expires_time: Option<usize>)
+    pub fn routed_by(self, ek: &[u8], to: Vec<&str>)
         -> Result<Self, Error> {
-            todo!()
-       // let payload = self.pack_compact_jwe(&ek)?;
-       // let forward_headers = DidcommHeader::forward(to, from, expires_time)?;
-       // let mut packed = Message::new();
-       // packed.headers = forward_headers;
-       // packed.body = payload.as_bytes().to_vec();
-       // Ok(packed)
+            let h = &self.get_didcomm_header().from.clone();
+            let to_wrap = self.seal(ek)?;
+            Ok(Message::new()
+                .to(to)
+                .from(h)
+                .m_type(MessageType::Forward)
+                .body(to_wrap.as_bytes()))
     }
 }
 
@@ -277,13 +280,13 @@ impl Message {
             }
         }
     }
-    /// Construct a message from compact representation of received data.
-    /// Raw, JWE or JWS payload is accepted.
-    /// FIXME: NOT IMPLEMENTED
-    /// TODO: Add examples
-    pub fn receive_compact(incomming: &str, pk: &[u8]) -> Result<Self, Error> {
-        todo!()
-    }
+    // /// Construct a message from compact representation of received data.
+    // /// Raw, JWE or JWS payload is accepted.
+    // /// FIXME: NOT IMPLEMENTED
+    // /// TODO: Add examples
+    // pub fn receive_compact(incomming: &str, pk: &[u8]) -> Result<Self, Error> {
+    //     todo!()
+    // }
 }
 
 #[cfg(test)]
