@@ -19,7 +19,7 @@ impl Message {
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
     /// TODO: Improve error here
     ///
-    pub fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
+    pub(crate) fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
         -> Result<(JwmHeader, Vec<u8>), Error> {
             if let Some(h) = &self.jwm_header {
                 let header = h.clone();
@@ -46,40 +46,48 @@ impl Message {
             Err(Error::PlugCryptoFailure)
         }
     }
-    /// Encrypts current message by consuming it.
-    /// Uses provided cryptography function to perform
-    ///     the asymmentric encryption. Agnostic of actual algorythm used.
-    /// Consuming is to make sure no changes are
-    ///     possible post packaging / sending.
-    /// Returns `Vec<u8>` to be sent to receiver.
-    ///
-    fn send_asymm(
-        self,
-        crypter: AssymetricCyptherMethod,
-        nonce: &[u8],
-        their_pk: &[u8],
-        our_sk: &[u8]
-    ) -> Result<Vec<u8>, Error> {
-        crypter(&serde_json::to_string(&self)?.as_bytes(), nonce, their_pk, our_sk)
+    // FIXME: to be implemented
+    pub fn sign() {
+
     }
-    /// Decrypts received cypher into instance of `Message`.
-    /// Asymmetric crypto algorythm is expected.
-    /// Returns `Ok(Message)` if decryption / deserialization
-    ///     succeded. `Error` othervice.
-    ///
-    fn receive_asymm(
-        received_message: &[u8],
-        decrypter: AssymetricCyptherMethod,
-        nonce: &[u8],
-        our_pk: &[u8],
-        their_sk: &[u8]
-    ) -> Result<Self, Error> {
-        if let Ok(raw_message_bytes) = decrypter(received_message, nonce, our_pk, their_sk) {
-            serde_json::from_slice(&raw_message_bytes).map_err(|e| Error::SerdeError(e))
-        } else {
-            Err(Error::PlugCryptoFailure)
-        }
+    // FIXME: to be implemented
+    pub fn verify() {
+
     }
+    // /// Encrypts current message by consuming it.
+    // /// Uses provided cryptography function to perform
+    // ///     the asymmentric encryption. Agnostic of actual algorythm used.
+    // /// Consuming is to make sure no changes are
+    // ///     possible post packaging / sending.
+    // /// Returns `Vec<u8>` to be sent to receiver.
+    // ///
+    // fn send_asymm(
+    //     self,
+    //     crypter: AssymetricCyptherMethod,
+    //     nonce: &[u8],
+    //     their_pk: &[u8],
+    //     our_sk: &[u8]
+    // ) -> Result<Vec<u8>, Error> {
+    //     crypter(&serde_json::to_string(&self)?.as_bytes(), nonce, their_pk, our_sk)
+    // }
+    // /// Decrypts received cypher into instance of `Message`.
+    // /// Asymmetric crypto algorythm is expected.
+    // /// Returns `Ok(Message)` if decryption / deserialization
+    // ///     succeded. `Error` othervice.
+    // ///
+    // fn receive_asymm(
+    //     received_message: &[u8],
+    //     decrypter: AssymetricCyptherMethod,
+    //     nonce: &[u8],
+    //     our_pk: &[u8],
+    //     their_sk: &[u8]
+    // ) -> Result<Self, Error> {
+    //     if let Ok(raw_message_bytes) = decrypter(received_message, nonce, our_pk, their_sk) {
+    //         serde_json::from_slice(&raw_message_bytes).map_err(|e| Error::SerdeError(e))
+    //     } else {
+    //         Err(Error::PlugCryptoFailure)
+    //     }
+    // }
 }
 
 #[cfg(test)] 

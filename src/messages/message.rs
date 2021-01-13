@@ -4,7 +4,15 @@ use super::{
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
 };
-use crate::{Error, Jwe, MessageType, crypto::encryptor::CryptoAlgorithm};
+use crate::{
+    Error,
+    Jwe,
+    MessageType,
+    crypto::{
+        CryptoAlgorithm,
+        SignatureAlgorithm
+    },
+};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -115,8 +123,15 @@ impl Message {
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
-    pub fn as_jws(&mut self) {
-        todo!()
+    pub fn as_jws(self, alg: SignatureAlgorithm) -> Self {
+        let mut out = self;
+        if let Some(h) = &mut out.jwm_header {
+            h.as_signed(alg);
+        } else {
+            out.jwm_header = Some(JwmHeader::default());
+            out = out.as_jws(alg);
+        }
+        out
     }
     /// Creates set of Jwm related headers for the JWS
     /// Modifies JWM related header portion to match
@@ -183,12 +198,9 @@ impl Message {
     // TODO: Adde examples
     // FIXME: Complete implementation!
     pub fn seal_signed(self, ek: &[u8], sk: &[u8]) -> Result<String, Error> {
+        let to = self.clone();
+        to.as_jws(SignatureAlgorithm::Es256k);
         todo!()
-        //let mut crypto_envelope = Message {
-        //    headers: Headers::encrypt_jws(self.headers.clone())?,
-        //    body: self.sign_compact_jws(&sk)?.as_bytes().to_vec()
-        //};
-        //crypto_envelope.pack_compact_jwe(&ek)
     }
     /// Wrap self to be mediated by some mediator.
     /// Warning: Should be called on a `Message` instance which is ready to be sent!
