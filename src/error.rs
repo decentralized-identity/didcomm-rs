@@ -9,7 +9,7 @@ pub enum Error {
     #[error("not a JWE compact representation")]
     JweCompactParseError,
     #[error("not a JWS compact representation")]
-    JwsCompactParseError,
+    JwsParseError,
     #[error("failed to parse as JWE")]
     JweParseError,
     #[error("{0}")]
@@ -21,6 +21,9 @@ pub enum Error {
     #[cfg(feature = "jose-biscuit")]
     #[error(transparent)]
     BisquitError(#[from] biscuit::errors::Error),
+    #[cfg(feature = "raw-crypto")]
+    #[error(transparent)]
+    EdDsaError(#[from] ed25519_dalek::SignatureError),
     #[error(transparent)]
     StringConversionError(#[from] std::string::FromUtf8Error),
     #[error(transparent)]

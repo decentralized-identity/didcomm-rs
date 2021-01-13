@@ -96,7 +96,7 @@ mod raw_tests {
     use chacha20poly1305::aead::{Aead, NewAead};
     use sodiumoxide::crypto::{
         secretbox,
-        box_
+        // box_
     };
     use rand_core::OsRng;
     use x25519_dalek::{
@@ -174,51 +174,51 @@ mod raw_tests {
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
     }
 
-    #[test]
-    #[cfg(feature="raw-crypto")]
-    fn plugin_crypto_asymm_libsodium_box() {
-        // Arrange
-        let (sender_pk, sender_sk) = box_::gen_keypair();
-        let (receiver_pk, receiver_sk) = box_::gen_keypair();
-        // Plugable encryptor function to encrypt data
-        let nonce = box_::Nonce::from_slice(b"extra long unique nonce!").unwrap();
-        let my_crypter = Box::new(|m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
-            -> Result<Vec<u8>, Error> {
-            Ok(box_::seal(m,
-                &box_::Nonce::from_slice(n).unwrap(),
-                &box_::PublicKey::from_slice(pk).unwrap(),
-                &box_::SecretKey::from_slice(sk).unwrap())
-            )
-        });
-        // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
-            -> Result<Vec<u8>, Error> {
-            Ok(box_::open(m,
-                &box_::Nonce::from_slice(n).unwrap(),
-                &box_::PublicKey::from_slice(pk).unwrap(),
-                &box_::SecretKey::from_slice(sk).unwrap())
-                .map_err(|_| Error::PlugCryptoFailure)?)
-        });
-        let m = Message::new();
-        let id = m.get_didcomm_header().id;
+    // #[test]
+    // #[cfg(feature="raw-crypto")]
+    // fn plugin_crypto_asymm_libsodium_box() {
+    //     // Arrange
+    //     let (sender_pk, sender_sk) = box_::gen_keypair();
+    //     let (receiver_pk, receiver_sk) = box_::gen_keypair();
+    //     // Plugable encryptor function to encrypt data
+    //     let nonce = box_::Nonce::from_slice(b"extra long unique nonce!").unwrap();
+    //     let my_crypter = Box::new(|m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
+    //         -> Result<Vec<u8>, Error> {
+    //         Ok(box_::seal(m,
+    //             &box_::Nonce::from_slice(n).unwrap(),
+    //             &box_::PublicKey::from_slice(pk).unwrap(),
+    //             &box_::SecretKey::from_slice(sk).unwrap())
+    //         )
+    //     });
+    //     // Plugable decryptor function to decrypt data
+    //     let my_decrypter = Box::new(|m: &[u8], n: &[u8], pk: &[u8], sk: &[u8]|
+    //         -> Result<Vec<u8>, Error> {
+    //         Ok(box_::open(m,
+    //             &box_::Nonce::from_slice(n).unwrap(),
+    //             &box_::PublicKey::from_slice(pk).unwrap(),
+    //             &box_::SecretKey::from_slice(sk).unwrap())
+    //             .map_err(|_| Error::PlugCryptoFailure)?)
+    //     });
+    //     let m = Message::new();
+    //     let id = m.get_didcomm_header().id;
 
-        // Act and Assert
-        let crypted =
-            m.send_asymm(my_crypter,
-            &nonce.as_ref(),
-            &receiver_pk.as_ref(),
-            &sender_sk.as_ref()
-        );
-        assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::receive_asymm(
-            &crypted.unwrap(),
-            my_decrypter,
-            &nonce.as_ref(),
-            &sender_pk.as_ref(),
-            &receiver_sk.as_ref());
-        assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id);
-    }
+    //     // Act and Assert
+    //     let crypted =
+    //         m.send_asymm(my_crypter,
+    //         &nonce.as_ref(),
+    //         &receiver_pk.as_ref(),
+    //         &sender_sk.as_ref()
+    //     );
+    //     assert!(&crypted.is_ok()); // Encryption check
+    //     let raw_m = Message::receive_asymm(
+    //         &crypted.unwrap(),
+    //         my_decrypter,
+    //         &nonce.as_ref(),
+    //         &sender_pk.as_ref(),
+    //         &receiver_sk.as_ref());
+    //     assert!(&raw_m.is_ok()); // Decryption check
+    //     assert_eq!(id, raw_m.unwrap().get_didcomm_header().id);
+    // }
 
     #[test]
     #[allow(non_snake_case)]

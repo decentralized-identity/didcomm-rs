@@ -18,8 +18,12 @@ fn send_receive_raw() {
 
     // Act
     let ready_to_send = m.clone().as_raw_json().unwrap();
+
+    // checking if encryption fails on it
     let packed = m.clone().seal(b"anuhcphus");
     assert!(packed.is_err());
+
+    // receiving raw message
     let received = Message::receive(&ready_to_send, None);
 
     // Assert

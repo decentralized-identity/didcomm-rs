@@ -6,7 +6,13 @@ use std::{
     time::SystemTime,
     collections::HashMap,
 };
-use crate::{Error, crypto::encryptor::CryptoAlgorithm};
+use crate::{
+    Error,
+    crypto::{
+        CryptoAlgorithm,
+        SignatureAlgorithm
+    },
+};
 use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -20,7 +26,7 @@ pub struct DidcommHeader {
     pub created_time: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_time: Option<usize>,
-    #[serde(flatten)]
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub(crate) other: HashMap<String, String>,
     /// A JWT, with sub: new DID and iss: prior DID, 
     /// with a signature from a key authorized by prior DID.
@@ -75,6 +81,9 @@ impl Default for DidcommHeader {
 
 /// JWM Header as specifiead in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
+///
+/// Designed to work for both [JWE](https://tools.ietf.org/html/rfc7516) and [JWS](https://tools.ietf.org/html/rfc7515) message types.
+///
 /// `iv` property is not explicitly listed in the registered properties on the RFC but is present
 ///     within example lists - used here as DIDComm crypto nonce sharing property.
 ///
@@ -91,6 +100,14 @@ pub struct JwmHeader {
     //  both JWE and/or JWS.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alg: Option<String>,
+    // Refers to a resource for a set of JSON-encoded public keys, one of
+    // which corresponds to the key used to digitally sign the JWS.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jku: Option<String>,
+    // public key that corresponds to the key used to digitally sign the JWS.
+    // TODO: implement proper struct for it:
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jwk: Option<String>,
     // Some(String) - serialized ephemeral public key.
     // TODO: implement proper struct for it:
     // https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
@@ -100,15 +117,34 @@ pub struct JwmHeader {
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<String>,
+    // General headers holder (registered, public or private).
+    // Stuff like x5* headers shoul go here if required.
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    pub(crate) other: HashMap<String, String>,
     // Nonce!
     // FIXME: should this be optional?
     iv: Vec<u8>,
 }
 
 impl JwmHeader {
+    /// `iv` getter
+    ///
     pub fn get_iv(&self) -> &[u8] {
         &self.iv
     }
+    // FIXME: complete the implementation
+    pub fn as_signed(&mut self, alg: SignatureAlgorithm) {
+        match alg {
+            SignatureAlgorithm::EdDsa => {
+
+            },
+            SignatureAlgorithm::Es256 => {},
+            SignatureAlgorithm::Es256k => {},
+        }
+    }
+    /// Setter of proper headers to identify which crypto alg and key type to use.
+    /// Modifies `enc` and `alg` headers.
+    ///
     pub fn as_encrypted(&mut self, alg: CryptoAlgorithm) {
         match alg {
             CryptoAlgorithm::A256GCM => { 
@@ -140,6 +176,9 @@ impl Default for JwmHeader {
             epk: None,
             alg: None,
             cty: None,
+            jku: None,
+            jwk: None,
+            other: HashMap::new(),
         }
     }
 }

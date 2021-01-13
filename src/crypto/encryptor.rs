@@ -117,11 +117,11 @@ impl CryptoAlgorithm {
 impl TryFrom<&String> for CryptoAlgorithm {
     type Error = Error;
     fn try_from(incomming: &String) -> Result<Self, Error> {
-        Ok(match &incomming[..] {
-            "A256GCM" => Self::A256GCM,
-            "ECDH-ES+A256KW" => Self::XC20P,
+        match &incomming[..] {
+            "A256GCM" => Ok(Self::A256GCM),
+            "ECDH-ES+A256KW" => Ok(Self::XC20P),
             _ => return Err(Error::JweParseError),
-        })
+        }
     }
 }
 // inner helper function
