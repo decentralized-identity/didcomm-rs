@@ -12,6 +12,8 @@ pub enum Error {
     JwsParseError,
     #[error("failed to parse as JWE")]
     JweParseError,
+    #[error("JWM header parsing failed - malformed alg")]
+    JwmHeaderParseError,
     #[error("{0}")]
     Generic(String),
     #[error(transparent)]

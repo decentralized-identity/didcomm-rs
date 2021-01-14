@@ -24,7 +24,7 @@ fn send_receive_raw() {
     assert!(packed.is_err());
 
     // receiving raw message
-    let received = Message::receive(&ready_to_send, None);
+    let received = Message::receive(&ready_to_send, None, None);
 
     // Assert
     assert!(&received.is_ok());
@@ -55,7 +55,7 @@ fn send_receive_encrypted_xc20p_json_test() {
     // Act
     let ready_to_send = message.seal(ek.as_bytes()).unwrap();
     let rk = bob_secret.diffie_hellman(&alice_public); // bob's shared secret calculation
-    let received = Message::receive(&ready_to_send, Some(rk.as_bytes())); // and now we parse received
+    let received = Message::receive(&ready_to_send, Some(rk.as_bytes()), None); // and now we parse received
 
     // Assert
     assert!(&received.is_ok());
@@ -103,13 +103,13 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
 
     // Received by mediator
     let rk_mediator = bob_mediator_secret.diffie_hellman(&alice_public_2); // key to decrypt mediated message
-    let received_mediated = Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()));
+    let received_mediated = Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()), None);
 
     assert!(&received_mediated.is_ok());
 
     // Received by Bob
     let rk_bob = bob_secret.diffie_hellman(&alice_public); // key to decrypt final message
-    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()));
+    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()), None);
 
     assert!(&received_bob.is_ok());
     assert_eq!(received_bob.unwrap().body, sample_dids::TEST_DID_SIGN_1.as_bytes());
