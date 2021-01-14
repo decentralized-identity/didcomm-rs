@@ -1,4 +1,4 @@
-use crate::{JwmHeader, error::Error, Jwe};
+use crate::{JwmHeader, error::Error, Jwe, Jws};
 use super::Message;
 
 // Arguments sequence: Nonce, Key, Message.
@@ -46,13 +46,32 @@ impl Message {
             Err(Error::PlugCryptoFailure)
         }
     }
-    // FIXME: to be implemented
-    pub fn sign() {
-
+    /// Signs message and turns it into `Jws` envelope.
+    /// `Err` is returned if message is not properly prepared or data is malformed.
+    /// Jws enveloped payload is base64_url encoded
+    pub fn sign(self, signer: SigningMethod, signing_key: &[u8]) -> Result<Jws, Error> {
+        if let Some(h) = self.jwm_header.clone() {
+            if h.alg.is_none() {
+                Err(Error::JwsParseError)
+            } else {
+                let payload = base64_url::encode(&serde_json::to_string(&self)?);
+                let signature = signer(signing_key, &payload.as_bytes())?;
+                Ok(Jws::new(payload, h, signature))
+            }
+        } else {
+            Err(Error::JwsParseError)
+        }
     }
-    // FIXME: to be implemented
-    pub fn verify() {
-
+    /// Verifyes signature and returns payload message on verification success.
+    /// `Err` return if signature invalid or data is malformed.
+    /// Expects Jws's payload to be a valid serialized `Message` and base64_url encoded.
+    ///
+    pub fn verify(verifyer: ValidationMethod, jws: Jws, key: &[u8]) -> Result<Message, Error> {
+        if verifyer(key, &jws.payload.as_bytes(), &jws.signature[..])? {
+            Ok(serde_json::from_slice(&base64_url::decode(&jws.payload)?)?)
+        } else {
+            Err(Error::JwsParseError)
+        }
     }
     // /// Encrypts current message by consuming it.
     // /// Uses provided cryptography function to perform

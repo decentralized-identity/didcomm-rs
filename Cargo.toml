@@ -29,7 +29,6 @@ num = "0.3"
 regex = "1"
 rand = "0.8"
 thiserror = "1.0"
-base64 = "0.13"
 
 [dev-dependencies]
 sodiumoxide = "0.2.6"

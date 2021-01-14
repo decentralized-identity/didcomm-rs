@@ -115,7 +115,7 @@ impl TryFrom<&String> for SignatureAlgorithm {
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         match &value[..] {
-            "EdDsa" => Ok(Self::EdDsa),
+            "EdDSA" => Ok(Self::EdDsa),
             "ES256" => Ok(Self::Es256),
             "ES256K" => Ok(Self::Es256k),
             _ => Err(Error::JwsParseError)

@@ -136,10 +136,14 @@ impl JwmHeader {
     pub fn as_signed(&mut self, alg: SignatureAlgorithm) {
         match alg {
             SignatureAlgorithm::EdDsa => {
-
+                self.alg = Some(String::from("EdDSA"));
             },
-            SignatureAlgorithm::Es256 => {},
-            SignatureAlgorithm::Es256k => {},
+            SignatureAlgorithm::Es256 => {
+                self.alg = Some(String::from("ES256"));
+            },
+            SignatureAlgorithm::Es256k => {
+                self.alg = Some(String::from("ES256k"));
+            },
         }
     }
     /// Setter of proper headers to identify which crypto alg and key type to use.

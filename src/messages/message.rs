@@ -200,6 +200,7 @@ impl Message {
     pub fn seal_signed(self, ek: &[u8], sk: &[u8]) -> Result<String, Error> {
         let to = self.clone();
         to.as_jws(SignatureAlgorithm::Es256k);
+        
         todo!()
     }
     /// Wrap self to be mediated by some mediator.

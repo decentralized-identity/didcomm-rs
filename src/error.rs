@@ -29,7 +29,7 @@ pub enum Error {
     #[error(transparent)]
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error(transparent)]
-    Base64DecodeError(#[from] base64::DecodeError),
+    Base64DecodeError(#[from] base64_url::base64::DecodeError),
     #[error(transparent)]
     Other(Box<dyn std::error::Error>),
 }
