@@ -1,4 +1,3 @@
-
 use crate::{
     Error,
     SigningMethod,
@@ -10,9 +9,11 @@ use std::convert::TryFrom;
 /// Implementation of all algorithms required by (spec)[https://identity.foundation/didcomm-messaging/spec/#algorithms]
 /// 
 pub enum SignatureAlgorithm {
+    /// `ed25519` signature
     EdDsa,
+    /// `ECDSA/P-256` NIST signature
     Es256,
-    /// `ECDSA/secp256k1` signatures.
+    /// `ECDSA/secp256k1` signature
     Es256k,
 }
 
@@ -39,7 +40,12 @@ impl SignatureAlgorithm {
                 })
             },
             SignatureAlgorithm::Es256 => {
-                todo!()
+                Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
+                    use p256::ecdsa::{SigningKey, Signature, signature::Signer};
+                    let sk = SigningKey::from_bytes(key)?;
+                    let signature: Signature = sk.sign(message);
+                    Ok(signature.as_ref().to_vec())
+                })
             },
             SignatureAlgorithm::Es256k => {
                 Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
@@ -79,7 +85,12 @@ impl SignatureAlgorithm {
                 })
             },
             SignatureAlgorithm::Es256 => {
-                todo!()
+                Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
+                    use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+                    let key = VerifyingKey::from_sec1_bytes(key)?;
+                    let s = Signature::try_from(signature)?;
+                    Ok(key.verify(message, &s).is_ok())
+                })
             },
             SignatureAlgorithm::Es256k => {
                 Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
@@ -90,10 +101,8 @@ impl SignatureAlgorithm {
                             signature::Verifier,
                         },
                     };
-                    let vk = VerifyingKey::from_sec1_bytes(key)
-                        .map_err(|e| Error::Generic(e.to_string()))?;
-                    let signature = Signature::try_from(signature)
-                        .map_err(|e| Error::Generic(e.to_string()))?;
+                    let vk = VerifyingKey::from_sec1_bytes(key)?;
+                    let signature = Signature::try_from(signature)?;
                     Ok(vk.verify(message, &signature).is_ok())
                 })
             }
