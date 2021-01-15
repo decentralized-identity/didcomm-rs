@@ -17,7 +17,7 @@ pub enum MessageType {
     #[serde(rename = "dodcomm/jwe")]
     DidcommJwe,
     #[serde(rename = "dodcomm/jws")]
-    DidcommJwm,
+    DidcommJws,
     #[serde(rename = "didcomm/unknown")]
     DidcommUnknown,
 }

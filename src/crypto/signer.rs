@@ -79,8 +79,8 @@ impl SignatureAlgorithm {
         match self {
             SignatureAlgorithm::EdDsa => {
                 Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
-                    use ed25519_dalek::{Keypair, Signature};
-                    let key = Keypair::from_bytes(key)?;
+                    use ed25519_dalek::{PublicKey, Signature, Verifier};
+                    let key = PublicKey::from_bytes(key)?;
                     let s = Signature::try_from(signature)?;
                     Ok(key.verify(message, &s).is_ok())
                 })

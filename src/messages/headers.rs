@@ -117,10 +117,6 @@ pub struct JwmHeader {
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<String>,
-    // General headers holder (registered, public or private).
-    // Stuff like x5* headers shoul go here if required.
-    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
-    pub(crate) other: HashMap<String, String>,
     // Nonce!
     // FIXME: should this be optional?
     iv: Vec<u8>,
@@ -142,7 +138,7 @@ impl JwmHeader {
                 self.alg = Some(String::from("ES256"));
             },
             SignatureAlgorithm::Es256k => {
-                self.alg = Some(String::from("ES256k"));
+                self.alg = Some(String::from("ES256K"));
             },
         }
     }
@@ -182,7 +178,6 @@ impl Default for JwmHeader {
             cty: None,
             jku: None,
             jwk: None,
-            other: HashMap::new(),
         }
     }
 }

@@ -5,7 +5,7 @@ use crate::JwmHeader;
 pub struct Jws {
     pub payload: String,
     pub protected: Option<JwmHeader>,
-    pub header: Option<JwmHeader>,
+    pub header: JwmHeader,
     pub signature: Vec<u8>,
 }
 
@@ -14,7 +14,7 @@ impl Jws {
         Jws {
             payload,
             protected: None,
-            header: Some(header),
+            header: header,
             signature
         }
     }

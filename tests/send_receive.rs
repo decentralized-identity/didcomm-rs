@@ -6,7 +6,7 @@ mod common;
 use common::*;
 use rand_core::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey};
-use didcomm_rs::crypto::CryptoAlgorithm;
+use didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm};
 
 #[test]
 fn send_receive_raw() {
@@ -113,4 +113,47 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
 
     assert!(&received_bob.is_ok());
     assert_eq!(received_bob.unwrap().body, sample_dids::TEST_DID_SIGN_1.as_bytes());
+}
+
+#[test]
+fn send_receive_direct_signed_and_encrypted_xc20p_test() {
+    // Arrange
+    // keys
+    let alice_secret = EphemeralSecret::new(OsRng);
+    let alice_public = PublicKey::from(&alice_secret);
+    let bob_secret = EphemeralSecret::new(OsRng);
+    let bob_public = PublicKey::from(&bob_secret);
+    let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+    // DIDComm related setup
+    let ek = alice_secret.diffie_hellman(&bob_public);
+
+    // Message construction
+    let message = Message::new() // creating message
+        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
+        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
+        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
+        .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
+        .add_header_field("another_key".into(), "another_value".into()) // another coustom header
+        .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
+
+    // Act
+    // Send
+    let ready_to_send = message.seal_signed(
+        ek.as_bytes(),
+        &sign_keypair.to_bytes(),
+        SignatureAlgorithm::EdDsa)
+        .unwrap();
+
+    //Receive
+    let rk = bob_secret.diffie_hellman(&alice_public); // bob's shared secret calculation
+    let received = Message::receive(
+        &ready_to_send,
+        Some(rk.as_bytes()),
+        Some(&sign_keypair.public.to_bytes())); // and now we parse received
+
+    // Assert
+    assert!(&received.is_ok());
+    let received = received.unwrap();
+    assert_eq!(sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(), received.body);
 }

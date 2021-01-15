@@ -1,4 +1,4 @@
-use std::convert::{TryInto, TryFrom};
+use std::convert::TryInto;
 use serde::{Serialize, Deserialize};
 use super::{
     headers::{DidcommHeader, JwmHeader},
@@ -7,7 +7,6 @@ use super::{
 use crate::{
     Error,
     Jwe,
-    Jws,
     MessageType,
     crypto::{
         CryptoAlgorithm,
@@ -21,8 +20,8 @@ use crate::{
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Message {
     /// JOSE header, which is sent as public part with JWE.
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    pub jwm_header: Option<JwmHeader>,
+    #[serde(flatten)]
+    pub jwm_header: JwmHeader,
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
@@ -37,7 +36,7 @@ impl Message {
     ///
     pub fn new() -> Self {
         Message {
-            jwm_header: None,
+            jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
             body: vec!(),
         }
@@ -78,16 +77,14 @@ impl Message {
     // Setter of the `kid` header
     // Helper method.
     //
-    pub fn kid(self, kid: String) -> Self {
-        let mut inner = self;
-        match &mut inner.jwm_header {
-            Some(h) => h.kid = Some(kid),
+    pub fn kid(mut self, kid: String) -> Self {
+        match &mut self.jwm_header.kid {
+            Some(h) => *h = kid,
             None => {
-                inner.jwm_header = Some(JwmHeader::default());
-                inner = inner.kid(kid);
+                self.jwm_header.kid = Some(kid);
             }
         }
-        inner
+        self
     }
     /// Checks if message is rotation one.
     /// Exposed for explicit checks on calling code level.
@@ -124,30 +121,18 @@ impl Message {
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
-    pub fn as_jws(self, alg: SignatureAlgorithm) -> Self {
-        let mut out = self;
-        if let Some(h) = &mut out.jwm_header {
-            h.as_signed(alg);
-        } else {
-            out.jwm_header = Some(JwmHeader::default());
-            out = out.as_jws(alg);
-        }
-        out
+    pub fn as_jws(mut self, alg: SignatureAlgorithm) -> Self {
+        self.jwm_header.as_signed(alg);
+        self
     }
     /// Creates set of Jwm related headers for the JWS
     /// Modifies JWM related header portion to match
     ///     signature implementation and leaves Other
     ///     parts unchanged.
     //
-    pub fn as_jwe(self, alg: CryptoAlgorithm) -> Self {
-        let mut out = self;
-        if let Some(h) = &mut out.jwm_header {
-            h.as_encrypted(alg);
-        } else {
-                out.jwm_header = Some(JwmHeader::default());
-                out = out.as_jwe(alg);
-        }
-        out
+    pub fn as_jwe(mut self, alg: CryptoAlgorithm) -> Self {
+        self.jwm_header.as_encrypted(alg);
+        self
     }
     /// Serializez current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
@@ -163,30 +148,8 @@ impl Message {
     // TODO: Feature-gate(split) this ("raw-crypto" / "jose-biscuit")?
     // TODO: Add examples
     pub fn seal(self, ek: &[u8]) -> Result<String, Error> {
-        if let Some(h) = &self.jwm_header {
-            let alg = crypter_from_header(h)?;
-            let (h, b) = self.encrypt(alg.encryptor(), ek)?;
-            serde_json::to_string(&Jwe::new(h, b))
-                .map_err(|e| Error::SerdeError(e))
-        } else {
-            Err(Error::JweParseError)
-        }
-    }
-    /// Seals self and returns ready to send JWE as compact representation
-    ///
-    /// # Parameters
-    ///
-    /// `ek` - encryption key for inner message payload JWE encryption
-    // TODO: Feature-gate this?
-    // TODO: Add examples
-    pub fn seal_compact(self, ek: &[u8]) -> Result<String, Error> {
-        if let Some(h) = &self.jwm_header {
-            let alg = crypter_from_header(h)?;
-            let (h, b) = self.encrypt(alg.encryptor(), ek)?;
-            Jwe::new(h, b).as_compact()
-        } else {
-            Err(Error::JweCompactParseError)
-        }
+        let alg = crypter_from_header(&self.jwm_header)?;
+        self.encrypt(alg.encryptor(), ek)
     }
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
@@ -208,8 +171,10 @@ impl Message {
         let signed = self
             .as_jws(signing_algorithm.clone())
             .sign(signing_algorithm.signer(), sk)?;
-        to.body = serde_json::to_string(&signed)?.as_bytes().to_vec();
-        to.seal(ek)
+        to.body = signed.as_bytes().to_vec();
+        to
+            .m_type(MessageType::DidcommJws)
+            .seal(ek)
     }
     /// Wrap self to be mediated by some mediator.
     /// Warning: Should be called on a `Message` instance which is ready to be sent!
@@ -295,22 +260,18 @@ impl Message {
                     let a: CryptoAlgorithm = alg.try_into()?;
                     // TODO: public-private header validation should be here?
                     let m = Message::decrypt(incomming.as_bytes(), a.decryptor(), key)?;
-                    if let Some(h) = &m.jwm_header {
-                        if let Ok(verify_alg) = SignatureAlgorithm::try_from(&h.alg.clone().unwrap()) {
-                            if let Some(val_key) = validation_key {
-                                let jws: Jws = serde_json::from_slice(&m.body)?;
-                                Message::verify(verify_alg.validator(), jws, val_key)
-                            } else {
-                                Err(Error::Generic(String::from("Validation key is missing")))
-                            }
+                    // TODO: hate this tree - needs some refactoring
+                    if &m.didcomm_header.m_type == &MessageType::DidcommJws {
+                        if let Some(val_key) = validation_key {
+                            Message::verify(&m.body, val_key)
                         } else {
-                            Ok(m)
+                            Err(Error::Generic(String::from("Validation key is missing")))
                         }
                     } else {
                         Ok(m)
                     }
-                } else { // Here we have JWS
-                    todo!()
+                } else { 
+                    Err(Error::JweParseError)
                 }
             }
         }

@@ -135,10 +135,7 @@ fn check_nonce(nonce: &[u8], expected_len: usize) -> Result<(), Error> {
 #[cfg(test)]
 mod batteries_tests {
     use super::*;
-    use crate::{
-        Message,
-        Jwe,
-    };
+    use crate::Message;
 
     #[test]
     fn xc20p_test() -> Result<(), Error> {
@@ -147,24 +144,22 @@ mod batteries_tests {
         let m = Message::new()
             .as_jwe(CryptoAlgorithm::XC20P) // Set jwe header manually - sohuld be preceeded by key properties
             .body(payload.as_bytes());
-        let original_header = m.jwm_header.clone().unwrap();
+        let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
-        let (h, r) = m.encrypt(
+        let jwe = m.encrypt(
             CryptoAlgorithm::XC20P.encryptor(),
             key
-        )?;
-        let jwe = Jwe::new(h, r);
-        let str_jwe = serde_json::to_string(&jwe);
-        assert!(&str_jwe.is_ok());
+        );
+        assert!(&jwe.is_ok());
         let s = Message::decrypt(
-            &str_jwe.unwrap().as_bytes(),
+            &jwe.unwrap().as_bytes(),
             CryptoAlgorithm::XC20P.decryptor(),
             key
             )?;
-        let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.
+        let received_payload = &String::from_utf8(s.body.clone())?; // Here we know it's a String, but could be anything really.
         // Assert
-        assert_eq!(s.jwm_header.unwrap(), original_header);
+        assert_eq!(s.jwm_header, original_header);
         assert_eq!(payload, received_payload);
         Ok(())
     }
@@ -175,24 +170,22 @@ mod batteries_tests {
         let m = Message::new()
             .as_jwe(CryptoAlgorithm::A256GCM) // Set jwe header manually - sohuld be preceeded by key properties
             .body(payload.as_bytes());
-        let original_header = m.jwm_header.clone().unwrap();
+        let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
-        let (h, r) = m.encrypt(
+        let jwe = m.encrypt(
             CryptoAlgorithm::A256GCM.encryptor(),
             key
-        )?;
-        let jwe = Jwe::new(h, r);
-        let str_jwe = serde_json::to_string(&jwe);
-        assert!(&str_jwe.is_ok());
+        );
+        assert!(&jwe.is_ok());
         let s = Message::decrypt(
-            &str_jwe.unwrap().as_bytes(),
+            &jwe.unwrap().as_bytes(),
             CryptoAlgorithm::A256GCM.decryptor(),
             key
             )?;
         let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.
         // Assert
-        assert_eq!(s.jwm_header.unwrap(), original_header);
+        assert_eq!(s.jwm_header, original_header);
         assert_eq!(payload, received_payload);
         Ok(())
     }
