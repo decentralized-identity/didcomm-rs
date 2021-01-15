@@ -109,6 +109,38 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()));
 ```
 
+## 4. Prepare JWS envelope wrapped into JWE -> sign -> pack -> receive
+* JWS header is set automatically based on signing algorythm type.
+* Message forming and encryption happens in same way as in other JWE examples.
+* ED25519-dalek signature is used in this example with keypair for signing and public key for verification.
+
+```rust
+    // Message construction
+    let message = Message::new() // creating message
+        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
+        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
+        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
+        .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
+        .add_header_field("another_key".into(), "another_value".into()) // another coustom header
+        .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
+
+    // Send as signed and encrypted JWS wrapped into JWE
+    let ready_to_send = message.seal_signed(
+        encryption_key.as_bytes(),
+        &sign_keypair.to_bytes(),
+        SignatureAlgorithm::EdDsa)
+        .unwrap();
+
+    //... transport to destination is happening here ...
+
+    //Receive - same method to receive for JWE or JWS wrapped into JWE but with pub verifying key
+    let received = Message::receive(
+        &ready_to_send,
+        Some(decryption_key.as_bytes()),
+        Some(&pub_sign_verify_key.to_bytes())); // and now we parse received
+```
+
 # Status
 
 In development - no releases
