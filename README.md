@@ -2,6 +2,9 @@
 
 Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-messaging/spec)
 
+![tests](https://github.com/jolocom/didcomm-rs/workflows/tests/badge.svg)
+
+
 #License
 
 [Apache-2.0](LICENSE.md)
