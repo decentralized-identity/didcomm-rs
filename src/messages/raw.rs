@@ -113,7 +113,7 @@ mod raw_tests {
             Ok(aead.decrypt(nonce, m).unwrap())
         });
         let m = Message::new()
-            .as_jwe(CryptoAlgorithm::A256GCM);
+            .as_jwe(&CryptoAlgorithm::A256GCM);
         let id = m.get_didcomm_header().id;
 
         // Act and Assert
@@ -142,7 +142,7 @@ mod raw_tests {
                 .unwrap())
         });
         let m = Message::new()
-            .as_jwe(CryptoAlgorithm::A256GCM);
+            .as_jwe(&CryptoAlgorithm::A256GCM);
         let id = m.get_didcomm_header().id;
         let key = secretbox::gen_key();
 
@@ -168,7 +168,7 @@ mod raw_tests {
         let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
         let m = Message::new()
-            .as_jwe(CryptoAlgorithm::XC20P);
+            .as_jwe(&CryptoAlgorithm::XC20P);
         let id = m.get_didcomm_header().id;
         // Plugable encryptor function to encrypt data
         let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {

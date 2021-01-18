@@ -131,7 +131,7 @@ impl JwmHeader {
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
     ///
-    pub fn as_signed(&mut self, alg: SignatureAlgorithm) {
+    pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
         self.typ = String::from("JWM");
         match alg {
             SignatureAlgorithm::EdDsa => {
@@ -148,7 +148,7 @@ impl JwmHeader {
     /// Setter of JOSE header preperties to identify which crypto alg and key type used.
     /// Modifies `enc`, `typ` and `alg` headers.
     ///
-    pub fn as_encrypted(&mut self, alg: CryptoAlgorithm) {
+    pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         self.typ = String::from("JWM");
         match alg {
             CryptoAlgorithm::A256GCM => { 

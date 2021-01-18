@@ -123,7 +123,7 @@ impl Message {
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
-    pub fn as_jws(mut self, alg: SignatureAlgorithm) -> Self {
+    pub fn as_jws(mut self, alg: &SignatureAlgorithm) -> Self {
         self.jwm_header.as_signed(alg);
         self
     }
@@ -132,7 +132,7 @@ impl Message {
     ///     signature implementation and leaves Other
     ///     parts unchanged.
     //
-    pub fn as_jwe(mut self, alg: CryptoAlgorithm) -> Self {
+    pub fn as_jwe(mut self, alg: &CryptoAlgorithm) -> Self {
         self.jwm_header.as_encrypted(alg);
         self
     }
@@ -171,7 +171,7 @@ impl Message {
     -> Result<String, Error> {
         let mut to = self.clone();
         let signed = self
-            .as_jws(signing_algorithm.clone())
+            .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), sk)?;
         to.body = signed.as_bytes().to_vec();
         to

@@ -52,7 +52,7 @@ fn compact_serialization_test() {
     let mut h = JwmHeader::default();
     let b = b"some sort of a message";
     // Act
-    h.as_encrypted(crate::crypto::encryptor::CryptoAlgorithm::A256GCM);
+    h.as_encrypted(&crate::crypto::CryptoAlgorithm::A256GCM);
     let b_encoded = to_base64(&String::from_utf8_lossy(b));
     let h_encoded = to_base64(&serde_json::to_string(&h).unwrap());
     let jwe = Jwe::new(h.clone(), b.clone().to_vec());

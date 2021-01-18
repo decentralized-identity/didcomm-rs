@@ -158,6 +158,8 @@ In order to use your own implementation[s] of message crypto and/or signature al
 
 [`Signer`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L39)
 
+Dont use `default` feature - might change in future.
+
 When implemented - use them instead of `CrptoAlgorithm` and `SignatureAlgorithm` from examples above.
 
 # Status

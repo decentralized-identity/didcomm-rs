@@ -6,7 +6,7 @@ mod common;
 use common::*;
 use rand_core::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey};
-use didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm};
+use didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer};
 
 #[test]
 fn send_receive_raw() {
@@ -47,7 +47,7 @@ fn send_receive_encrypted_xc20p_json_test() {
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
-        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
+        .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
@@ -84,7 +84,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(vec!("did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
-        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
+        .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)) // set kid header
@@ -96,7 +96,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     // Message envelope to mediator
     let ready_to_send = message
         .unwrap()
-        .as_jwe(CryptoAlgorithm::XC20P) // here this method call is crucial as mediator and end receiver may use different algorithms.
+        .as_jwe(&CryptoAlgorithm::XC20P) // here this method call is crucial as mediator and end receiver may use different algorithms.
         .seal(ek_to_mediator.as_bytes()); // this would've failed without previous method call.
 
     assert!(&ready_to_send.is_ok());
@@ -116,6 +116,27 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
 }
 
 #[test]
+fn send_receive_signed_json_test() {
+    // Arrange + Act
+    let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+    // Message construction an JWS wrapping
+    let message = Message::new() // creating message
+        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
+        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
+        .as_jws(&SignatureAlgorithm::EdDsa)
+        .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes());
+
+    assert!(&message.is_ok());
+
+    // Receiving JWS
+    let received = Message::verify(&message.unwrap().as_bytes(), &sign_keypair.public.to_bytes());
+    // Assert
+    assert!(&received.is_ok());
+    assert_eq!(sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(), received.unwrap().body);
+}
+
+#[test]
 fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     // Arrange
     // keys
@@ -132,7 +153,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
-        .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
+        .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
