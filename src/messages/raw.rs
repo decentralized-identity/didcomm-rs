@@ -1,14 +1,16 @@
 use std::convert::TryInto;
-use crate::{Jwe, Jws, crypto::SignatureAlgorithm, error::Error};
+use crate::{
+    Jwe,
+    Jws,
+    Error,
+    crypto::{
+        SignatureAlgorithm,
+        SymmetricCypherMethod,
+        SigningMethod,
+        Signer,
+    },
+};
 use super::Message;
-
-// Arguments sequence: Nonce, Key, Message.
-pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
-pub type AssymetricCyptherMethod = Box<dyn Fn(&[u8], &[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
-/// .0 == `key: &[u8]`; .1 == `message`;
-pub type SigningMethod = Box<dyn Fn(&[u8], &[u8]) -> Result<Vec<u8>, Error>>;
-/// .0 == `key: &[u8]`; .1 == `message`; .2 == `signature`;
-pub type ValidationMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<bool, Error>>;
 
 #[cfg(feature = "raw-crypto")]
 impl Message {
@@ -18,7 +20,6 @@ impl Message {
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
-    /// TODO: Improve error here
     ///
     pub(crate) fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
         -> Result<String, Error> {

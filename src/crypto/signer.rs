@@ -1,8 +1,4 @@
-use crate::{
-    Error,
-    SigningMethod,
-    ValidationMethod,
-};
+use super::*;
 use std::convert::TryFrom;
 
 /// Signature related batteries for DIDComm.
@@ -18,18 +14,18 @@ pub enum SignatureAlgorithm {
     Es256k,
 }
 
-impl SignatureAlgorithm {
+impl Signer for SignatureAlgorithm {
     /// Builds signer FnOnce, which performs signing.
     ///
     /// # Examples
     /// ```
     /// # fn main() {
-    /// use didcomm_rs::crypto::signer::SignatureAlgorithm;
+    /// use didcomm_rs::crypto::{SignatureAlgorithm, Signer};
     /// let signer = SignatureAlgorithm::Es256k.signer();
     /// # }
     ///```
     ///
-    pub fn signer(&self) -> SigningMethod {
+    fn signer(&self) -> SigningMethod {
         match self {
             // an &[u8] representing the scalar for the secret key, and a compressed Edwards-Y coordinate of a point on curve25519, both as bytes. 
             SignatureAlgorithm::EdDsa => {
@@ -70,12 +66,12 @@ impl SignatureAlgorithm {
     /// # Examples
     /// ```
     /// # fn main() {
-    /// use didcomm_rs::crypto::signer::SignatureAlgorithm;
+    /// use didcomm_rs::crypto::{Signer, SignatureAlgorithm};
     /// let validator = SignatureAlgorithm::Es256k.validator();
     /// # }
     /// ```
     ///
-    pub fn validator(&self) -> ValidationMethod {
+    fn validator(&self) -> ValidationMethod {
         match self {
             SignatureAlgorithm::EdDsa => {
                 Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {

@@ -10,7 +10,9 @@ use crate::{
     MessageType,
     crypto::{
         CryptoAlgorithm,
-        SignatureAlgorithm
+        SignatureAlgorithm,
+        Cypher,
+        Signer,
     },
 };
 
@@ -276,13 +278,6 @@ impl Message {
             }
         }
     }
-    // /// Construct a message from compact representation of received data.
-    // /// Raw, JWE or JWS payload is accepted.
-    // /// FIXME: NOT IMPLEMENTED
-    // /// TODO: Add examples
-    // pub fn receive_compact(incomming: &str, pk: &[u8]) -> Result<Self, Error> {
-    //     todo!()
-    // }
 }
 
 #[cfg(test)]

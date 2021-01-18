@@ -1,10 +1,5 @@
-
 use std::convert::TryFrom;
-use crate::{
-    SymmetricCypherMethod,
-    AssymetricCyptherMethod,
-    Error,
-};
+use super::*;
 
 /// Plugable closure generator enum, which creates instance of crypto function
 ///     based on selected algorythm types.
@@ -22,11 +17,11 @@ pub enum CryptoAlgorithm {
     A256GCM,
 }
 
-impl CryptoAlgorithm {
+impl Cypher for CryptoAlgorithm {
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms encryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
     ///
-    pub fn encryptor(self) -> SymmetricCypherMethod {
+    fn encryptor(&self) -> SymmetricCypherMethod {
         match self {
            CryptoAlgorithm::XC20P => {
                Box::new(|nonce: &[u8], key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
@@ -65,7 +60,7 @@ impl CryptoAlgorithm {
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
     ///
-    pub fn decryptor(&self) -> SymmetricCypherMethod {
+    fn decryptor(&self) -> SymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => {
                 Box::new(|nonce: &[u8], key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
@@ -102,7 +97,7 @@ impl CryptoAlgorithm {
        }
     }
     /// Not implemented - no usecase atm...
-    pub fn assymetric_encryptor(self) -> AssymetricCyptherMethod {
+    fn assymetric_encryptor(&self) -> AssymetricCyptherMethod {
         match self {
             CryptoAlgorithm::XC20P => {
                 todo!()

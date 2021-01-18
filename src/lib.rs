@@ -6,7 +6,7 @@ mod messages;
 mod dids;
 mod error;
 mod util;
-#[cfg(feature = "raw-crypto")]
+
 pub mod crypto;
 
 pub use error::*;

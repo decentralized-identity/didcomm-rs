@@ -150,6 +150,16 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         Some(&pub_sign_verify_key.to_bytes())); // and now we parse received
 ```
 
+# Plugable cryptography
+
+In order to use your own implementation[s] of message crypto and/or signature algorythms implement these trait[s]:
+
+[`Cypher`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L30)
+
+[`Signer`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L39)
+
+When implemented - use them instead of `CrptoAlgorithm` and `SignatureAlgorithm` from examples above.
+
 # Status
 
 In development - no releases
