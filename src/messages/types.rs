@@ -1,6 +1,12 @@
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum MessageType {
-    #[serde(rename = "didcomm/forward")]
+    #[serde(rename = "dodcomm/jwe")]
+    DidcommJwe,
+    #[serde(rename = "dodcomm/jws")]
+    DidcommJws,
+    #[serde(rename = "didcomm/unknown")]
+    DidcommUnknown,
+    #[serde(rename = "https://didcomm.org/routing/2.0/forward")]
     Forward,
     #[serde(rename = "application/pdf")]
     MediaPdf,
@@ -14,10 +20,4 @@ pub enum MessageType {
     ZipArchive,
     #[serde(rename = "application/octet-stream")]
     BinaryData,
-    #[serde(rename = "dodcomm/jwe")]
-    DidcommJwe,
-    #[serde(rename = "dodcomm/jws")]
-    DidcommJws,
-    #[serde(rename = "didcomm/unknown")]
-    DidcommUnknown,
 }
