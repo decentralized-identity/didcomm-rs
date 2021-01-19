@@ -173,9 +173,9 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
 In order to use your own implementation[s] of message crypto and/or signature algorythms implement these trait[s]:
 
-[`Cypher`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L30)
+[`didcomm_rs::crypto::Cypher`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L30)
 
-[`Signer`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L39)
+[`didcomm_rs::crypto::Signer`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L39)
 
 Dont use `default` feature - might change in future.
 
