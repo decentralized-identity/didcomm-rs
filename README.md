@@ -66,7 +66,26 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
 ```
 
-## 3. Prepare JWE message to be mediated -> mediate -> receive
+## 3. Prepare JWS message -> send -> receive
+* Here `Message` is signed but not encrypted.
+* In such scenarios explicit use of `.sign(...)` and `Message::verify(...)` required.
+
+```rust
+    // Message construction an JWS wrapping
+    let message = Message::new() // creating message
+        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
+        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
+        .as_jws(&SignatureAlgorithm::EdDsa)
+        .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes()).unwrap();
+
+    //... transport is happening here ...
+
+    // Receiving JWS
+    let received = Message::verify(&message.unwrap().as_bytes(), &sign_keypair.public.to_bytes());
+```
+
+## 4. Prepare JWE message to be mediated -> mediate -> receive
 * Message should be encrypted by destination key first in `.routed_by()` method call using key for the recepient.
 * Next it should be encrypted by mediator key in `.seal()` method call - this can be done multiple times - once for each mediator in chain but should be strictly sequentual to match mediators sequence in the chain.
 * Method call `.seal()` **MUST** be preceeded by  `.as_jwe(CryptoAlgorithm)` as mediators may use different algorithms and key types than destination and this is not automatically predicted or populated.
@@ -116,7 +135,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()));
 ```
 
-## 4. Prepare JWS envelope wrapped into JWE -> sign -> pack -> receive
+## 5. Prepare JWS envelope wrapped into JWE -> sign -> pack -> receive
 * JWS header is set automatically based on signing algorythm type.
 * Message forming and encryption happens in same way as in other JWE examples.
 * ED25519-dalek signature is used in this example with keypair for signing and public key for verification.
