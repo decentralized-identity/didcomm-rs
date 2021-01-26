@@ -18,3 +18,9 @@ pub use jws::*;
 #[cfg(feature = "raw-crypto")]
 pub use raw::*;
 
+pub trait Shape: Sized {
+    type Err;
+
+    fn get_body(m: &Message) -> Result<Self, Self::Err>;
+}
+

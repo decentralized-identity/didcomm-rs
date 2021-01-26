@@ -4,6 +4,7 @@ extern crate did_doc;
 pub use didcomm_rs::{
     Error,
     Message,
+    Shape,
 };
 
 pub use did_doc::{
