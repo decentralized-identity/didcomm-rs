@@ -10,7 +10,7 @@ struct DesiredShape {
 
 impl Shape for DesiredShape {
     type Err = Error;
-    fn get_body(m: &Message) -> Result<DesiredShape, Error> {
+    fn shape(m: &Message) -> Result<DesiredShape, Error> {
         serde_json::from_slice(&m.body)
             .map_err(|e| Error::SerdeError(e))
     }
@@ -29,7 +29,7 @@ fn shape_desired_test() {
     // -- pack, send, receive happens here
 
     // Act
-    let received_typed_body: DesiredShape = serde_json::from_slice(&m.body).unwrap();
+    let received_typed_body = DesiredShape::shape(&m).unwrap();
 
     // Assert
     assert_eq!(received_typed_body, initial_shape);

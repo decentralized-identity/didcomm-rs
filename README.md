@@ -181,6 +181,39 @@ Dont use `default` feature - might change in future.
 
 When implemented - use them instead of `CrptoAlgorithm` and `SignatureAlgorithm` from examples above.
 
+# Strongly typed Message payload (body)
+
+### GoTo: [full test](https://github.com/jolocom/didcomm-rs/blob/main/tests/shape.rs)
+
+In most cases apllication implementation would prefer to have strongly typed body of the message instead of raw `Vec<u8>`.
+For this scenario `Shape` trait should be implemented for target type.
+
+* First, let's define our target type. JSON in this example.
+```rust
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+struct DesiredShape {
+    num_field: usize,
+    string_field: String,
+}
+```
+
+* Next, implement `Shape` trait for it
+```rust
+impl Shape for DesiredShape {
+    type Err = Error;
+    fn get_body(m: &Message) -> Result<DesiredShape, Error> {
+        serde_json::from_slice(&m.body)
+            .map_err(|e| Error::SerdeError(e))
+    }
+}
+```
+
+* Now we can call `shape()` on our `Message` and shape in in.
+* In this example we expect JSON payload and use it's Deserializer to get our data, but your implementation can work with any serialization.
+```rust
+let received_typed_body = DesiredShape::shape(&m).unwrap(); // Where m = Message
+```
+
 # Status
 
 In development - no releases
