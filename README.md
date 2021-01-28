@@ -214,6 +214,6 @@ impl Shape for DesiredShape {
 let received_typed_body = DesiredShape::shape(&m).unwrap(); // Where m = Message
 ```
 
-# Status
+# Disclaimer
 
-In development - no releases
+This is a sample implementation of the DIDComm V2 spec. The DIDComm V2 spec is still actively being developed by the DIDComm WG in the DIF and therefore subject to change.
