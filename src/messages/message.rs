@@ -109,6 +109,14 @@ impl Message {
     pub fn get_didcomm_header(&self) -> &DidcommHeader {
         &self.didcomm_header
     }
+    /// Setter of `didcomm_header`.
+    /// Replaces existing one with provided by consuming both values.
+    /// Returns modified instance of `Self`.
+    ///
+    pub fn set_didcomm_header(mut self, h: DidcommHeader) -> Self {
+        self.didcomm_header = h;
+        self
+    }
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     ///
