@@ -4,6 +4,7 @@ mod headers;
 mod types;
 mod jwe;
 mod jws;
+mod jwk;
 
 #[cfg(feature = "raw-crypto")]
 mod raw;
@@ -14,6 +15,7 @@ pub use headers::*;
 pub use types::*;
 pub use jwe::*;
 pub use jws::*;
+pub use jwk::*;
 
 #[cfg(feature = "raw-crypto")]
 pub use raw::*;

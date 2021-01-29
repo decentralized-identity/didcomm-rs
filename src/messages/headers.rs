@@ -8,6 +8,7 @@ use std::{
 };
 use crate::{
     Error,
+    Jwk,
     crypto::{
         CryptoAlgorithm,
         SignatureAlgorithm
@@ -107,12 +108,12 @@ pub struct JwmHeader {
     // public key that corresponds to the key used to digitally sign the JWS.
     // TODO: implement proper struct for it:
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub jwk: Option<String>,
+    pub jwk: Option<Jwk>,
     // Some(String) - serialized ephemeral public key.
     // TODO: implement proper struct for it:
     // https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub epk: Option<String>,
+    pub epk: Option<Jwk>,
     // Some("JWM") should be used if nested JWS inside JWE.
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
     #[serde(skip_serializing_if = "Option::is_none")]
