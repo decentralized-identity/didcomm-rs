@@ -24,8 +24,9 @@ impl Message {
     pub(crate) fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
         -> Result<String, Error> {
             let header = self.jwm_header.clone();
+            let d_header = self.get_didcomm_header().to_owned();
             let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
-            Ok(serde_json::to_string(&Jwe::new(header, cyphertext))?)
+            Ok(serde_json::to_string(&Jwe::new(header, d_header, cyphertext))?)
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
