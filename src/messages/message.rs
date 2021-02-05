@@ -1,4 +1,7 @@
-use std::convert::TryInto;
+use std::{
+    convert::TryInto,
+    time::SystemTime,
+};
 use serde::{Serialize, Deserialize};
 use super::{
     headers::{DidcommHeader, JwmHeader},
@@ -86,6 +89,20 @@ impl Message {
                 self.jwm_header.kid = Some(kid);
             }
         }
+        self
+    }
+    /// Sets times of creation as now and, optional, expires time.
+    /// # Parameters
+    /// * `expires` - time in seconds since Unix Epoch when message is
+    /// considered to be invalid.
+    ///
+    pub fn timed(mut self, expires: Option<u64>) -> Self {
+        self.didcomm_header.expires_time = expires;
+        self.didcomm_header.created_time = 
+            match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(t) => Some(t.as_secs()),
+                Err(_) => None,
+            };
         self
     }
     /// Checks if message is rotation one.

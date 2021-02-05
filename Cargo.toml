@@ -1,6 +1,6 @@
 [package]
 name = "didcomm_rs"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
 description = "DIDComm messaging v2 specifications implementation: https://identity.foundation/didcomm-messaging/spec/"
