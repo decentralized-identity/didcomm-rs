@@ -2,7 +2,7 @@
 
 Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-messaging/spec)
 
-![tests](https://github.com/jolocom/didcomm-rs/workflows/tests/badge.svg)
+![tests](https://github.com/decentralized-identity/didcomm-rs/workflows/tests/badge.svg)
 
 
 #License
@@ -12,7 +12,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 # Examples of usage
 
 ## 1. Prepare raw message for send and receive
-### GoTo: [full test](https://github.com/jolocom/didcomm-rs/blob/master/tests/send_receive.rs#L12)
+### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/tests/send_receive.rs#L12)
 
 ```rust
     // Message construction
@@ -35,7 +35,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 2. Prepare JWE message for direct send
-### GoTo: [full test](https://github.com/jolocom/didcomm-rs/blob/master/tests/send_receive.rs#L35)
+### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/tests/send_receive.rs#L35)
 
 ```rust
     // decide which [Algorithm](crypto::encryptor::CryptoAlgorithm) is used (based on key)
@@ -91,7 +91,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 * Method call `.seal()` **MUST** be preceeded by  `.as_jwe(CryptoAlgorithm)` as mediators may use different algorithms and key types than destination and this is not automatically predicted or populated.
 * Keys used for encryption should be used in reverse order - final destination - last mediator - second to last mediator - etc. Onion style.
 
-### GoTo: [full test](https://github.com/jolocom/didcomm-rs/blob/master/tests/send_receive.rs#L67)
+### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/tests/send_receive.rs#L67)
 
 ```rust
     // Message construction
@@ -140,7 +140,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 * Message forming and encryption happens in same way as in other JWE examples.
 * ED25519-dalek signature is used in this example with keypair for signing and public key for verification.
 
-### GoTo: [full test](https://github.com/jolocom/didcomm-rs/blob/master/tests/send_receive.rs#L119)
+### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/tests/send_receive.rs#L119)
 
 ```rust
     // Message construction
@@ -173,9 +173,9 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
 In order to use your own implementation[s] of message crypto and/or signature algorythms implement these trait[s]:
 
-[`didcomm_rs::crypto::Cypher`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L30)
+[`didcomm_rs::crypto::Cypher`](https://github.com/decentralized-identity/didcomm-rs/blob/master/src/crypto/mod.rs#L30)
 
-[`didcomm_rs::crypto::Signer`](https://github.com/jolocom/didcomm-rs/blob/master/src/crypto/mod.rs#L39)
+[`didcomm_rs::crypto::Signer`](https://github.com/decentralized-identity/didcomm-rs/blob/master/src/crypto/mod.rs#L39)
 
 Dont use `default` feature - might change in future.
 
@@ -183,7 +183,7 @@ When implemented - use them instead of `CrptoAlgorithm` and `SignatureAlgorithm`
 
 # Strongly typed Message payload (body)
 
-### GoTo: [full test](https://github.com/jolocom/didcomm-rs/blob/main/tests/shape.rs)
+### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/main/tests/shape.rs)
 
 In most cases apllication implementation would prefer to have strongly typed body of the message instead of raw `Vec<u8>`.
 For this scenario `Shape` trait should be implemented for target type.
