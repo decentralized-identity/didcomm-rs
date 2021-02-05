@@ -23,7 +23,7 @@ pub struct DidcommHeader {
     pub m_type: MessageType,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
-    pub from: String,
+    pub from: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_time: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -43,7 +43,7 @@ impl DidcommHeader {
             id: DidcommHeader::gen_random_id(),
             m_type: MessageType::DidcommUnknown,
             to: vec!(String::default()),
-            from: String::default(),
+            from: Some(String::default()),
             created_time: None,
             expires_time: None,
             from_prior: None,
@@ -62,7 +62,7 @@ impl DidcommHeader {
     }
     /// Creates set of DIDComm related headers with the static forward type
     ///
-    pub fn forward(to: Vec<String>, from: String, expires_time: Option<usize>) -> Result<Self, Error> {
+    pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<usize>) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: rand::thread_rng().gen(),
             m_type: MessageType::Forward,
