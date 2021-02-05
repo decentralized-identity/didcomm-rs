@@ -21,6 +21,7 @@ pub struct DidcommHeader {
     pub id: usize,
     #[serde(rename = "type")]
     pub m_type: MessageType,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
     pub from: String,
     #[serde(skip_serializing_if = "Option::is_none")]
