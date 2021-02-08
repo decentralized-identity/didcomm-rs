@@ -1,8 +1,10 @@
 [package]
-name = "didcomm_rs"
+name = "didcomm-rs"
 version = "0.2.2"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/decentralized-identity/didcomm-rs"
+documentation = "https://docs.rs/didcomm-rs/"
 description = "DIDComm messaging v2 specifications implementation: https://identity.foundation/didcomm-messaging/spec/"
 license = "Apache-2.0"
 
