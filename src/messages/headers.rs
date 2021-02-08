@@ -21,12 +21,13 @@ pub struct DidcommHeader {
     pub id: usize,
     #[serde(rename = "type")]
     pub m_type: MessageType,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
-    pub from: String,
+    pub from: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_time: Option<usize>,
+    pub created_time: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires_time: Option<usize>,
+    pub expires_time: Option<u64>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub(crate) other: HashMap<String, String>,
     /// A JWT, with sub: new DID and iss: prior DID, 
@@ -42,7 +43,7 @@ impl DidcommHeader {
             id: DidcommHeader::gen_random_id(),
             m_type: MessageType::DidcommUnknown,
             to: vec!(String::default()),
-            from: String::default(),
+            from: Some(String::default()),
             created_time: None,
             expires_time: None,
             from_prior: None,
@@ -61,13 +62,13 @@ impl DidcommHeader {
     }
     /// Creates set of DIDComm related headers with the static forward type
     ///
-    pub fn forward(to: Vec<String>, from: String, expires_time: Option<usize>) -> Result<Self, Error> {
+    pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: rand::thread_rng().gen(),
             m_type: MessageType::Forward,
             to,
             from,
-            created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs() as usize),
+            created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()),
             expires_time,
             ..DidcommHeader::new()
         })
