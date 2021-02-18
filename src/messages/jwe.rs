@@ -17,6 +17,16 @@ impl Jwe {
     pub fn new(header: JwmHeader, didcomm_header: DidcommHeader, ciphertext: Vec<u8>) -> Self {
         Jwe { header, didcomm_header, ciphertext }
     }
+    /// Transparent referrence to `DidcommHeader.from` field.
+    ///
+    pub fn from(&self) -> &Option<String> {
+        &self.didcomm_header.from
+    }
+    /// Transparent referrence to `DidcommHeader.to` field.
+    ///
+    pub fn to(&self) -> &[String] {
+        &self.didcomm_header.to
+    }
     // Constructor to build instance from received Compact representation.
     // DEPRECATED - removed from spec
     // pub fn from_compact(data: &str) -> Result<Self, Error> {
