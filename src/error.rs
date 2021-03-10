@@ -14,6 +14,10 @@ pub enum Error {
     JweParseError,
     #[error("JWM header parsing failed - malformed alg")]
     JwmHeaderParseError,
+    #[error("cannot resolve did document from JWE header from field")]
+    DidResolveFailed,
+    #[error("invalid key size {0}")]
+    InvalidKeySize(String),
     #[error("{0}")]
     Generic(String),
     #[error(transparent)]
@@ -23,6 +27,8 @@ pub enum Error {
     #[cfg(feature = "jose-biscuit")]
     #[error(transparent)]
     BisquitError(#[from] biscuit::errors::Error),
+    #[error(transparent)]
+    TryFromError(#[from] core::convert::Infallible),
     #[cfg(feature = "raw-crypto")]
     #[error(transparent)]
     EdDsaError(#[from] ed25519_dalek::SignatureError),

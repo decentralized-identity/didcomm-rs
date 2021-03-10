@@ -3,12 +3,15 @@
 
 mod common;
 
+#[cfg(feature = "resolve")]
+use base58::FromBase58;
 use common::*;
 use rand_core::OsRng;
 use x25519_dalek::{EphemeralSecret, PublicKey};
 use didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer};
 
 #[test]
+#[cfg(not(feature = "resolve"))]
 fn send_receive_raw() {
     // Arrange
     let m = Message::new()
@@ -24,7 +27,10 @@ fn send_receive_raw() {
     assert!(packed.is_err());
 
     // receiving raw message
+    #[cfg(not(feature = "resolve"))]
     let received = Message::receive(&ready_to_send, None, None);
+    #[cfg(feature = "resolve")]
+    let received = Message::receive(&ready_to_send, b"");
 
     // Assert
     assert!(&received.is_ok());
@@ -32,6 +38,7 @@ fn send_receive_raw() {
 }
 
 #[test]
+#[cfg(not(feature = "resolve"))]
 fn send_receive_encrypted_xc20p_json_test() {
     // Arrange
     // keys
@@ -44,18 +51,21 @@ fn send_receive_encrypted_xc20p_json_test() {
 
     // Message construction
     let message = Message::new() // creating message
-        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp") // setting from
+        .to(vec!("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp", "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
-        .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
+        .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#); // set kid header
 
     // Act
     let ready_to_send = message.seal(ek.as_bytes()).unwrap();
     let rk = bob_secret.diffie_hellman(&alice_public); // bob's shared secret calculation
+    #[cfg(not(feature = "resolve"))]
     let received = Message::receive(&ready_to_send, Some(rk.as_bytes()), None); // and now we parse received
+    #[cfg(feature = "resolve")]
+    let received = Message::receive(&ready_to_send, &"6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap()); // and now we parse received
 
     // Assert
     assert!(&received.is_ok());
@@ -64,6 +74,7 @@ fn send_receive_encrypted_xc20p_json_test() {
 }
 
 #[test]
+#[cfg(not(feature = "resolve"))]
 fn send_receive_mediated_encrypted_xc20p_json_test() {
     // Arrange
     // keys
@@ -81,14 +92,14 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
 
     // Message construction
     let message = Message::new() // creating message
-        .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(vec!("did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp") // setting from
+        .to(vec!("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp", "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG")) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
-        .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)) // set kid header
-        .routed_by(ek_to_bob.as_bytes(), vec!("did:mediator:suetcpl23pt23rp2teu995t98u")); // here we use destination key to bob and `to` header of mediator
+        .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#) // set kid header
+        .routed_by(ek_to_bob.as_bytes(), vec!("did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf")); // here we use destination key to bob and `to` header of mediator
 
     // Act + Assert as we go
     assert!(&message.is_ok());
@@ -103,19 +114,26 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
 
     // Received by mediator
     let rk_mediator = bob_mediator_secret.diffie_hellman(&alice_public_2); // key to decrypt mediated message
+    #[cfg(not(feature = "resolve"))]
     let received_mediated = Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()), None);
+    #[cfg(feature = "resolve")]
+    let received_mediated = Message::receive(&ready_to_send.unwrap(), &"ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap());
 
     assert!(&received_mediated.is_ok());
 
     // Received by Bob
     let rk_bob = bob_secret.diffie_hellman(&alice_public); // key to decrypt final message
+    #[cfg(not(feature = "resolve"))]
     let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()), None);
+    #[cfg(feature = "resolve")]
+    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap());
 
     assert!(&received_bob.is_ok());
     assert_eq!(received_bob.unwrap().body, sample_dids::TEST_DID_SIGN_1.as_bytes());
 }
 
 #[test]
+#[cfg(not(feature = "resolve"))]
 fn send_receive_signed_json_test() {
     // Arrange + Act
     let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
@@ -137,6 +155,7 @@ fn send_receive_signed_json_test() {
 }
 
 #[test]
+#[cfg(not(feature = "resolve"))]
 fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     // Arrange
     // keys
@@ -156,7 +175,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
         .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
-        .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#)); // set kid header
+        .kid(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#); // set kid header
 
     // Act
     // Send
@@ -168,10 +187,13 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
 
     //Receive
     let rk = bob_secret.diffie_hellman(&alice_public); // bob's shared secret calculation
+    #[cfg(not(feature = "resolve"))]
     let received = Message::receive(
         &ready_to_send,
         Some(rk.as_bytes()),
         Some(&sign_keypair.public.to_bytes())); // and now we parse received
+    #[cfg(feature = "resolve")]
+    let received = Message::receive(&ready_to_send, &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap());
 
     // Assert
     assert!(&received.is_ok());

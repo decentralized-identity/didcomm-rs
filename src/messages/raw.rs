@@ -21,7 +21,7 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
     ///
-    pub(crate) fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
+    pub fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
         -> Result<String, Error> {
             let header = self.jwm_header.clone();
             let d_header = self.get_didcomm_header().to_owned();
