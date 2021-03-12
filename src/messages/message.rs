@@ -455,7 +455,7 @@ mod crypto_tests {
     fn send_receive_didkey_test() {
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
-            .to(vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"))
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P);
         // TODO: validate derived pub from priv key <<<
         let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
