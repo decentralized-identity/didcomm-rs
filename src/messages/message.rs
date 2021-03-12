@@ -62,9 +62,9 @@ impl Message {
     /// Setter of `to` header
     /// Helper method.
     ///
-    pub fn to(mut self, to: Vec<&str>) -> Self {
+    pub fn to(mut self, to: &[&str]) -> Self {
         for s in to {
-            self.didcomm_header.to.push(String::from(s));
+            self.didcomm_header.to.push(s.to_string());
         }
         while let Some(a) = self.didcomm_header.to.iter().position(|e| e == &String::default()) {
             self.didcomm_header.to.remove(a);
@@ -267,7 +267,7 @@ impl Message {
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
     /// TODO: Add examples
-    pub fn routed_by(self, ek: &[u8], to: Vec<&str>)
+    pub fn routed_by(self, ek: &[u8], to: &[&str])
         -> Result<Self, Error> {
             let h = match &self.get_didcomm_header().from.clone() {
                 Some(s) => s.to_owned(),

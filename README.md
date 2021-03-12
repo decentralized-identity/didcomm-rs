@@ -20,7 +20,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         // setting `from` header (sender) - Optional
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
         // setting `to` header (recepients) - Optional
-        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"))
+        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
         // populating body with some data - `Vec<bytes>`
         .body(some_payload.as_bytes());
 
@@ -74,7 +74,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     // Message construction an JWS wrapping
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jws(&SignatureAlgorithm::EdDsa)
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes()).unwrap();
@@ -99,7 +99,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         // setting from
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
         // setting to
-        .to(vec!("did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"))
+        .to(&["did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
         // packing in some payload
         .body(some_payload.as_bytes())
         // set JOSE header for XC20P algorithm
@@ -146,7 +146,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     // Message construction
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(vec!("did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe")) // setting to
+        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
