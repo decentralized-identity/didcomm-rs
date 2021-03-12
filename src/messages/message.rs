@@ -62,9 +62,9 @@ impl Message {
     /// Setter of `to` header
     /// Helper method.
     ///
-    pub fn to(mut self, to: Vec<&str>) -> Self {
+    pub fn to(mut self, to: &[&str]) -> Self {
         for s in to {
-            self.didcomm_header.to.push(String::from(s));
+            self.didcomm_header.to.push(s.to_string());
         }
         while let Some(a) = self.didcomm_header.to.iter().position(|e| e == &String::default()) {
             self.didcomm_header.to.remove(a);
@@ -267,7 +267,7 @@ impl Message {
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
     /// TODO: Add examples
-    pub fn routed_by(self, ek: &[u8], to: Vec<&str>)
+    pub fn routed_by(self, ek: &[u8], to: &[&str])
         -> Result<Self, Error> {
             let h = match &self.get_didcomm_header().from.clone() {
                 Some(s) => s.to_owned(),
@@ -455,7 +455,7 @@ mod crypto_tests {
     fn send_receive_didkey_test() {
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
-            .to(vec!("did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"))
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P);
         // TODO: validate derived pub from priv key <<<
         let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
