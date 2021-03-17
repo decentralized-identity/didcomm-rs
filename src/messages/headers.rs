@@ -41,7 +41,7 @@ impl DidcommHeader {
     pub fn new() -> Self {
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
-            m_type: MessageType::DidcommUnknown,
+            m_type: MessageType::DidcommRaw,
             to: vec!(String::default()),
             from: Some(String::default()),
             created_time: None,
@@ -65,7 +65,7 @@ impl DidcommHeader {
     pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: rand::thread_rng().gen(),
-            m_type: MessageType::Forward,
+            m_type: MessageType::DidcommRaw,
             to,
             from,
             created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()),

@@ -1,4 +1,6 @@
 mod message;
+mod mediated;
+mod didurl;
 mod prior_claims;
 mod headers;
 mod types;
