@@ -99,7 +99,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#) // set kid header
-        .routed_by(ek_to_bob.as_bytes(), &["did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"]); // here we use destination key to bob and `to` header of mediator
+        .routed_by(ek_to_bob.as_bytes(), "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"); // here we use destination key to bob and `to` header of mediator
 
     // Act + Assert as we go
     assert!(&message.is_ok());

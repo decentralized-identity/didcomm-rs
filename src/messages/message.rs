@@ -1,6 +1,8 @@
-use std::{convert::TryInto, time::SystemTime};
+use std::{convert::TryInto, str::FromStr, time::SystemTime};
 use serde::{Serialize, Deserialize};
 use super::{
+    DidUrl,
+    mediated::Mediated,
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
 };
@@ -267,19 +269,26 @@ impl Message {
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
     /// TODO: Add examples
-    pub fn routed_by(self, ek: &[u8], to: &[&str])
+    pub fn routed_by(self, ek: &[u8], to: &str)
         -> Result<Self, Error> {
             let h = match &self.get_didcomm_header().from.clone() {
                 Some(s) => s.to_owned(),
                 None => String::default(),
             };
+            let to_cloned = self.didcomm_header.to.clone();
+            let to_recepients: Vec<&str> = to_cloned
+                .iter()
+                .map(String::as_str)
+                .collect();
             let to_wrap: String;
             to_wrap = self.seal(ek)?;
+            let body = Mediated::new(DidUrl::from_str(to)?)
+                .with_payload(to_wrap.as_bytes().to_vec());
             Ok(Message::new()
-                .to(to)
+                .to(&to_recepients)
                 .from(&h)
                 .m_type(MessageType::DidcommRaw)
-                .body(to_wrap.as_bytes()))
+                .body(serde_json::to_string(&body)?.as_bytes()))
     }
 }
 
@@ -348,7 +357,14 @@ impl Message {
                             Err(Error::Generic(String::from("Validation key is missing")))
                         }
                     } else {
-                        Ok(m)
+                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.body) {
+                            Ok(Message {
+                                body: mediated.payload,
+                                ..m
+                            })
+                        } else {
+                            Ok(m)
+                        }
                     }
                 } else { 
                     Err(Error::JweParseError)
@@ -375,7 +391,14 @@ impl Message {
                             Err(Error::JwsParseError)
                         }
                     } else {
-                        Ok(m)
+                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.body) {
+                            Ok(Message {
+                                body: mediated.payload,
+                                ..m
+                            })
+                        } else {
+                            Ok(m)
+                        }
                     }
                 } else {
                     Err(Error::BadDid)

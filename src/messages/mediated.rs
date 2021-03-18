@@ -7,9 +7,38 @@ use crate::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mediated {
-    next: DidUrl,
+    pub next: DidUrl,
     #[serde(rename = "payloads~attach")]
-    payload: Vec<u8>
+    pub payload: Vec<u8>
+}
+
+impl Mediated {
+    /// Constructor with empty payload
+    /// # Parameters
+    /// *next - `DidUrl` of delivery target.
+    ///
+    pub fn new(next: DidUrl) -> Self {
+        Mediated{
+            next,
+            payload: vec!()
+        }
+    }
+    /// Payload setter to be chained in forwarding calls.
+    ///
+    /// # Example
+    /// ```rust
+    /// use std::str::FromStr;
+    /// use didcomm_rs::{Mediated, DidUrl};
+    /// let warpper_payload = Mediated::new(DidUrl::from_str("did:key:abc").unwrap())
+    ///     .with_payload(b"hello, abc".to_vec());
+    /// ```
+    ///
+    pub fn with_payload(self, payload: Vec<u8>) -> Self {
+        Mediated {
+            payload,
+            ..self
+        }
+    }
 }
 
 impl Shape for Mediated {

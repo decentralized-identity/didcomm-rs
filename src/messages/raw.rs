@@ -40,9 +40,7 @@ impl Message {
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
         if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), key, &jwe.payload()) {
-            let m = serde_json::from_slice(&raw_message_bytes);
-            if m.is_err() { println!("{:?}", &m); }
-            Ok(m?)
+            Ok(serde_json::from_slice(&raw_message_bytes)?)
         } else {
             Err(Error::PlugCryptoFailure)
         }

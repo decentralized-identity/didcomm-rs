@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct DidUrl(String);
+pub struct DidUrl(pub String);
 
 impl ToString for DidUrl {
     fn to_string(&self) -> String {
