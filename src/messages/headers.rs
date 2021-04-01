@@ -188,6 +188,25 @@ impl Default for JwmHeader {
     }
 }
 
+/// This struct presents single recepient of JWE `recepients` collection.
+/// Each recepient should have same body cypher key ecrypted with shared secret.
+/// [Spec](https://tools.ietf.org/html/rfc7516#section-7.2.1)
+///
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Recepient {
+    pub header: Jwk,
+    pub encrypted_key: String
+}
+
+impl Recepient {
+    pub fn new(header: Jwk, encrypted_key: String) -> Self {
+        Recepient {
+            header,
+            encrypted_key
+        }
+    }
+}
+
 #[test]
 fn default_jwm_header_with_random_iv() {
     // Arrange
