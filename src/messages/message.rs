@@ -1,17 +1,36 @@
-use std::{convert::TryInto, time::SystemTime};
+use std::{convert::TryInto, str::FromStr, time::SystemTime};
 use serde::{Serialize, Deserialize};
 use super::{
+    DidUrl,
+    mediated::Mediated,
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
 };
 #[cfg(feature = "resolve")]
 pub use ddoresolver_rs::*;
 #[cfg(feature = "resolve")]
-use arrayref::array_ref;
-#[cfg(feature = "resolve")]
-use x25519_dalek::{
-    StaticSecret,
-    PublicKey
+use {
+    arrayref::array_ref,
+    x25519_dalek::{
+        StaticSecret,
+        PublicKey
+    },
+    rand_chacha::ChaCha20Rng,
+    rand::{RngCore, SeedableRng},
+    chacha20poly1305::{
+        XChaCha20Poly1305,
+        XNonce,
+        aead::{
+            Aead,
+            NewAead
+        },
+    },
+    base64_url::{encode, decode},
+    crate::{
+        Jwk,
+        Recepient,
+        KeyAlgorithm,
+    }
 };
 use crate::{
     Error,
@@ -36,6 +55,9 @@ pub struct Message {
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
+    #[cfg(feature = "resolve")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) recepients: Option<Vec<Recepient>>,
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as bytes of data.
     pub body: Vec<u8>,
@@ -49,6 +71,8 @@ impl Message {
         Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
+            #[cfg(feature = "resolve")]
+            recepients: None,
             body: vec!(),
         }
     }
@@ -194,27 +218,50 @@ impl Message {
     /// # Parameters
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
-    // TODO: Feature-gate(split) this ("raw-crypto" / "jose-biscuit")?
     // TODO: Add examples
     #[cfg(not(feature = "resolve"))]
-    pub fn seal(self, ek: &[u8]) -> Result<String, Error> {
+    pub fn seal(self, ek: impl AsRef<[u8]>) -> Result<String, Error> {
         let alg = crypter_from_header(&self.jwm_header)?;
-        self.encrypt(alg.encryptor(), ek)
+        self.encrypt(alg.encryptor(), ek.as_ref())
     }
     #[cfg(feature = "resolve")]
-    pub fn seal(self, sk: &[u8]) -> Result<String, Error> {
-        if sk.len() != 32 { return Err(Error::InvalidKeySize("!32".into())); }
-        if let Some(document) = resolve_any(&self.didcomm_header.to[0]) { // FIXME: should pack one for each recepient
-            if let Some(agreement) = document.find_public_key_for_curve("X25519") {
-                let shared = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
-                    .diffie_hellman(&PublicKey::from(array_ref!(agreement, 0, 32).to_owned()));
+    pub fn seal(mut self, sk: impl AsRef<[u8]>) -> Result<String, Error> {
+        if sk.as_ref().len() != 32 { return Err(Error::InvalidKeySize("!32".into())); }
+        match &self.didcomm_header.to.len() {
+            1 => {
+                let to = self.didcomm_header.to[0].clone();
+                let shared = gen_shared_for_recepient(sk, &to)?;
                 let alg = crypter_from_header(&self.jwm_header)?;
-                self.encrypt(alg.encryptor(), shared.as_bytes())
-            } else {
-                Err(Error::DidResolveFailed)
+                self.encrypt(alg.encryptor(), shared.as_ref())
+            },
+            0 => todo!(), // What should happen in this scenario?
+            _ => {
+                // generate static secret
+                let mut shared_key = [0u8; 32];
+                let mut rng = ChaCha20Rng::from_seed(Default::default());
+                rng.fill_bytes(&mut shared_key);
+                let mut recepients: Vec<Recepient> = vec!();
+                // create jwk from static secret per recepient
+                for dest in &self.didcomm_header.to {
+                    let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
+                    let mut jwk = Jwk::new();
+                    jwk.alg = KeyAlgorithm::EcdhEsA256kw;
+                    jwk.kty = Some("oct".into());
+                    jwk.use_ = Some("enc".into());
+                    jwk.kid = Some(key_id_from_didurl( &dest));
+                // encrypt jwk for each recepient using shared secret
+                    let crypter = XChaCha20Poly1305::new(shared.as_ref().into());
+                    let nonce = XNonce::from_slice(&self.jwm_header.get_iv());
+                    let sealed_key = crypter
+                        .encrypt(nonce, shared_key.as_ref())
+                        .map_err(|e| Error::Generic(e.to_string()))?;
+                    recepients.push(Recepient::new(jwk, encode(&sealed_key)));
+                }
+                self.recepients = Some(recepients);
+                // encrypt original message with static secret
+                let alg = crypter_from_header(&self.jwm_header)?;
+                self.encrypt(alg.encryptor(), shared_key.as_ref())
             }
-        } else {
-            Err(Error::DidResolveFailed)
         }
     }
     /// Signs raw message and then packs it to encrypted envelope
@@ -267,19 +314,26 @@ impl Message {
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
     /// TODO: Add examples
-    pub fn routed_by(self, ek: &[u8], to: &[&str])
+    pub fn routed_by(self, ek: &[u8], to: &str)
         -> Result<Self, Error> {
             let h = match &self.get_didcomm_header().from.clone() {
                 Some(s) => s.to_owned(),
                 None => String::default(),
             };
+            let to_cloned = self.didcomm_header.to.clone();
+            let to_recepients: Vec<&str> = to_cloned
+                .iter()
+                .map(String::as_str)
+                .collect();
             let to_wrap: String;
             to_wrap = self.seal(ek)?;
+            let body = Mediated::new(DidUrl::from_str(to)?)
+                .with_payload(to_wrap.as_bytes().to_vec());
             Ok(Message::new()
-                .to(to)
+                .to(&to_recepients)
                 .from(&h)
-                .m_type(MessageType::Forward)
-                .body(to_wrap.as_bytes()))
+                .m_type(MessageType::DidcommRaw)
+                .body(serde_json::to_string(&body)?.as_bytes()))
     }
 }
 
@@ -333,7 +387,7 @@ impl Message {
         match crypto_key {
             None => serde_json::from_str(incomming)
                 .map_err(|e| Error::SerdeError(e)),
-            Some(key) => { // TODO: compact parsing validation should be here
+            Some(key) => {
                 let jwe: Jwe = serde_json::from_str(&incomming)?;
                 // Here we have JWE
                 if let Some(alg) = &jwe.header.alg {
@@ -348,7 +402,14 @@ impl Message {
                             Err(Error::Generic(String::from("Validation key is missing")))
                         }
                     } else {
-                        Ok(m)
+                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.body) {
+                            Ok(Message {
+                                body: mediated.payload,
+                                ..m
+                            })
+                        } else {
+                            Ok(m)
+                        }
                     }
                 } else { 
                     Err(Error::JweParseError)
@@ -366,7 +427,31 @@ impl Message {
                     let shared = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
                         .diffie_hellman(&PublicKey::from(array_ref!(k_arg, 0, 32).to_owned()));
                     let a: CryptoAlgorithm = alg.try_into()?;
-                    let m = Message::decrypt(incomming.as_bytes(), a.decryptor(), shared.as_bytes())?;
+                    let m: Message;
+                    if jwe.to().len() > 1 {
+                        if let Some(recepients) = jwe.recepients {
+                            let mut key: Option<Vec<u8>> = None;
+                            for recepient in recepients {
+                                let cryptor = XChaCha20Poly1305::new(shared.as_bytes().into());
+                                match cryptor.decrypt(jwe.header.get_iv().into(), decode(&recepient.encrypted_key).unwrap().as_ref()) {
+                                    Ok(k) => {
+                                        key = Some(k);
+                                        break;
+                                    },
+                                    Err(_) => continue
+                                }
+                            }
+                            if let Some(k) = key {
+                                m = Message::decrypt(incomming.as_bytes(), a.decryptor(), &k)?;
+                            } else {
+                                return Err(Error::JweParseError);
+                            }
+                        } else {
+                            return Err(Error::JweParseError);
+                        }
+                    } else {
+                        m = Message::decrypt(incomming.as_bytes(), a.decryptor(), shared.as_bytes())?;
+                    }
                     if &m.didcomm_header.m_type == &MessageType::DidcommJws {
                         if m.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
                         if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.alg.unwrap()) {
@@ -375,7 +460,14 @@ impl Message {
                             Err(Error::JwsParseError)
                         }
                     } else {
-                        Ok(m)
+                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.body) {
+                            Ok(Message {
+                                body: mediated.payload,
+                                ..m
+                            })
+                        } else {
+                            Ok(m)
+                        }
                     }
                 } else {
                     Err(Error::BadDid)
@@ -386,6 +478,36 @@ impl Message {
         } else {
             Err(Error::DidResolveFailed)
         }
+    }
+}
+
+#[cfg(feature = "resolve")]
+fn gen_shared_for_recepient(sk: impl AsRef<[u8]>, did: &str) -> Result<impl AsRef<[u8]>, Error> {
+    if let Some(document) = resolve_any(did) {
+        if let Some(agreement) = document.find_public_key_for_curve("X25519") {
+            let ss = StaticSecret::from(array_ref!(sk.as_ref(), 0, 32).to_owned())
+                .diffie_hellman(&PublicKey::from(array_ref!(agreement, 0, 32).to_owned()));
+            Ok(*ss.as_bytes())
+        } else {
+            Err(Error::DidResolveFailed)
+        }
+    } else {
+        Err(Error::DidResolveFailed)
+    }
+}
+
+#[cfg(feature = "resolve")]
+fn key_id_from_didurl(url: &str) -> String {
+    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$").unwrap();
+    match  re.captures(url) {
+        Some(s) =>
+            match s.name("key_id") {
+                Some(name) =>
+                    format!("#{}", name.as_str()),
+                None => String::default(),
+            },
+        None =>
+            String::default()
     }
 }
 
@@ -438,11 +560,21 @@ mod crypto_tests {
     // use crate::Error;
    use super::*;
 
+   #[test]
+   #[cfg(not(feature = "resolve"))]
+   fn create_and_send() {
+       let rk = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92];
+        let m = Message::new()
+            .as_jwe(&CryptoAlgorithm::XC20P);
+        let p = m.seal(&rk);
+        assert!(p.is_ok());
+   }
+
     #[test]
     #[cfg(not(feature = "resolve"))]
     fn receive_test() {
         // Arrange
-        let received_jwe = r#"{"typ":"JWM","enc":"A256GCM","alg":"ECDH-ES+A256KW","iv":[222,55,121,212,26,150,141,210,48,185,246,138,32,22,45,133,228,160,150,177,17,158,190,224],"id":4351085393442299745,"type":"didcomm/unknown","to":["did:keri:usath909guh43y3slrih01hurdesntuhir0#90887"],"from":"did:keri:ulrchpl0940hu1092hoxkhp90#ucbpuei9","ciphertext":[222,225,218,187,202,113,141,242,209,52,161,232,221,47,154,87,33,190,83,39,189,167,177,23,86,181,37,104,202,145,80,26,90,161,105,53,56,145,151,235,181,35,107,193,123,208,139,133,186,194,183,110,153,68,209,173,49,118,37,238,99,213,6,92,136,29,23,232,41,215,232,126,246,123,92,134,17,186,181,164,115,178,123,174,210,18,228,30,105,151,226,238,121,11,106,207,166,252,36,76,80,24,102,211,180,144,206,85,194,130,36,53,52,104,59,44,39,174,58,223,144,114,42,29,176,1,205,125,142,173,202,1,93,55,221,39,74,94,37,129,188,211,136,144,211,98,100,161,186,165,204,248,104,160,205,238,126,39,129,240,116,51,183,67,247,0,254,253,202,46,44,103,40,254,202,169,119,184,158,132,118,39,75,44,70,4,156,147,122,6,42,167,216,86,96,202,231,189,167,167,130,53,147,146,187,251,252,182,101,33,164,111,14,81,107,194,250,167,109,185,80,16,236,163,151,17,172,168,44,170,160,11,59,178,162,135,219,23,136,23,71,138,185,81,175,226,207,126,237,128,99,196,43,104,207,47,139,94,167,137,15,181,245,194,142,180,141,134,201,34,104,190,132,161,244,41,38,102,159,243,126,35,77,29,86,34,4,249,199,124,31,231,198,61,126,160,109,63,211,200,46,14,33,113,254,90,189,216,86,64,65,115,191,203,188,232,116,78,252,76,140,75,17,184,25,241,236,191,213,213,87,73,142,42,246,166,147]}"#;
+        let received_jwe = r#"{"typ":"JWM","enc":"XC20P","alg":"ECDH-ES+A256KW","iv":[227,154,25,80,3,225,217,179,39,204,103,60,92,16,59,171,110,156,28,196,83,9,237,84],"id":1117912036141727650,"type":"application/didcomm-plain+json","to":[""],"from":"","ciphertext":[62,11,202,108,20,132,51,66,76,129,34,228,203,69,243,45,221,224,164,191,183,21,5,252,46,47,30,28,202,26,161,139,123,56,73,253,63,129,111,225,250,98,11,81,77,12,125,221,149,202,85,102,211,239,86,176,188,98,152,61,170,137,215,232,139,252,28,40,203,98,222,104,145,158,149,65,27,234,205,140,161,220,125,66,226,176,57,151,33,77,106,148,185,95,75,83,230,40,12,218,152,207,246,117,125,201,42,205,31,157,45,227,128,223,14,43,80,112,191,141,119,11,187,183,161,185,106,13,192,198,64,141,114,169,56,90,80,89,218,245,20,15,117,25,189,223,92,64,194,39,77,197,45,8,155,89,124,19,185,112,6,231,207,95,208,51,134,180,251,232,0,161,197,128,98,50,13,55,156,95,244,136,13,30,171,51,124,231,204,236,35,35,30,160,57,247,223,106,13,20,84,89,24,192,22,190,125,63,133,234,58,209,167,212,9,249,149,213,248,135,23,51,145,74,9,99,105,35,134,115,175,94,190,169,189,167,163,145,237,32,151,215,93,200,76,206,103,91,253,128]}"#;
         let rk = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92];
         // Act
         let received = Message::receive(received_jwe, Some(&rk), None);
@@ -465,5 +597,25 @@ mod crypto_tests {
 
         let received = Message::receive(&jwe.unwrap(), &bobs_private);
         assert!(received.is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "resolve")]
+    fn send_receive_didkey_multiple_receivers_test() {
+        let m = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"])
+            .as_jwe(&CryptoAlgorithm::XC20P);
+        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
+        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let third_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
+        let jwe = m.seal(&alice_private);
+        assert!(jwe.is_ok());
+
+        let jwe = jwe.unwrap();
+        let received_bob = Message::receive(&jwe, &bobs_private);
+        let received_third = Message::receive(&jwe, &third_private);
+        assert!(received_bob.is_ok());
+        assert!(received_third.is_ok());
     }
 }

@@ -146,7 +146,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     // Message construction
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
+        .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
         .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
@@ -167,6 +167,32 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         &ready_to_send,
         Some(decryption_key.as_bytes()),
         Some(&pub_sign_verify_key.to_bytes())); // and now we parse received
+```
+## 6. Multiple receivers static key wrap per recepient with shared secret
+* ! Works with `resolve` feature only - requires resolution of public keys for each recepient for shared secret generation.
+* Static key generated randomly in the background (`to` field has >1 recepient).
+
+### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/src/messages/message.rs#L597)
+```rust
+// Creating message with multiple recepients.
+let m = Message::new()
+    .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+    .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"])
+    .as_jwe(&CryptoAlgorithm::XC20P);
+
+let jwe = m.seal(&sender_private);
+// Packing was ok?
+assert!(jwe.is_ok());
+
+let jwe = jwe.unwrap();
+
+// Each of the recepients receive it in same way as before (direct with single receiver)
+let received_first = Message::receive(&jwe, &first_private);
+let received_second = Message::receive(&jwe, &second_private);
+
+// All good without any extra inputs
+assert!(received_first.is_ok());
+assert!(received_second.is_ok());
 ```
 
 # Plugable cryptography

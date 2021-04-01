@@ -25,8 +25,17 @@ impl Message {
         -> Result<String, Error> {
             let header = self.jwm_header.clone();
             let d_header = self.get_didcomm_header().to_owned();
-            let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
-            Ok(serde_json::to_string(&Jwe::new(header, d_header, cyphertext))?)
+            #[cfg(feature = "resolve")]
+            {
+                let recepients = self.recepients.clone();
+                let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
+                Ok(serde_json::to_string(&Jwe::new(header, d_header, recepients, cyphertext))?)
+            }
+            #[cfg(not(feature = "resolve"))]
+            {
+                let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
+                Ok(serde_json::to_string(&Jwe::new(header, d_header,  cyphertext))?)
+            }
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
@@ -40,9 +49,7 @@ impl Message {
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
         if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), key, &jwe.payload()) {
-            let m = serde_json::from_slice(&raw_message_bytes);
-            if m.is_err() { println!("{:?}", &m); }
-            Ok(m?)
+            Ok(serde_json::from_slice(&raw_message_bytes)?)
         } else {
             Err(Error::PlugCryptoFailure)
         }

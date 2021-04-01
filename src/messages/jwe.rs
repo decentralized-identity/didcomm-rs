@@ -1,4 +1,6 @@
 use crate::{DidcommHeader, JwmHeader};
+#[cfg(feature = "resolve")]
+use crate::Recepient;
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
 ///
@@ -8,12 +10,20 @@ pub struct Jwe {
     pub header: JwmHeader,
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
+    #[cfg(feature = "resolve")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) recepients: Option<Vec<Recepient>>,
     ciphertext: Vec<u8>
 }
 
 impl Jwe {
     /// Constructor, which should be used after message is encrypted.
     ///
+    #[cfg(feature = "resolve")]
+    pub fn new(header: JwmHeader, didcomm_header: DidcommHeader, recepients: Option<Vec<Recepient>>, ciphertext: Vec<u8>) -> Self {
+        Jwe { header, didcomm_header, recepients, ciphertext }
+    }
+    #[cfg(not(feature = "resolve"))]
     pub fn new(header: JwmHeader, didcomm_header: DidcommHeader, ciphertext: Vec<u8>) -> Self {
         Jwe { header, didcomm_header, ciphertext }
     }
