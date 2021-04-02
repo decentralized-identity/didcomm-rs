@@ -28,7 +28,7 @@ impl Message {
             #[cfg(feature = "resolve")]
             {
                 let recepients = self.recepients.clone();
-                let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
+                let cyphertext = crypter(&self.jwm_header.get_iv().as_ref(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
                 Ok(serde_json::to_string(&Jwe::new(header, d_header, recepients, cyphertext))?)
             }
             #[cfg(not(feature = "resolve"))]

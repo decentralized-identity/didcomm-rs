@@ -138,7 +138,7 @@ mod batteries_tests {
         let payload = "test message's body - can be anything...";
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P) // Set jwe header manually - sohuld be preceeded by key properties
-            .body(payload.as_bytes());
+            .set_body(payload.as_bytes());
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -152,7 +152,7 @@ mod batteries_tests {
             CryptoAlgorithm::XC20P.decryptor(),
             key
             )?;
-        let received_payload = &String::from_utf8(s.body.clone())?; // Here we know it's a String, but could be anything really.
+        let received_payload = &String::from_utf8(s.get_body()?.as_ref().to_vec())?; // Here we know it's a String, but could be anything really.
         // Assert
         assert_eq!(s.jwm_header, original_header);
         assert_eq!(payload, received_payload);
@@ -164,7 +164,7 @@ mod batteries_tests {
         let payload = "test message's body - can be anything...";
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM) // Set jwe header manually - sohuld be preceeded by key properties
-            .body(payload.as_bytes());
+            .set_body(payload.as_bytes());
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -178,7 +178,7 @@ mod batteries_tests {
             CryptoAlgorithm::A256GCM.decryptor(),
             key
             )?;
-        let received_payload = &String::from_utf8(s.body.clone())?; // I know it's a String, but could be anything really.
+        let received_payload = &String::from_utf8(s.get_body()?.as_ref().to_vec())?; // I know it's a String, but could be anything really.
         // Assert
         assert_eq!(s.jwm_header, original_header);
         assert_eq!(payload, received_payload);

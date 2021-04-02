@@ -1,4 +1,5 @@
 use std::{convert::TryInto, str::FromStr, time::SystemTime};
+use base64_url::{encode, decode};
 use serde::{Serialize, Deserialize};
 use super::{
     DidUrl,
@@ -25,23 +26,23 @@ use {
             NewAead
         },
     },
-    base64_url::{encode, decode},
     crate::{
         Jwk,
         Recepient,
         KeyAlgorithm,
     }
 };
+#[cfg(feature = "raw-crypto")]
+use crate::crypto::{
+    CryptoAlgorithm,
+    SignatureAlgorithm,
+    Cypher,
+    Signer,
+};
 use crate::{
     Error,
     Jwe,
     MessageType,
-    crypto::{
-        CryptoAlgorithm,
-        SignatureAlgorithm,
-        Cypher,
-        Signer,
-    },
 };
 
 /// DIDComm message structure.
@@ -59,8 +60,9 @@ pub struct Message {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
-    ///     as bytes of data.
-    pub body: Vec<u8>,
+    ///     as base64url String of raw bytes of data.
+    /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
+    body: String,
 }
 
 impl Message {
@@ -73,7 +75,7 @@ impl Message {
             didcomm_header: DidcommHeader::new(),
             #[cfg(feature = "resolve")]
             recepients: None,
-            body: vec!(),
+            body: String::default(),
         }
     }
     /// Setter of `from` header
@@ -102,11 +104,17 @@ impl Message {
         self.didcomm_header.m_type = m_type;
         self
     }
+    /// Getter of the `body` as ref of bytes slice.
+    /// Helpe method.
+    ///
+    pub fn get_body(&self) -> Result<impl AsRef<[u8]>, Error> {
+        Ok(decode(&self.body)?)
+    }
     /// Setter of the `body`
     /// Helper method.
     ///
-    pub fn body(mut self, body: &[u8]) -> Self {
-        self.body = body.to_vec();
+    pub fn set_body(mut self, body: &[u8]) -> Self {
+        self.body = encode(body);
         self
     }
     // Setter of the `kid` header
@@ -251,7 +259,8 @@ impl Message {
                     jwk.kid = Some(key_id_from_didurl( &dest));
                 // encrypt jwk for each recepient using shared secret
                     let crypter = XChaCha20Poly1305::new(shared.as_ref().into());
-                    let nonce = XNonce::from_slice(&self.jwm_header.get_iv());
+                    let iv = self.jwm_header.get_iv();
+                    let nonce = XNonce::from_slice(iv.as_ref());
                     let sealed_key = crypter
                         .encrypt(nonce, shared_key.as_ref())
                         .map_err(|e| Error::Generic(e.to_string()))?;
@@ -284,7 +293,7 @@ impl Message {
         let signed = self
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), sk)?;
-        to.body = signed.as_bytes().to_vec();
+        to.body = encode(&signed.as_bytes());
         return to
             .m_type(MessageType::DidcommJws)
             .seal(ek);
@@ -333,7 +342,7 @@ impl Message {
                 .to(&to_recepients)
                 .from(&h)
                 .m_type(MessageType::DidcommRaw)
-                .body(serde_json::to_string(&body)?.as_bytes()))
+                .set_body(serde_json::to_string(&body)?.as_bytes()))
     }
 }
 
@@ -397,14 +406,14 @@ impl Message {
                     // TODO: hate this tree - needs some refactoring
                     if &m.didcomm_header.m_type == &MessageType::DidcommJws {
                         if let Some(val_key) = validation_key {
-                            Message::verify(&m.body, val_key)
+                            Message::verify(&decode(&m.body)?, val_key)
                         } else {
                             Err(Error::Generic(String::from("Validation key is missing")))
                         }
                     } else {
-                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.body) {
+                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&decode(&m.body)?) {
                             Ok(Message {
-                                body: mediated.payload,
+                                body: encode(&mediated.payload),
                                 ..m
                             })
                         } else {
@@ -433,7 +442,10 @@ impl Message {
                             let mut key: Option<Vec<u8>> = None;
                             for recepient in recepients {
                                 let cryptor = XChaCha20Poly1305::new(shared.as_bytes().into());
-                                match cryptor.decrypt(jwe.header.get_iv().into(), decode(&recepient.encrypted_key).unwrap().as_ref()) {
+                                match cryptor.decrypt(
+                                    jwe.header.get_iv().as_ref().into(), 
+                                    decode(&recepient.encrypted_key).unwrap().as_ref())
+                                {
                                     Ok(k) => {
                                         key = Some(k);
                                         break;
@@ -454,17 +466,16 @@ impl Message {
                     }
                     if &m.didcomm_header.m_type == &MessageType::DidcommJws {
                         if m.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
-                        if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.alg.unwrap()) {
-                            Ok(Message::verify(&m.body, &verifying_key)?)
+                        if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.alg.clone().unwrap_or_default()) {
+                            Ok(Message::verify(m.get_body()?.as_ref(), &verifying_key)?)
                         } else {
                             Err(Error::JwsParseError)
                         }
                     } else {
-                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.body) {
+                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.get_body()?.as_ref()) {
                             Ok(Message {
-                                body: mediated.payload,
                                 ..m
-                            })
+                            }.set_body(&mediated.payload))
                         } else {
                             Ok(m)
                         }
@@ -574,7 +585,7 @@ mod crypto_tests {
     #[cfg(not(feature = "resolve"))]
     fn receive_test() {
         // Arrange
-        let received_jwe = r#"{"typ":"JWM","enc":"XC20P","alg":"ECDH-ES+A256KW","iv":"0RMtn313eDRL5C8THqK43OQv0_z7yMYC","id":2887512615064430182,"type":"application/didcomm-plain+json","to":[""],"from":"","ciphertext":[0,57,198,242,232,4,219,44,213,40,117,11,17,115,229,12,72,70,39,208,239,165,66,237,41,58,250,0,238,165,91,111,174,167,127,160,82,186,79,103,221,45,219,78,245,161,109,160,99,117,66,91,131,46,154,96,13,16,82,112,33,244,182,40,89,86,99,81,16,154,70,2,99,80,154,189,209,56,141,79,253,104,78,157,213,245,135,194,183,212,198,181,53,161,212,251,215,224,188,233,115,28,65,73,138,50,108,101,94,131,226,8,89,71,170,83,156,227,91,153,197,56,241,81,252,120,224,71,69,0,24,197,168,134,60,179,207,172,30,206,17,179,199,198,213,234,213,50,167,23,44,184,89,176,36,242,114,206,25,197,155,199,248,119,252,190,236,182,181,65,145,5,209,70,235,237,176,147,189,219,226,230,231,127,249,73,56,167,71,9,142,145,10,25,60,18,250,11,109,156,50]}"#;
+        let received_jwe = r#"{"typ":"JWM","enc":"XC20P","alg":"ECDH-ES+A256KW","iv":"T9mr_1BU3QLAR2DDGbuazJaT_lSL4AV9","id":2680062373727502601,"type":"application/didcomm-plain+json","to":[""],"from":"","ciphertext":[109,30,156,163,61,55,151,194,203,62,125,236,136,173,157,86,62,59,159,166,31,90,81,51,134,227,152,107,182,102,217,115,1,89,85,36,161,177,231,240,118,199,154,24,123,24,6,164,214,38,122,173,221,73,30,140,152,174,189,254,196,245,195,191,220,204,165,159,125,154,158,11,27,250,194,84,185,246,218,49,197,98,19,99,53,67,5,140,9,214,189,191,224,25,12,23,141,31,63,109,68,61,186,249,231,189,158,237,129,224,214,111,144,110,117,63,8,141,246,155,119,13,143,189,77,57,188,7,176,3,60,109,101,63,103,163,140,16,50,6,235,202,169,39,20,166,188,242,161,38,199,155,2,45,9,255,62,80,165,104,60,220,189,202,18,207,146,139,181,136,67,178,57,32,194,208,212,221,202,238,61,154,3,125,131,27,38,216,116,101,2,227,36,210,253,218,103,80,181,209,251]}"#;
         let rk = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92];
         // Act
         let received = Message::receive(received_jwe, Some(&rk), None);
