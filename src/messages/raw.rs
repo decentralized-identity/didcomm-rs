@@ -33,7 +33,7 @@ impl Message {
             }
             #[cfg(not(feature = "resolve"))]
             {
-                let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
+                let cyphertext = crypter(self.jwm_header.get_iv().as_ref(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
                 Ok(serde_json::to_string(&Jwe::new(header, d_header,  cyphertext))?)
             }
     }
@@ -48,7 +48,7 @@ impl Message {
         key: &[u8]) 
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
-        if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), key, &jwe.payload()) {
+        if let Ok(raw_message_bytes) = decrypter(jwe.header.get_iv().as_ref(), key, &jwe.payload()) {
             Ok(serde_json::from_slice(&raw_message_bytes)?)
         } else {
             Err(Error::PlugCryptoFailure)
