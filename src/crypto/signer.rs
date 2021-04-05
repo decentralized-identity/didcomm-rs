@@ -122,9 +122,12 @@ impl TryFrom<&String> for SignatureAlgorithm {
 
 #[test]
 fn es256k_test() {
-    use k256::ecdsa::SigningKey;
+    use k256::{
+        elliptic_curve::rand_core::OsRng,
+        ecdsa::SigningKey,
+    };
     // Arrange
-    let sk = SigningKey::random(&mut rand_core::OsRng);
+    let sk = SigningKey::random(&mut OsRng);
     let vk = &sk.verify_key();
     let m = b"this is the message we're signing in this test...";
     // Act

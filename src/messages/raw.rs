@@ -90,8 +90,8 @@ impl Message {
 mod raw_tests {
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
+    use k256::elliptic_curve::rand_core::OsRng;
     use sodiumoxide::crypto::secretbox;
-    use rand_core::OsRng;
     use x25519_dalek::{
         EphemeralSecret,
         PublicKey,

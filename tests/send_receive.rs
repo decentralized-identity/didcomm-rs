@@ -6,9 +6,9 @@ mod common;
 #[cfg(not(feature = "resolve"))]
 use {
     common::*,
-    rand_core::OsRng,
+    k256::elliptic_curve::rand_core::OsRng,
     x25519_dalek::{EphemeralSecret, PublicKey},
-    didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer}
+    didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer},
 };
 
 #[test]
