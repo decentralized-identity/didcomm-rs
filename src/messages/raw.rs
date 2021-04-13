@@ -1,15 +1,14 @@
 use std::convert::TryInto;
 use crate::{
+    Error,
     Jwe,
     Jws,
-    Error,
     crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
         Signer,
-    },
-};
+    }};
 use super::Message;
 
 #[cfg(feature = "raw-crypto")]
@@ -21,21 +20,19 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
     ///
-    pub fn encrypt(self, crypter: SymmetricCypherMethod, receiver_pk: &[u8])
+    pub fn encrypt(self, crypter: SymmetricCypherMethod, encryption_key: &[u8])
         -> Result<String, Error> {
             let header = self.jwm_header.clone();
-            let d_header = self.get_didcomm_header().to_owned();
-            #[cfg(feature = "resolve")]
-            {
-                let recepients = self.recepients.clone();
-                let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
-                Ok(serde_json::to_string(&Jwe::new(header, d_header, recepients, cyphertext))?)
+            let d_header = self.get_didcomm_header();
+            let cyphertext = crypter(self.jwm_header.get_iv().as_ref(), encryption_key, serde_json::to_string(&self)?.as_bytes())?;
+            let mut jwe = Jwe::new(header, self.recepients.clone(), cyphertext);
+            let multi = self.recepients.is_some();
+            jwe.header.skid = Some(d_header.from.clone().unwrap_or_default())   ; 
+            if !multi {
+                jwe.header.kid = Some(d_header.to[0].clone());
             }
-            #[cfg(not(feature = "resolve"))]
-            {
-                let cyphertext = crypter(&self.jwm_header.get_iv(), receiver_pk, serde_json::to_string(&self)?.as_bytes())?;
-                Ok(serde_json::to_string(&Jwe::new(header, d_header,  cyphertext))?)
-            }
+            jwe.header.skid = d_header.from.clone();
+            Ok(serde_json::to_string(&jwe)?)
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
@@ -48,7 +45,7 @@ impl Message {
         key: &[u8]) 
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
-        if let Ok(raw_message_bytes) = decrypter(&jwe.header.get_iv(), key, &jwe.payload()) {
+        if let Ok(raw_message_bytes) = decrypter(jwe.header.get_iv().as_ref(), key, &jwe.payload()) {
             Ok(serde_json::from_slice(&raw_message_bytes)?)
         } else {
             Err(Error::PlugCryptoFailure)
@@ -90,8 +87,8 @@ impl Message {
 mod raw_tests {
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
+    use k256::elliptic_curve::rand_core::OsRng;
     use sodiumoxide::crypto::secretbox;
-    use rand_core::OsRng;
     use x25519_dalek::{
         EphemeralSecret,
         PublicKey,

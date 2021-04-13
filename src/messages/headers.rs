@@ -14,6 +14,7 @@ use crate::{
         SignatureAlgorithm
     },
 };
+use base64_url::{encode, decode};
 use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -98,6 +99,8 @@ pub struct JwmHeader {
     // None if raw text message, Some(key ID) otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skid: Option<String>,
     // None if raw text message, Some(String) for
     //  both JWE and/or JWS.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,14 +124,14 @@ pub struct JwmHeader {
     pub cty: Option<String>,
     // Nonce!
     // FIXME: should this be optional?
-    iv: Vec<u8>,
+    iv: String,
 }
 
 impl JwmHeader {
     /// `iv` getter
     ///
-    pub fn get_iv(&self) -> &[u8] {
-        &self.iv
+    pub fn get_iv(&self) -> impl AsRef<[u8]> {
+        decode(&self.iv).unwrap()
     }
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
@@ -176,9 +179,10 @@ impl Default for JwmHeader {
         a.shuffle(&mut rng);
         JwmHeader {
             typ: "JWM".into(),
-            iv: a,
+            iv: encode(&a),
             enc: None,
             kid: None,
+            skid: None,
             epk: None,
             alg: None,
             cty: None,
@@ -214,5 +218,5 @@ fn default_jwm_header_with_random_iv() {
     // Act
     let h = JwmHeader::default();
     // Assert
-    assert_ne!(not_expected, h.iv);
+    assert_ne!(not_expected, decode(&h.iv).unwrap());
 }

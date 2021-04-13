@@ -6,8 +6,8 @@ pub enum Error {
     NoRotationData,
     #[error("malformed DID string")]
     BadDid,
-    #[error("not a JWE compact representation")]
-    JweCompactParseError,
+    #[error("no recepient set for jwe")]
+    NoJweRecepient,
     #[error("not a JWS compact representation")]
     JwsParseError,
     #[error("failed to parse as JWE")]

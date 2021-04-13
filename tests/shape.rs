@@ -11,7 +11,7 @@ struct DesiredShape {
 impl Shape for DesiredShape {
     type Err = Error;
     fn shape(m: &Message) -> Result<DesiredShape, Error> {
-        serde_json::from_slice(&m.body)
+        serde_json::from_slice(m.get_body()?.as_ref())
             .map_err(|e| Error::SerdeError(e))
     }
 }
@@ -24,7 +24,7 @@ fn shape_desired_test() {
         string_field: "important data".into()
     };
     let m = Message::new()
-        .body(serde_json::to_string(&initial_shape).unwrap().as_bytes());
+        .set_body(serde_json::to_string(&initial_shape).unwrap().as_bytes());
     
     // -- pack, send, receive happens here
 

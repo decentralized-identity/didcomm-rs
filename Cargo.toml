@@ -1,6 +1,6 @@
 [package]
 name = "didcomm-rs"
-version = "0.4.0"
+version = "0.6.0"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/decentralized-identity/didcomm-rs"
@@ -14,31 +14,30 @@ license = "Apache-2.0"
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-base64-url = "1.4.8"
+base64-url = "1.4.9"
 # Raw crypto dependancies
 chacha20poly1305 = { version = "0.7", optional = true }
 aes-gcm = { version = "0.8", optional = true }
-k256 = { version = "0.7.2", optional = true, features = ["ecdsa", "sha256"] }
-p256 = { version = "0.7", optional = true, features = ["ecdsa"] }
+k256 = { version = "0.7.2", optional = true, features = ["ecdsa", "sha256", "zeroize"] }
+p256 = { version = "0.7.2", optional = true, features = ["ecdsa", "zeroize"] }
 ed25519-dalek = { version = "1.0", optional = true }
+ddoresolver-rs = { git = "https://github.com/jolocom/ddoresolver-rs", branch = "main", features = ["all"], optional = true }
 x25519-dalek = "1.1"
-ddoresolver-rs = { version = "0.1.6", optional = true }
 arrayref = "0.3"
 # cbor = "0.4"
 
 # Other
 regex = "1"
 rand = "0.8"
-rand_chacha = { version = "0.3.0", optional = true }
+rand_chacha = "0.3.0"
 thiserror = "1.0"
 
 [dev-dependencies]
 sodiumoxide = "0.2.6"
-rand_core = "0.5"
 base58 = "0.1.0"
 
 [features]
-default = ["raw-crypto"]
+default = ["raw-crypto", "resolve"]
 raw-crypto = ["chacha20poly1305", "aes-gcm", "k256", "p256", "ed25519-dalek"]
-resolve = ["ddoresolver-rs", "rand_chacha"]
+resolve = ["ddoresolver-rs"]
 

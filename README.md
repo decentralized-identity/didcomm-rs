@@ -22,7 +22,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         // setting `to` header (recepients) - Optional
         .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
         // populating body with some data - `Vec<bytes>`
-        .body(some_payload.as_bytes());
+        .set_body(some_payload.as_bytes());
 
     // Serialize message into JWM json (SENDER action)
     let ready_to_send = m.as_raw_json().unwrap();
@@ -43,14 +43,13 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     // key as bytes
     let ek = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92]
     // creating message
-    let mut message = Message::new();
+    let mut message = Message::new()
     // packing in some payload (can be anything really)
-    message.body = br#"{'key':'value','key2':'value2'}"#;
+        .set_body(br#"{'key':'value','key2':'value2'}"#)
     // set JOSE header for XC20P algorithm
-    message.as_jwe(alg);
+        .as_jwe(alg)
     // add some custom app/protocol related headers to didcomm header portion
     // these are not included into JOSE header
-    message = message // shadowing here is required to provide option of chainig calls
         .add_header_field("my_custom_key".into(), "my_custom_value".into())
         .add_header_field("another_key".into(), "another_value".into());
     // set `kid` property
@@ -58,8 +57,6 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         Some(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#));
     // encrypt and serialize message with JOSE header included
     let ready_to_send = message.seal(ek.as_bytes())?;
-    // alternatively use compact JWE format
-    let ready_to_send = message.seal_compact(ek.as_bytes())?;
     // use transport of choice to send `ready_to_send` data to the receiver!
 
     //... transport is happening here ...
@@ -75,7 +72,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
-        .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
+        .set_body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jws(&SignatureAlgorithm::EdDsa)
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes()).unwrap();
 
@@ -101,7 +98,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         // setting to
         .to(&["did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
         // packing in some payload
-        .body(some_payload.as_bytes())
+        .set_body(some_payload.as_bytes())
         // set JOSE header for XC20P algorithm
         .as_jwe(CryptoAlgorithm::XC20P)
         // custom header
@@ -132,7 +129,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
     // Received by Bob
     // `rk_bob` - key to decrypt final message
-    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), Some(rk_bob.as_bytes()));
+    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().get_body()?.as_ref()), Some(rk_bob.as_bytes()));
 ```
 
 ## 5. Prepare JWS envelope wrapped into JWE -> sign -> pack -> receive
@@ -147,7 +144,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
         .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
-        .body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
+        .set_body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
@@ -227,7 +224,7 @@ struct DesiredShape {
 ```rust
 impl Shape for DesiredShape {
     type Err = Error;
-    fn get_body(m: &Message) -> Result<DesiredShape, Error> {
+    fn shape(m: &Message) -> Result<DesiredShape, Error> {
         serde_json::from_slice(&m.body)
             .map_err(|e| Error::SerdeError(e))
     }
