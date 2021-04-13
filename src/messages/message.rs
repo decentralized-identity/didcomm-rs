@@ -1,8 +1,7 @@
-use std::{convert::TryInto, str::FromStr, time::SystemTime};
+use std::{convert::TryInto, time::SystemTime};
 use base64_url::{encode, decode};
 use serde::{Serialize, Deserialize};
 use super::{
-    DidUrl,
     mediated::Mediated,
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
@@ -319,26 +318,19 @@ impl Message {
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
     /// TODO: Add examples
-    pub fn routed_by(self, ek: &[u8], to: &str)
-        -> Result<Self, Error> {
-            let h = match &self.get_didcomm_header().from.clone() {
-                Some(s) => s.to_owned(),
-                None => String::default(),
-            };
-            let to_cloned = self.didcomm_header.to.clone();
-            let to_recepients: Vec<&str> = to_cloned
-                .iter()
-                .map(String::as_str)
-                .collect();
-            let to_wrap: String;
-            to_wrap = self.seal(ek)?;
-            let body = Mediated::new(DidUrl::from_str(to)?)
-                .with_payload(to_wrap.as_bytes().to_vec());
-            Ok(Message::new()
-                .to(&to_recepients)
-                .from(&h)
-                .m_type(MessageType::DidcommRaw)
-                .set_body(serde_json::to_string(&body)?.as_bytes()))
+    pub fn routed_by(self, ek: &[u8], mediator_did: &str)
+        -> Result<String, Error> {
+            let from = &self.didcomm_header.from.clone().unwrap_or_default();
+            let alg = crypter_from_header(&self.jwm_header)?;
+            let body = Mediated::new(self.didcomm_header.to[0].clone().into())
+                .with_payload(self.seal(ek)?.as_bytes().to_vec());
+            Message::new()
+                .to(&[mediator_did])
+                .from(&from)
+                .as_jwe(&alg)
+                .m_type(MessageType::DidcommForward)
+                .set_body(serde_json::to_string(&body)?.as_bytes())
+                .seal(ek)
     }
 }
 
@@ -468,13 +460,7 @@ impl Message {
                             Err(Error::JwsParseError)
                         }
                     } else {
-                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&m.get_body()?.as_ref()) {
-                            Ok(Message {
-                                ..m
-                            }.set_body(&mediated.payload))
-                        } else {
-                            Ok(m)
-                        }
+                        Ok(m)
                     }
                 } else {
                     Err(Error::BadDid)
@@ -622,5 +608,33 @@ mod crypto_tests {
         let received_third = Message::receive(&jwe, &third_private);
         assert!(received_bob.is_ok());
         assert!(received_third.is_ok());
+    }
+
+    #[test]
+    fn mediated_didkey_test() {
+        let mediator_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
+        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
+        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let sealed = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .as_jwe(&CryptoAlgorithm::XC20P)
+            .routed_by(&alice_private, "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf");
+        assert!(sealed.is_ok());
+
+        let mediator_received = Message::receive(&sealed.unwrap(), &mediator_private);
+        assert!(mediator_received.is_ok());
+
+        use crate::Mediated;
+        let mediator_received_unwrapped = mediator_received.unwrap().get_body().unwrap();
+        let pl_string = String::from_utf8_lossy(mediator_received_unwrapped.as_ref()); 
+        let message_to_forward: Mediated = serde_json::from_str(&pl_string).unwrap();
+        let attached_jwe = serde_json::from_slice::<Jwe>(&message_to_forward.payload);
+        assert!(attached_jwe.is_ok());
+        let str_jwe = serde_json::to_string(&attached_jwe.unwrap());
+        assert!(str_jwe.is_ok());
+
+        let bob_received = Message::receive(&String::from_utf8_lossy(&message_to_forward.payload), &bobs_private);
+        assert!(bob_received.is_ok());
     }
 }

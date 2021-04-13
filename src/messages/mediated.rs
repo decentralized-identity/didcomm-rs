@@ -1,13 +1,12 @@
 use super::{
     Shape,
     Message,
-    didurl::DidUrl,
 };
 use crate::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mediated {
-    pub next: DidUrl,
+    pub next: String,
     #[serde(rename = "payloads~attach")]
     pub payload: Vec<u8>
 }
@@ -17,7 +16,7 @@ impl Mediated {
     /// # Parameters
     /// *next - `DidUrl` of delivery target.
     ///
-    pub fn new(next: DidUrl) -> Self {
+    pub fn new(next: String) -> Self {
         Mediated{
             next,
             payload: vec!()
@@ -28,8 +27,8 @@ impl Mediated {
     /// # Example
     /// ```rust
     /// use std::str::FromStr;
-    /// use didcomm_rs::{Mediated, DidUrl};
-    /// let warpper_payload = Mediated::new(DidUrl::from_str("did:key:abc").unwrap())
+    /// use didcomm_rs::Mediated;
+    /// let warpper_payload = Mediated::new("did:key:abc".into())
     ///     .with_payload(b"hello, abc".to_vec());
     /// ```
     ///
