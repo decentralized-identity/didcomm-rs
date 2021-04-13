@@ -99,6 +99,8 @@ pub struct JwmHeader {
     // None if raw text message, Some(key ID) otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skid: Option<String>,
     // None if raw text message, Some(String) for
     //  both JWE and/or JWS.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -180,6 +182,7 @@ impl Default for JwmHeader {
             iv: encode(&a),
             enc: None,
             kid: None,
+            skid: None,
             epk: None,
             alg: None,
             cty: None,

@@ -15,7 +15,7 @@ pub struct Jwk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<String>,
     #[serde(flatten)]
-    other: HashMap<String, String>,
+    pub(crate) other: HashMap<String, String>,
 }
 
 impl Jwk {

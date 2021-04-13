@@ -7,11 +7,10 @@ use super::{
     headers::{DidcommHeader, JwmHeader},
     prior_claims::PriorClaims,
 };
+use arrayref::array_ref;
 #[cfg(feature = "resolve")]
 pub use ddoresolver_rs::*;
-#[cfg(feature = "resolve")]
 use {
-    arrayref::array_ref,
     x25519_dalek::{
         StaticSecret,
         PublicKey
@@ -30,7 +29,7 @@ use {
         Jwk,
         Recepient,
         KeyAlgorithm,
-    }
+    },
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{
@@ -56,7 +55,6 @@ pub struct Message {
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
-    #[cfg(feature = "resolve")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
@@ -73,7 +71,6 @@ impl Message {
         Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
-            #[cfg(feature = "resolve")]
             recepients: None,
             body: String::default(),
         }
@@ -227,12 +224,11 @@ impl Message {
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
     // TODO: Add examples
-    #[cfg(not(feature = "resolve"))]
-    pub fn seal(self, ek: impl AsRef<[u8]>) -> Result<String, Error> {
-        let alg = crypter_from_header(&self.jwm_header)?;
-        self.encrypt(alg.encryptor(), ek.as_ref())
-    }
-    #[cfg(feature = "resolve")]
+    // pub fn seal(self, ek: impl AsRef<[u8]>) -> Result<String, Error> {
+    //     let alg = crypter_from_header(&self.jwm_header)?;
+    //     self.encrypt(alg.encryptor(), ek.as_ref())
+    // }
+  //  #[cfg(feature = "resolve")]
     pub fn seal(mut self, sk: impl AsRef<[u8]>) -> Result<String, Error> {
         if sk.as_ref().len() != 32 { return Err(Error::InvalidKeySize("!32".into())); }
         match &self.didcomm_header.to.len() {
@@ -391,53 +387,53 @@ impl Message {
     /// Construct a message from received data.
     /// Raw or JWE payload is accepted.
     ///
-    #[cfg(not(feature = "resolve"))]
-    pub fn receive(incomming: &str, crypto_key: Option<&[u8]>, validation_key: Option<&[u8]>) -> Result<Self, Error> {
-        match crypto_key {
-            None => serde_json::from_str(incomming)
-                .map_err(|e| Error::SerdeError(e)),
-            Some(key) => {
-                let jwe: Jwe = serde_json::from_str(&incomming)?;
-                // Here we have JWE
-                if let Some(alg) = &jwe.header.alg {
-                    let a: CryptoAlgorithm = alg.try_into()?;
-                    // TODO: public-private header validation should be here?
-                    let m = Message::decrypt(incomming.as_bytes(), a.decryptor(), key)?;
-                    // TODO: hate this tree - needs some refactoring
-                    if &m.didcomm_header.m_type == &MessageType::DidcommJws {
-                        if let Some(val_key) = validation_key {
-                            Message::verify(&decode(&m.body)?, val_key)
-                        } else {
-                            Err(Error::Generic(String::from("Validation key is missing")))
-                        }
-                    } else {
-                        if let Ok(mediated) = serde_json::from_slice::<Mediated>(&decode(&m.body)?) {
-                            Ok(Message {
-                                body: encode(&mediated.payload),
-                                ..m
-                            })
-                        } else {
-                            Ok(m)
-                        }
-                    }
-                } else { 
-                    Err(Error::JweParseError)
-                }
-            }
-        }
-    }
-    #[cfg(feature = "resolve")]
+    // #[cfg(not(feature = "resolve"))]
+    // pub fn receive(incomming: &str, crypto_key: Option<&[u8]>, validation_key: Option<&[u8]>) -> Result<Self, Error> {
+    //     match crypto_key {
+    //         None => serde_json::from_str(incomming)
+    //             .map_err(|e| Error::SerdeError(e)),
+    //         Some(key) => {
+    //             let jwe: Jwe = serde_json::from_str(&incomming)?;
+    //             // Here we have JWE
+    //             if let Some(alg) = &jwe.header.alg {
+    //                 let a: CryptoAlgorithm = alg.try_into()?;
+    //                 // TODO: public-private header validation should be here?
+    //                 let m = Message::decrypt(incomming.as_bytes(), a.decryptor(), key)?;
+    //                 // TODO: hate this tree - needs some refactoring
+    //                 if &m.didcomm_header.m_type == &MessageType::DidcommJws {
+    //                     if let Some(val_key) = validation_key {
+    //                         Message::verify(&decode(&m.body)?, val_key)
+    //                     } else {
+    //                         Err(Error::Generic(String::from("Validation key is missing")))
+    //                     }
+    //                 } else {
+    //                     if let Ok(mediated) = serde_json::from_slice::<Mediated>(&decode(&m.body)?) {
+    //                         Ok(Message {
+    //                             body: encode(&mediated.payload),
+    //                             ..m
+    //                         })
+    //                     } else {
+    //                         Ok(m)
+    //                     }
+    //                 }
+    //             } else { 
+    //                 Err(Error::JweParseError)
+    //             }
+    //         }
+    //     }
+    // }
+    // #[cfg(feature = "resolve")]
     pub fn receive(incomming: &str, sk: &[u8]) -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_str(incomming)?;
-        if jwe.from().is_none() { return Err(Error::DidResolveFailed); }
-        if let Some(document) = ddoresolver_rs::resolve_any(&jwe.from().to_owned().unwrap()) {
+        if jwe.header.skid.is_none() { return Err(Error::DidResolveFailed); }
+        if let Some(document) = ddoresolver_rs::resolve_any(&jwe.header.skid.to_owned().unwrap()) {
             if let Some(alg) = &jwe.header.alg {
                 if let Some(k_arg) = document.find_public_key_for_curve("X25519") {
                     let shared = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
                         .diffie_hellman(&PublicKey::from(array_ref!(k_arg, 0, 32).to_owned()));
                     let a: CryptoAlgorithm = alg.try_into()?;
                     let m: Message;
-                    if jwe.to().len() > 1 {
+                    if jwe.recepients.is_some() {
                         if let Some(recepients) = jwe.recepients {
                             let mut key: Option<Vec<u8>> = None;
                             for recepient in recepients {
@@ -492,7 +488,6 @@ impl Message {
     }
 }
 
-#[cfg(feature = "resolve")]
 fn gen_shared_for_recepient(sk: impl AsRef<[u8]>, did: &str) -> Result<impl AsRef<[u8]>, Error> {
     if let Some(document) = resolve_any(did) {
         if let Some(agreement) = document.find_public_key_for_curve("X25519") {
@@ -507,7 +502,6 @@ fn gen_shared_for_recepient(sk: impl AsRef<[u8]>, did: &str) -> Result<impl AsRe
     }
 }
 
-#[cfg(feature = "resolve")]
 fn key_id_from_didurl(url: &str) -> String {
     let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$").unwrap();
     match  re.captures(url) {
