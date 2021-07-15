@@ -240,3 +240,6 @@ let received_typed_body = DesiredShape::shape(&m).unwrap(); // Where m = Message
 # Disclaimer
 
 This is a sample implementation of the DIDComm V2 spec. The DIDComm V2 spec is still actively being developed by the DIDComm WG in the DIF and therefore subject to change.
+
+## Testing PR Mechanism
+Do not merge this PR
