@@ -87,7 +87,6 @@ impl Message {
 mod raw_tests {
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
-    use k256::elliptic_curve::rand_core::OsRng;
     use sodiumoxide::crypto::secretbox;
     use x25519_dalek::{
         EphemeralSecret,
@@ -166,9 +165,9 @@ mod raw_tests {
     #[cfg(feature="raw-crypto")]
     fn plugin_crypto_xChaCha20Paly1305_x25519_dalek_shared_secret() {
         // Arrange
-        let sender_sk = EphemeralSecret::new(OsRng);
+        let sender_sk = EphemeralSecret::new(rand_core::OsRng);
         let sender_pk = PublicKey::from(&sender_sk);
-        let receiver_sk = EphemeralSecret::new(OsRng);
+        let receiver_sk = EphemeralSecret::new(rand_core::OsRng);
         let receiver_pk = PublicKey::from(&receiver_sk);
         let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);

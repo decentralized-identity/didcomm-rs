@@ -1,6 +1,6 @@
 [package]
 name = "didcomm-rs"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/decentralized-identity/didcomm-rs"
@@ -16,12 +16,13 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 base64-url = "1.4.9"
 # Raw crypto dependancies
-chacha20poly1305 = { version = "0.7", optional = true }
-aes-gcm = { version = "0.8", optional = true }
-k256 = { version = "0.7.2", optional = true, features = ["ecdsa", "sha256", "zeroize"] }
-p256 = { version = "0.7.2", optional = true, features = ["ecdsa", "zeroize"] }
+chacha20poly1305 = { version = "0.8", optional = true }
+aes-gcm = { version = "0.9.2", optional = true }
+k256 = { version = "0.9.4", optional = true, features = ["ecdsa", "sha256", "zeroize"] }
+p256 = { version = "0.9.0", optional = true, features = ["ecdsa", "zeroize"] }
 ed25519-dalek = { version = "1.0", optional = true }
-ddoresolver-rs = { git = "https://github.com/jolocom/ddoresolver-rs", branch = "main", features = ["all"], optional = true }
+#ddoresolver-rs = { git = "https://github.com/jolocom/ddoresolver-rs", branch = "main", features = ["all"], optional = true }
+ddoresolver-rs = { path = "../ddoresolver-rs", features = ["all"], optional = true }
 x25519-dalek = "1.1"
 arrayref = "0.3"
 # cbor = "0.4"
@@ -34,6 +35,7 @@ thiserror = "1.0"
 
 [dev-dependencies]
 sodiumoxide = "0.2.6"
+rand_core = "0.5"
 base58 = "0.1.0"
 
 [features]
