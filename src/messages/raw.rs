@@ -1,15 +1,21 @@
 use std::convert::TryInto;
-use crate::{
-    Error,
-    Jwe,
-    Jws,
-    crypto::{
+use crate::{DidcommHeader, Error, Jwe, Jws, Recepient, crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
         Signer,
     }};
 use super::Message;
+
+#[derive(Serialize, Deserialize)]
+pub struct PayloadToVerify {
+    #[serde(flatten)]
+    didcomm_header: DidcommHeader,
+    #[cfg(feature = "resolve")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) recepients: Option<Vec<Recepient>>,
+    body: String,
+}
 
 #[cfg(feature = "raw-crypto")]
 impl Message {
@@ -59,9 +65,25 @@ impl Message {
         if h.alg.is_none() {
             Err(Error::JwsParseError)
         } else {
-            let payload = base64_url::encode(&serde_json::to_string(&self)?);
+            let payload = base64_url::encode(&serde_json::to_string(&self.jwm_header)?);
+            let payload_to_verify: PayloadToVerify = PayloadToVerify {
+                didcomm_header: self.get_didcomm_header().clone(),
+                #[cfg(feature = "resolve")]
+                recepients: self.recepients.clone(),
+                body: self.body.clone(),
+            };
+            let payload_to_verify_json_string = serde_json::to_string(&payload_to_verify)?;
+            let payload_to_verify_string_base64 =
+                base64_url::encode(&payload_to_verify_json_string);
+            let payload = format!("{}.{}", &payload, &payload_to_verify_string_base64);
             let signature = signer(signing_key, &payload.as_bytes())?;
-            Ok(serde_json::to_string(&Jws::new(payload, h, signature))?)
+            let serialized_jws = serde_json::to_string(&Jws::new(
+                payload_to_verify_string_base64,
+                h,
+                signature,
+            ))?;
+
+            Ok(serialized_jws)
         }
     }
     /// Verifyes signature and returns payload message on verification success.

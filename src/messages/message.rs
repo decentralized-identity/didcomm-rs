@@ -59,7 +59,7 @@ pub struct Message {
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as base64url String of raw bytes of data.
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
-    body: String,
+    pub(crate) body: String,
 }
 
 impl Message {
