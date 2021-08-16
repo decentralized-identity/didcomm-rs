@@ -43,8 +43,9 @@ impl Mediated {
 impl Shape for Mediated {
    type Err = Error;
    fn shape(m: &Message) -> Result<Self, Self::Err> {
-       serde_json::from_slice(m.get_body()?.as_ref())
-           .map_err(|e| Error::SerdeError(e))
+       serde_json::from_str::<Mediated>(
+           &serde_json::to_string(&m.get_body()?)?,
+       ).map_err(|e| Error::SerdeError(e))
    }
 }
 

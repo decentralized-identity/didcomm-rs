@@ -19,7 +19,7 @@ use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
-    pub id: usize,
+    pub id: String,
     #[serde(rename = "type")]
     pub m_type: MessageType,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -53,8 +53,9 @@ impl DidcommHeader {
     }
     /// Generates random `id`
     /// TODO: Should this be public?
-    pub fn gen_random_id() -> usize {
-            rand::thread_rng().gen()
+    pub fn gen_random_id() -> String {
+        let id_number: usize = rand::thread_rng().gen();
+        format!("{}", id_number)
     }
     /// Getter method for `from_prior` retreival
     ///
@@ -65,7 +66,7 @@ impl DidcommHeader {
     ///
     pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
         Ok(DidcommHeader {
-            id: rand::thread_rng().gen(),
+            id: DidcommHeader::gen_random_id(),
             m_type: MessageType::DidcommRaw,
             to,
             from,
@@ -124,14 +125,15 @@ pub struct JwmHeader {
     pub cty: Option<String>,
     // Nonce!
     // FIXME: should this be optional?
-    iv: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub iv: Option<String>,
 }
 
 impl JwmHeader {
     /// `iv` getter
     ///
     pub fn get_iv(&self) -> impl AsRef<[u8]> {
-        decode(&self.iv).unwrap()
+        decode(&self.iv.as_ref().unwrap()).unwrap()
     }
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
@@ -179,7 +181,7 @@ impl Default for JwmHeader {
         a.shuffle(&mut rng);
         JwmHeader {
             typ: "JWM".into(),
-            iv: encode(&a),
+            iv: Some(encode(&a)),
             enc: None,
             kid: None,
             skid: None,
@@ -218,5 +220,5 @@ fn default_jwm_header_with_random_iv() {
     // Act
     let h = JwmHeader::default();
     // Assert
-    assert_ne!(not_expected, decode(&h.iv).unwrap());
+    assert_ne!(not_expected, decode(&h.iv.unwrap()).unwrap());
 }

@@ -1,6 +1,7 @@
 use std::{convert::TryInto, time::SystemTime};
 use base64_url::{encode, decode};
 use serde::{Serialize, Deserialize};
+use serde_json::Value;
 use super::{
     mediated::Mediated,
     headers::{DidcommHeader, JwmHeader},
@@ -59,7 +60,7 @@ pub struct Message {
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as base64url String of raw bytes of data.
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
-    pub(crate) body: String,
+    pub(crate) body: Value,
 }
 
 impl Message {
@@ -71,7 +72,7 @@ impl Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
             recepients: None,
-            body: String::default(),
+            body: Value::Null,
         }
     }
     /// Setter of `from` header
@@ -103,14 +104,14 @@ impl Message {
     /// Getter of the `body` as ref of bytes slice.
     /// Helpe method.
     ///
-    pub fn get_body(&self) -> Result<impl AsRef<[u8]>, Error> {
-        Ok(decode(&self.body)?)
+    pub fn get_body(&self) -> Result<Value, Error> {
+        Ok(self.body.clone())
     }
     /// Setter of the `body`
     /// Helper method.
     ///
-    pub fn set_body(mut self, body: &[u8]) -> Self {
-        self.body = encode(body);
+    pub fn set_body(mut self, body: &Value) -> Self {
+        self.body = body.clone();
         self
     }
     // Setter of the `kid` header
@@ -288,7 +289,7 @@ impl Message {
         let signed = self
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), sk)?;
-        to.body = encode(&signed.as_bytes());
+        to.body = serde_json::from_str(&signed)?;
         return to
             .m_type(MessageType::DidcommJws)
             .seal(ek);
@@ -329,7 +330,7 @@ impl Message {
                 .from(&from)
                 .as_jwe(&alg)
                 .m_type(MessageType::DidcommForward)
-                .set_body(serde_json::to_string(&body)?.as_bytes())
+                .set_body(&serde_json::from_str(&serde_json::to_string(&body)?)?)
                 .seal(ek)
     }
 }
@@ -455,7 +456,7 @@ impl Message {
                     if &m.didcomm_header.m_type == &MessageType::DidcommJws {
                         if m.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
                         if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.alg.clone().unwrap_or_default()) {
-                            Ok(Message::verify(m.get_body()?.as_ref(), &verifying_key)?)
+                            Ok(Message::verify_value(&m.get_body()?, &verifying_key)?)
                         } else {
                             Err(Error::JwsParseError)
                         }
