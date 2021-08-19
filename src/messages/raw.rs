@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use base64_url::{decode, encode};
 use serde_json::Value;
 
 use crate::{DidcommHeader, Error, Jwe, Jws, Recepient, crypto::{
@@ -30,16 +31,33 @@ impl Message {
     ///
     pub fn encrypt(self, crypter: SymmetricCypherMethod, encryption_key: &[u8])
         -> Result<String, Error> {
-            let header = self.jwm_header.clone();
+            let mut header = self.jwm_header.clone();
             let d_header = self.get_didcomm_header();
-            let cyphertext = crypter(self.jwm_header.get_iv().as_ref(), encryption_key, serde_json::to_string(&self)?.as_bytes())?;
-            let mut jwe = Jwe::new(header, self.recepients.clone(), cyphertext);
+            let iv = Jwe::generate_iv();
             let multi = self.recepients.is_some();
-            jwe.header.skid = Some(d_header.from.clone().unwrap_or_default())   ; 
+            header.skid = Some(d_header.from.clone().unwrap_or_default())   ; 
             if !multi {
-                jwe.header.kid = Some(d_header.to[0].clone());
+                header.kid = Some(d_header.to[0].clone());
             }
-            jwe.header.skid = d_header.from.clone();
+            header.skid = d_header.from.clone();
+            let aad_string = encode(&serde_json::to_string(&header)?.as_bytes());
+            let aad = aad_string.as_bytes();
+            let cyphertext_and_tag = crypter(
+                &decode(&iv)?,
+                encryption_key,
+                serde_json::to_string(&self)?.as_bytes(),
+                aad,
+            )?;
+            let (cyphertext, tag) = cyphertext_and_tag.split_at(cyphertext_and_tag.len() - 16);
+            let jwe = Jwe::new(
+                None,
+                self.recepients.clone(),
+                cyphertext.to_vec(),
+                Some(header),
+                None,
+                Some(tag),
+                Some(iv),
+            );
             Ok(serde_json::to_string(&jwe)?)
     }
     /// Decrypts received cypher into instance of `Message`.
@@ -53,7 +71,10 @@ impl Message {
         key: &[u8]) 
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
-        if let Ok(raw_message_bytes) = decrypter(jwe.header.get_iv().as_ref(), key, &jwe.payload()) {
+        let protected = jwe.protected.as_ref().ok_or_else(|| Error::Generic("jwe is missing protected header".to_string()) )?;
+        let aad_string = encode(&serde_json::to_string(&protected)?.as_bytes());
+        let aad = aad_string.as_bytes();
+        if let Ok(raw_message_bytes) = decrypter(jwe.get_iv().as_ref(), key, &jwe.payload(), &aad) {
             Ok(serde_json::from_slice(&raw_message_bytes)?)
         } else {
             Err(Error::PlugCryptoFailure)
@@ -72,7 +93,7 @@ impl Message {
                 didcomm_header: self.get_didcomm_header().clone(),
                 #[cfg(feature = "resolve")]
                 recepients: self.recepients.clone(),
-                body: self.get_body()?,
+                body: serde_json::from_str(&self.get_body()?)?,
             };
             let payload_json_string = serde_json::to_string(&payload)?;
             let payload_string_base64 =
@@ -134,20 +155,20 @@ mod raw_tests {
         // Arrange
         let key = Key::from_slice(b"an example very very secret key.");
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);
             aead.encrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);
             Ok(aead.decrypt(nonce, m).unwrap())
         });
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM);
-        let id = m.get_didcomm_header().id;
+        let id = m.get_didcomm_header().id.to_owned();
 
         // Act and Assert
         let crypted = m.encrypt(my_crypter, key);
@@ -162,13 +183,13 @@ mod raw_tests {
     fn plugin_crypto_libsodium_box() {
         // Arrange
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8], _a: &[u8]|
             -> Result<Vec<u8>, Error> {
             let nonce = secretbox::Nonce::from_slice(n).unwrap();
             Ok(secretbox::seal(m, &nonce, &secretbox::Key::from_slice( k).unwrap()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8], _a: &[u8]|
             -> Result<Vec<u8>, Error> {
             let nonce = secretbox::Nonce::from_slice(n).unwrap();
             Ok(secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap())
@@ -176,7 +197,7 @@ mod raw_tests {
         });
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM);
-        let id = m.get_didcomm_header().id;
+        let id = m.get_didcomm_header().id.to_owned();
         let key = secretbox::gen_key();
 
         // Act and Assert
@@ -202,15 +223,15 @@ mod raw_tests {
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P);
-        let id = m.get_didcomm_header().id;
+        let id = m.get_didcomm_header().id.to_owned();
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);
             aead.encrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8], _a: &[u8]|
             -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);

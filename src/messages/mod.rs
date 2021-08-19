@@ -7,6 +7,7 @@ mod types;
 mod jwe;
 mod jws;
 mod jwk;
+mod serialization;
 
 #[cfg(feature = "raw-crypto")]
 mod raw;

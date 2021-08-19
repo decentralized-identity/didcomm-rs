@@ -1,6 +1,5 @@
 use rand::{
     Rng,
-    seq::SliceRandom,
 };
 use std::{
     time::SystemTime,
@@ -14,7 +13,6 @@ use crate::{
         SignatureAlgorithm
     },
 };
-use base64_url::{encode, decode};
 use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -123,18 +121,9 @@ pub struct JwmHeader {
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<String>,
-    // Nonce!
-    // FIXME: should this be optional?
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub iv: Option<String>,
 }
 
 impl JwmHeader {
-    /// `iv` getter
-    ///
-    pub fn get_iv(&self) -> impl AsRef<[u8]> {
-        decode(&self.iv.as_ref().unwrap()).unwrap()
-    }
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
     ///
@@ -164,7 +153,7 @@ impl JwmHeader {
             },
             CryptoAlgorithm::XC20P => {
                 self.enc = Some("XC20P".into());
-                self.alg = Some("ECDH-ES+A256KW".into());
+                self.alg = Some("ECDH-1PU+XC20PKW".into());
             }
         }
     }
@@ -176,12 +165,8 @@ impl JwmHeader {
 impl Default for JwmHeader {
     // Need to make sure nonce is 192 bit long unigue for each message.
     fn default() -> Self {
-        let mut rng = rand::thread_rng();
-        let mut a = rng.gen::<[u8; 24]>().to_vec();
-        a.shuffle(&mut rng);
         JwmHeader {
             typ: "JWM".into(),
-            iv: Some(encode(&a)),
             enc: None,
             kid: None,
             skid: None,
@@ -211,14 +196,4 @@ impl Recepient {
             encrypted_key
         }
     }
-}
-
-#[test]
-fn default_jwm_header_with_random_iv() {
-    // Arrange
-    let not_expected: Vec<u8> = vec![0; 24];
-    // Act
-    let h = JwmHeader::default();
-    // Assert
-    assert_ne!(not_expected, decode(&h.iv.unwrap()).unwrap());
 }

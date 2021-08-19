@@ -1,5 +1,7 @@
 use std::{convert::TryInto, time::SystemTime};
 use base64_url::{encode, decode};
+use k256::elliptic_curve::rand_core;
+use rand::{Rng, prelude::SliceRandom};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use super::{
@@ -38,11 +40,9 @@ use crate::crypto::{
     Cypher,
     Signer,
 };
-use crate::{
-    Error,
-    Jwe,
-    MessageType,
-};
+use std::convert::TryFrom;
+use sha2::{Digest, Sha256};
+use crate::{Error, Jwe, MessageType, RecipientValue};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -68,6 +68,7 @@ impl Message {
     /// Use extension messages to build final one before `send`ing.
     ///
     pub fn new() -> Self {
+        match env_logger::try_init() { Ok(_) | Err(_) => () }
         Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
@@ -104,14 +105,14 @@ impl Message {
     /// Getter of the `body` as ref of bytes slice.
     /// Helpe method.
     ///
-    pub fn get_body(&self) -> Result<Value, Error> {
-        Ok(self.body.clone())
+    pub fn get_body(&self) -> Result<String, Error> {
+        Ok(serde_json::to_string(&self.body)?)
     }
     /// Setter of the `body`
     /// Helper method.
     ///
-    pub fn set_body(mut self, body: &Value) -> Self {
-        self.body = body.clone();
+    pub fn set_body(mut self, body: &str) -> Self {
+        self.body = serde_json::from_str(body).unwrap();
         self
     }
     // Setter of the `kid` header
@@ -231,43 +232,30 @@ impl Message {
   //  #[cfg(feature = "resolve")]
     pub fn seal(mut self, sk: impl AsRef<[u8]>) -> Result<String, Error> {
         if sk.as_ref().len() != 32 { return Err(Error::InvalidKeySize("!32".into())); }
-        match &self.didcomm_header.to.len() {
-            1 => {
-                let to = self.didcomm_header.to[0].clone();
-                let shared = gen_shared_for_recepient(sk, &to)?;
-                let alg = crypter_from_header(&self.jwm_header)?;
-                self.encrypt(alg.encryptor(), shared.as_ref())
-            },
-            0 => todo!(), // What should happen in this scenario?
-            _ => {
-                // generate static secret
-                let mut shared_key = [0u8; 32];
-                let mut rng = ChaCha20Rng::from_seed(Default::default());
-                rng.fill_bytes(&mut shared_key);
-                let mut recepients: Vec<Recepient> = vec!();
-                // create jwk from static secret per recepient
-                for dest in &self.didcomm_header.to {
-                    let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
-                    let mut jwk = Jwk::new();
-                    jwk.alg = KeyAlgorithm::EcdhEsA256kw;
-                    jwk.kty = Some("oct".into());
-                    jwk.use_ = Some("enc".into());
-                    jwk.kid = Some(key_id_from_didurl( &dest));
-                // encrypt jwk for each recepient using shared secret
-                    let crypter = XChaCha20Poly1305::new(shared.as_ref().into());
-                    let iv = self.jwm_header.get_iv();
-                    let nonce = XNonce::from_slice(iv.as_ref());
-                    let sealed_key = crypter
-                        .encrypt(nonce, shared_key.as_ref())
-                        .map_err(|e| Error::Generic(e.to_string()))?;
-                    recepients.push(Recepient::new(jwk, encode(&sealed_key)));
-                }
-                self.recepients = Some(recepients);
-                // encrypt original message with static secret
-                let alg = crypter_from_header(&self.jwm_header)?;
-                self.encrypt(alg.encryptor(), shared_key.as_ref())
-            }
+        // generate content encryption key
+        let mut cek = [0u8; 32];
+        let mut rng = ChaCha20Rng::from_seed(Default::default());
+        rng.fill_bytes(&mut cek);
+        trace!("sealing message with shared_key: {:?}", &cek.as_ref());
+
+        if self.didcomm_header.to.len() == 0 as usize {
+            todo!(); // What should happen in this scenario?
         }
+
+        let mut recepients: Vec<Recepient> = vec!();
+        // create jwk from static secret per recepient
+        for dest in &self.didcomm_header.to {
+            let rv = self.get_recipient_value(&sk.as_ref(), dest, &cek)?;
+            recepients.push(Recepient::new(
+                rv.header.ok_or_else(
+                    || Error::Generic("could not get recipient header value".to_string()))?,
+                encode(&rv.encrypted_key),
+            ));
+        }
+        self.recepients = Some(recepients);
+        // encrypt original message with static secret
+        let alg = crypter_from_header(&self.jwm_header)?;
+        self.encrypt(alg.encryptor(), cek.as_ref())
     }
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
@@ -330,8 +318,81 @@ impl Message {
                 .from(&from)
                 .as_jwe(&alg)
                 .m_type(MessageType::DidcommForward)
-                .set_body(&serde_json::from_str(&serde_json::to_string(&body)?)?)
+                .set_body(&serde_json::to_string(&body)?)
                 .seal(ek)
+    }
+
+    /// # Parameters
+    ///
+    /// `sk` - senders private key
+    ///
+    /// `dest` - receiver to encrypt cek for
+    ///
+    /// `cek` - key used to encrypt content with, will be encrypted per recipient
+    ///
+    fn get_recipient_value(
+        &self,
+        sk: &[u8],
+        dest: &str,
+        cek: &[u8; 32], 
+    ) -> Result<RecipientValue, Error> {
+        trace!("creating per-recipient JWE value for {}", &dest);
+        let alg = self.jwm_header.alg.as_ref()
+            .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
+        match alg.as_ref() {
+            "ECDH-1PU+XC20PKW" => {
+                trace!("using algorithm ECDH-1PU+XC20PKW");
+                // zE (temporary secret)
+                let epk = StaticSecret::new(rand_core::OsRng);
+                let epk_public = PublicKey::from(&epk);
+                let ze = gen_shared_for_recepient(epk.to_bytes(), dest)?;
+                trace!("ze: {:?}", &ze.as_ref());
+
+                // zS (shared for recipient)
+                let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
+                trace!("shared: {:?}", &shared.as_ref());
+
+                // shared secret
+                let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
+                trace!("shared_secret: {:?}", &shared_secret);
+
+                // key encryption key
+                let kek = concat_kdf(&shared_secret, alg, None, None)?;
+                trace!("kek: {:?}", &kek);
+
+                // initial vector
+                let mut rng = rand::thread_rng();
+                let mut iv = rng.gen::<[u8; 24]>().to_vec();
+                iv.shuffle(&mut rng);
+
+                // start building jwk
+                let mut jwk = Jwk::new();
+                jwk.alg = KeyAlgorithm::Ecdh1puXc20pkw;
+                jwk.kid = Some(key_id_from_didurl( &dest));
+                jwk.add_other_header("iv".to_string(), encode(&iv));
+                
+                // encrypt jwk for each recipient using shared secret
+                let kek_key = chacha20poly1305::Key::from_slice(kek.as_slice());
+                let crypter = XChaCha20Poly1305::new(kek_key);
+                trace!("iv: {:?}", &iv);
+                let nonce = XNonce::from_slice(iv.as_ref());
+                trace!("nonce: {:?}", &nonce);
+                let sealed_cek_and_tag = crypter
+                    .encrypt(nonce, cek.as_ref())
+                    .map_err(|e| Error::Generic(e.to_string()))?;
+                trace!("sealed_cek_and_tag: {:?}", &sealed_cek_and_tag);
+                let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
+                jwk.add_other_header("tag".to_string(), encode(&tag));
+
+                // finish jwk and build result
+                let jwk = jwk.ephemeral("OKP".to_string(), "X25519".to_string(), encode(epk_public.as_bytes()), None);
+                Ok(RecipientValue {
+                    header: Some(jwk),
+                    encrypted_key: sealed_cek.to_vec(),
+                })
+            },
+            _ => Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))),
+        }
     }
 }
 
@@ -341,6 +402,48 @@ fn crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgorithm, Error> {
         Some(alg) => alg.try_into()
     }
 }
+
+fn length_and_input(vector: &[u8]) -> Result<Vec<u8>, Error> {
+    let mut collected: Vec<u8> = u32::try_from(vector.len())
+        .map_err(|err| Error::Generic(err.to_string()))?
+        .to_be_bytes()
+        .to_vec();
+    collected.extend(vector);
+    Ok(collected)
+}
+
+fn concat_kdf(
+    secret: &Vec<u8>,
+    alg: &str,
+    producer_info: Option<&Vec<u8>>,
+    consumer_info: Option<&Vec<u8>>,
+) -> Result<Vec<u8>, Error> {
+    let mut value = length_and_input(alg.as_bytes())?;
+    if let Some(vector) = producer_info {
+        value.extend(length_and_input(vector)?);
+    } else {
+        value.extend(&[0, 0, 0, 0]);
+    }
+    if let Some(vector) = consumer_info {
+        value.extend(length_and_input(vector)?);
+    } else {
+        value.extend(&[0, 0, 0, 0]);
+    }
+    // only key length 256 is supported
+    value.extend(&[0, 0, 1, 0]);
+
+    // since our key length is 256 we only have to do one round
+    let mut to_hash: Vec<u8> = vec![0, 0, 0, 1];
+    to_hash.extend(secret);
+    to_hash.extend(value);
+
+    let mut hasher = Sha256::new();
+    hasher.input(&to_hash);
+    let hash_result = hasher.result();
+    let hashed = hash_result.as_slice();
+
+    Ok(hashed.to_vec())
+  }
 
 /// Associated functions implementations.
 /// Possibly not required as Jwe serialization covers this.
@@ -418,21 +521,22 @@ impl Message {
     // #[cfg(feature = "resolve")]
     pub fn receive(incomming: &str, sk: &[u8]) -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_str(incomming)?;
-        if jwe.header.skid.is_none() { return Err(Error::DidResolveFailed); }
-        if let Some(document) = ddoresolver_rs::resolve_any(&jwe.header.skid.to_owned().unwrap()) {
-            if let Some(alg) = &jwe.header.alg {
+        if jwe.skid().is_none() { return Err(Error::DidResolveFailed); }
+        if let Some(document) = ddoresolver_rs::resolve_any(&jwe.skid().to_owned().unwrap()) {
+            if let Some(alg) = &jwe.alg() {
                 if let Some(k_arg) = document.find_public_key_for_curve("X25519") {
                     let shared = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
                         .diffie_hellman(&PublicKey::from(array_ref!(k_arg, 0, 32).to_owned()));
                     let a: CryptoAlgorithm = alg.try_into()?;
                     let m: Message;
+                    let iv = jwe.get_iv();
                     if jwe.recepients.is_some() {
                         if let Some(recepients) = jwe.recepients {
                             let mut key: Option<Vec<u8>> = None;
                             for recepient in recepients {
                                 let cryptor = XChaCha20Poly1305::new(shared.as_bytes().into());
                                 match cryptor.decrypt(
-                                    jwe.header.get_iv().as_ref().into(), 
+                                    iv.as_ref().into(), 
                                     decode(&recepient.encrypted_key).unwrap().as_ref())
                                 {
                                     Ok(k) => {
@@ -456,7 +560,7 @@ impl Message {
                     if &m.didcomm_header.m_type == &MessageType::DidcommJws {
                         if m.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
                         if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.alg.clone().unwrap_or_default()) {
-                            Ok(Message::verify_value(&m.get_body()?, &verifying_key)?)
+                            Ok(Message::verify(&m.get_body()?.as_ref(), &verifying_key)?)
                         } else {
                             Err(Error::JwsParseError)
                         }
