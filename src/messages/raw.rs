@@ -74,10 +74,17 @@ impl Message {
         let protected = jwe.protected.as_ref().ok_or_else(|| Error::Generic("jwe is missing protected header".to_string()) )?;
         let aad_string = encode(&serde_json::to_string(&protected)?.as_bytes());
         let aad = aad_string.as_bytes();
-        if let Ok(raw_message_bytes) = decrypter(jwe.get_iv().as_ref(), key, &jwe.payload(), &aad) {
-            Ok(serde_json::from_slice(&raw_message_bytes)?)
-        } else {
-            Err(Error::PlugCryptoFailure)
+        let tag = jwe.tag.as_ref().ok_or_else(|| "JWE is missing tag").map_err(|e| Error::Generic(e.to_string()))?;
+        let mut cyphertext_and_tag: Vec<u8> = vec![];
+        cyphertext_and_tag.extend(&jwe.payload());
+        cyphertext_and_tag.extend(&decode(&tag)?);
+
+        return match decrypter(jwe.get_iv().as_ref(), key, &cyphertext_and_tag, &aad) {
+            Ok(raw_message_bytes) => Ok(serde_json::from_slice(&raw_message_bytes)?),
+            Err(e) => {
+                error!("decryption failed; {}", &e);
+                Err(Error::PlugCryptoFailure)
+            },
         }
     }
     /// Signs message and turns it into `Jws` envelope.

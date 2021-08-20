@@ -135,25 +135,28 @@ fn check_nonce(nonce: &[u8], expected_len: usize) -> Result<(), Error> {
 #[cfg(test)]
 mod batteries_tests {
     use super::*;
-    use crate::Message;
+    use crate::{Jwe, Message};
 
     #[test]
     fn xc20p_test() -> Result<(), Error> {
         // Arrange
-        let payload = "test message's body - can be anything...";
+        let payload = r#"{"test":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P) // Set jwe header manually - sohuld be preceeded by key properties
             .set_body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
-        let jwe = m.encrypt(
+        let jwe_string_result = m.encrypt(
             CryptoAlgorithm::XC20P.encryptor(),
             key
         );
-        assert!(&jwe.is_ok());
+        assert!(&jwe_string_result.is_ok());
+        let jwe_string = jwe_string_result?;
+        let jwe: Jwe = serde_json::from_str(&jwe_string)?;
+        assert!(&jwe.tag.is_some());
         let s = Message::decrypt(
-            &jwe.unwrap().as_bytes(),
+            &jwe_string.as_bytes(),
             CryptoAlgorithm::XC20P.decryptor(),
             key
             )?;
