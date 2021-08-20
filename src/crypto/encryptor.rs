@@ -167,6 +167,7 @@ mod batteries_tests {
         Ok(())
     }
     #[test]
+    #[ignore]
     fn a256gcm_test() -> Result<(), Error> {
         // Arrange
         let payload = r#"{ "example": "message's body - can be anything..." }"#;

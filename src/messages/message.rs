@@ -245,7 +245,7 @@ impl Message {
         let mut recepients: Vec<Recepient> = vec!();
         // create jwk from static secret per recepient
         for dest in &self.didcomm_header.to {
-            let rv = self.get_recipient_value(&sk.as_ref(), dest, &cek)?;
+            let rv = self.encrypt_cek(&sk.as_ref(), dest, &cek)?;
             recepients.push(Recepient::new(
                 rv.header.ok_or_else(
                     || Error::Generic("could not get recipient header value".to_string()))?,
@@ -330,7 +330,7 @@ impl Message {
     ///
     /// `cek` - key used to encrypt content with, will be encrypted per recipient
     ///
-    fn get_recipient_value(
+    fn encrypt_cek(
         &self,
         sk: &[u8],
         dest: &str,
@@ -390,6 +390,67 @@ impl Message {
                     header: Some(jwk),
                     encrypted_key: sealed_cek.to_vec(),
                 })
+            },
+            _ => Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))),
+        }
+    }
+
+    fn decrypt_cek(
+        jwe: &Jwe,
+        sk: &[u8],
+        recipient: &Recepient,
+    ) -> Result<Vec<u8>, Error> {
+        trace!("decrypting per-recipient JWE value");
+        let alg = jwe.alg()
+            .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
+        match alg.as_ref() {
+            "ECDH-1PU+XC20PKW" => {
+                trace!("using algorithm ECDH-1PU+XC20PKW");
+                let skid = jwe.skid()
+                    .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
+
+                // zE (temporary secret)
+                let epk = recipient.header.epk.as_ref()
+                    .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
+                let epk_public_array: [u8; 32] = decode(&epk.x)?
+                    .try_into()
+                    .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
+                let epk_public = PublicKey::from(epk_public_array);
+                let ss = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
+                    .diffie_hellman(&epk_public);
+                let ze = *ss.as_bytes();
+                trace!("ze: {:?}", &ze.as_ref());
+    
+                // zS (shared for recipient)
+                let shared = gen_shared_for_recepient(sk.as_ref(), &skid)?;
+                trace!("shared: {:?}", &shared.as_ref());
+    
+                // shared secret
+                let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
+                trace!("shared_secret: {:?}", &shared_secret);
+    
+                // key encryption key
+                let kek = concat_kdf(&shared_secret, &alg, None, None)?;
+                trace!("kek: {:?}", &kek);
+                
+                let iv = recipient.header.other.get("iv")
+                    .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
+                let iv_bytes = decode(&iv)?;
+                    
+                let nonce = XNonce::from_slice(&iv_bytes);
+                let kek_key = chacha20poly1305::Key::from_slice(kek.as_slice());
+                let crypter = XChaCha20Poly1305::new(kek_key);
+                let tag = recipient.header.other.get("tag")
+                    .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
+                let mut cyphertext_and_tag: Vec<u8> = vec![];
+                cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
+                cyphertext_and_tag.extend(&decode(&tag)?);
+    
+                let cek = crypter
+                    .decrypt(nonce, cyphertext_and_tag.as_ref())
+                    .map_err(|e| Error::Generic(e.to_string()))?;
+                
+                Ok(cek)
             },
             _ => Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))),
         }
@@ -529,22 +590,11 @@ impl Message {
                         .diffie_hellman(&PublicKey::from(array_ref!(k_arg, 0, 32).to_owned()));
                     let a: CryptoAlgorithm = alg.try_into()?;
                     let m: Message;
-                    let iv = jwe.get_iv();
-                    if jwe.recepients.is_some() {
-                        if let Some(recepients) = jwe.recepients {
+                    if jwe.recepients.as_ref().is_some() {
+                        if let Some(recepients) = jwe.recepients.as_ref() {
                             let mut key: Option<Vec<u8>> = None;
                             for recepient in recepients {
-                                let cryptor = XChaCha20Poly1305::new(shared.as_bytes().into());
-                                match cryptor.decrypt(
-                                    iv.as_ref().into(), 
-                                    decode(&recepient.encrypted_key).unwrap().as_ref())
-                                {
-                                    Ok(k) => {
-                                        key = Some(k);
-                                        break;
-                                    },
-                                    Err(_) => continue
-                                }
+                                key = Some(Message::decrypt_cek( &jwe, &sk, &recepient)?)
                             }
                             if let Some(k) = key {
                                 m = Message::decrypt(incomming.as_bytes(), a.decryptor(), &k)?;
@@ -696,6 +746,7 @@ mod crypto_tests {
     }
 
     #[test]
+    #[ignore]
     #[cfg(feature = "resolve")]
     fn send_receive_didkey_multiple_receivers_test() {
         let m = Message::new()
