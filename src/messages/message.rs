@@ -322,6 +322,35 @@ impl Message {
                 .seal(ek)
     }
 
+    /// Creates a key used to encrypt/decrypt keys (key encryption key).
+    ///
+    /// # Parameters
+    ///
+    /// `did` - receiver of a message (during encryption) or sender of a message (during decryption)
+    ///
+    /// `sk` - senders private key (encryption) or receivers private key (decryption)
+    ///
+    /// `ze` - temporary secret zE
+    ///
+    /// `alg` - encryption algorithm used
+    fn get_kek(did: &str, sk: &[u8], ze: impl AsRef<[u8]>, alg: &str) -> Result<Vec<u8>, Error> {
+        // zS (shared for recipient)
+        let shared = gen_shared_for_recepient(sk.as_ref(), did)?;
+        trace!("sk: {:?} shared: {:?} dest: {:?}", sk, &shared.as_ref(), did);
+
+        // shared secret
+        let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
+        trace!("shared_secret: {:?}", &shared_secret);
+
+        // key encryption key
+        let kek = concat_kdf(&shared_secret, alg, None, None)?;
+        trace!("kek: {:?}", &kek);
+
+        Ok(kek)
+    }
+
+    /// Encrypts the content encryption key with a key encryption key.
+    ///
     /// # Parameters
     ///
     /// `sk` - senders private key
@@ -329,7 +358,6 @@ impl Message {
     /// `dest` - receiver to encrypt cek for
     ///
     /// `cek` - key used to encrypt content with, will be encrypted per recipient
-    ///
     fn encrypt_cek(
         &self,
         sk: &[u8],
@@ -346,16 +374,9 @@ impl Message {
         let epk_public = PublicKey::from(&epk);
         let ze = gen_shared_for_recepient(epk.to_bytes(), dest)?;
         trace!("ze: {:?} epk_public: {:?}, dest: {:?}", &ze.as_ref(), epk_public,  dest);
-        // zS (shared for recipient)
-        let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
-        trace!("sk: {:?} shared: {:?} dest: {:?}", sk, &shared.as_ref(), dest);
-
-        // shared secret
-        let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
-        trace!("shared_secret: {:?}", &shared_secret);
 
         // key encryption key
-        let kek = concat_kdf(&shared_secret, alg, None, None)?;
+        let kek = Self::get_kek(dest, sk, ze, alg)?;
         trace!("kek: {:?}", &kek);
 
         // preparation for initial vector
@@ -416,6 +437,15 @@ impl Message {
         })
     }
 
+    /// Decrypts the content encryption key with a key encryption key.
+    ///
+    /// # Parameters
+    ///
+    /// `jwe` - jwe to decrypt content encryption key for
+    ///
+    /// `sk` - receivers private key
+    ///
+    /// `recipient` - recipient data from JWE
     fn decrypt_cek(
         jwe: &Jwe,
         sk: &[u8],
@@ -441,16 +471,8 @@ impl Message {
         let ze = *ss.as_bytes();
         trace!("ze: {:?}", &ze.as_ref());
 
-        // zS (shared for recipient)
-        let shared = gen_shared_for_recepient(sk.as_ref(), &skid)?;
-        trace!("shared: {:?}", &shared.as_ref());
-
-        // shared secret
-        let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
-        trace!("shared_secret: {:?}", &shared_secret);
-
         // key encryption key
-        let kek = concat_kdf(&shared_secret, &alg, None, None)?;
+        let kek = Self::get_kek(&skid, sk, ze, &alg)?;
         trace!("kek: {:?}", &kek);
 
         let iv = recipient.header.other.get("iv")
