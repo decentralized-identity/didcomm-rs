@@ -99,6 +99,8 @@ pub enum KeyAlgorithm {
     A128GCMKW,
     A192GCMKW,
     A256GCMKW,
+    #[serde(rename = "ECDH-1PU+A256KW")]
+    Ecdh1puA256kw,
     #[serde(rename = "ECDH-1PU+XC20PKW")]
     Ecdh1puXc20pkw,
     #[serde(rename = "PBES2-HS256+A128KW")]

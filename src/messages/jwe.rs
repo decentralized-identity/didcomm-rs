@@ -29,7 +29,7 @@ macro_rules! create_getter {
 pub struct RecipientValue {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<Jwk>,
-    
+
 	#[serde(with="base64_buffer")]
     pub encrypted_key: Vec<u8>,
 }
@@ -48,7 +48,7 @@ pub struct Jwe {
 
     #[serde(rename = "recipients")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) recepients: Option<Vec<Recepient>>,
+    pub recepients: Option<Vec<Recepient>>,
 
     ciphertext: String,
 
@@ -103,7 +103,7 @@ impl Jwe {
         a.shuffle(&mut rng);
         encode(&a)
     }
-    
+
     /// Getter for ciphered payload of JWE.
     ///
     pub fn payload(&self) -> Vec<u8> {

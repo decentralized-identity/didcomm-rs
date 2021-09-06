@@ -35,7 +35,7 @@ impl Message {
             let d_header = self.get_didcomm_header();
             let iv = Jwe::generate_iv();
             let multi = self.recepients.is_some();
-            header.skid = Some(d_header.from.clone().unwrap_or_default())   ; 
+            header.skid = Some(d_header.from.clone().unwrap_or_default());
             if !multi {
                 header.kid = Some(d_header.to[0].clone());
             }
@@ -68,7 +68,7 @@ impl Message {
     pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
-        key: &[u8]) 
+        key: &[u8])
             -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
         let protected = jwe.protected.as_ref().ok_or_else(|| Error::Generic("jwe is missing protected header".to_string()) )?;
@@ -121,8 +121,14 @@ impl Message {
         let jws: Jws = serde_json::from_slice(jws)?;
         if let Some(alg) = &jws.signature_value.alg() {
             let verifyer: SignatureAlgorithm = alg.try_into()?;
-            if verifyer.validator()(key, &jws.payload.as_bytes(), &jws.signature_value.signature[..])? {
-                Ok(serde_json::from_slice(&base64_url::decode(&jws.payload)?)?)
+            let encoded_header = base64_url::encode(&serde_json::to_string(&jws.signature_value.protected)?);
+            let payload_to_verify = format!("{}.{}", &encoded_header, &jws.payload);
+            if verifyer.validator()(key, &payload_to_verify.as_bytes(), &jws.signature_value.signature[..])? {
+                let payload: PayloadToVerify = serde_json::from_slice(&base64_url::decode(&jws.payload)?)?;
+                let mut message = Message::new();
+                message = message.set_didcomm_header(payload.didcomm_header);
+                message = message.set_body(&serde_json::to_string(&payload.body)?);
+                Ok(message)
             } else {
                 Err(Error::JwsParseError)
             }
@@ -140,7 +146,7 @@ impl Message {
     }
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod raw_tests {
     use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
     use chacha20poly1305::aead::{Aead, NewAead};
@@ -154,7 +160,7 @@ mod raw_tests {
         Error,
     };
     use crate::crypto::CryptoAlgorithm;
-    
+
     #[test]
     #[allow(non_snake_case)]
     #[cfg(feature="raw-crypto")]

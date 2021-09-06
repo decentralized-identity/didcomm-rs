@@ -29,7 +29,7 @@ pub struct DidcommHeader {
     pub expires_time: Option<u64>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub(crate) other: HashMap<String, String>,
-    /// A JWT, with sub: new DID and iss: prior DID, 
+    /// A JWT, with sub: new DID and iss: prior DID,
     /// with a signature from a key authorized by prior DID.
     #[serde(skip_serializing_if = "Option::is_none")]
     from_prior: Option<PriorClaims>,
@@ -147,9 +147,9 @@ impl JwmHeader {
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         self.typ = String::from("JWM");
         match alg {
-            CryptoAlgorithm::A256GCM => { 
+            CryptoAlgorithm::A256GCM => {
                 self.enc = Some("A256GCM".into());
-                self.alg = Some("ECDH-ES+A256KW".into());
+                self.alg = Some("ECDH-1PU+A256KW".into());
             },
             CryptoAlgorithm::XC20P => {
                 self.enc = Some("XC20P".into());
