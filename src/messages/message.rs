@@ -339,37 +339,40 @@ impl Message {
         trace!("creating per-recipient JWE value for {}", &dest);
         let alg = self.jwm_header.alg.as_ref()
             .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
-        match alg.as_ref() {
+        trace!("using algorithm {}", &alg);
+
+        // zE (temporary secret)
+        let epk = StaticSecret::new(rand_core::OsRng);
+        let epk_public = PublicKey::from(&epk);
+        let ze = gen_shared_for_recepient(epk.to_bytes(), dest)?;
+        trace!("ze: {:?} epk_public: {:?}, dest: {:?}", &ze.as_ref(), epk_public,  dest);
+        // zS (shared for recipient)
+        let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
+        trace!("sk: {:?} shared: {:?} dest: {:?}", sk, &shared.as_ref(), dest);
+
+        // shared secret
+        let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
+        trace!("shared_secret: {:?}", &shared_secret);
+
+        // key encryption key
+        let kek = concat_kdf(&shared_secret, alg, None, None)?;
+        trace!("kek: {:?}", &kek);
+
+        // preparation for initial vector
+        let mut rng = rand::thread_rng();
+        let mut iv: Vec<u8>;
+
+        // start building jwk
+        let mut jwk = Jwk::new();
+        jwk.kid = Some(key_id_from_didurl( &dest));
+
+        let sealed_cek_and_tag: Vec<u8> = match alg.as_ref() {
             "ECDH-1PU+A256KW" => {
-                trace!("using algorithm ECDH-1PU+A256KW");
-                // zE (temporary secret)
-                let epk = StaticSecret::new(rand_core::OsRng);
-                let epk_public = PublicKey::from(&epk);
-                let ze = gen_shared_for_recepient(epk.to_bytes(), dest)?;
-                trace!("ze: {:?}", &ze.as_ref());
-
-                // zS (shared for recipient)
-                let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
-                trace!("shared: {:?}", &shared.as_ref());
-
-                // shared secret
-                let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
-                trace!("shared_secret: {:?}", &shared_secret);
-
-                // key encryption key
-                let kek = concat_kdf(&shared_secret, alg, None, None)?;
-                trace!("kek: {:?}", &kek);
+                jwk.alg = KeyAlgorithm::Ecdh1puA256kw;
 
                 // initial vector
-                let mut rng = rand::thread_rng();
-                let mut iv = rng.gen::<[u8; 12]>().to_vec();
+                iv = rng.gen::<[u8; 12]>().to_vec();
                 iv.shuffle(&mut rng);
-
-                // start building jwk
-                let mut jwk = Jwk::new();
-                jwk.alg = KeyAlgorithm::Ecdh1puA256kw;
-                jwk.kid = Some(key_id_from_didurl( &dest));
-                jwk.add_other_header("iv".to_string(), encode(&iv));
 
                 // encrypt jwk for each recipient using shared secret
                 let kek_key = GenericArray::from_slice(kek.as_slice());
@@ -377,49 +380,16 @@ impl Message {
                 trace!("iv: {:?}", &iv);
                 let nonce = GenericArray::from_slice(iv.as_ref());
                 trace!("nonce: {:?}", &nonce);
-                let sealed_cek_and_tag = crypter
+                crypter
                     .encrypt(nonce, cek.as_ref())
-                    .map_err(|e| Error::Generic(e.to_string()))?;
-                trace!("sealed_cek_and_tag: {:?}", &sealed_cek_and_tag);
-                let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
-                jwk.add_other_header("tag".to_string(), encode(&tag));
-
-                // finish jwk and build result
-                let jwk = jwk.ephemeral("OKP".to_string(), "X25519".to_string(), encode(epk_public.as_bytes()), None);
-                Ok(RecipientValue {
-                    header: Some(jwk),
-                    encrypted_key: sealed_cek.to_vec(),
-                })
-            }
+                    .map_err(|e| Error::Generic(e.to_string()))?
+            },
             "ECDH-1PU+XC20PKW" => {
-                trace!("using algorithm ECDH-1PU+XC20PKW");
-                // zE (temporary secret)
-                let epk = StaticSecret::new(rand_core::OsRng);
-                let epk_public = PublicKey::from(&epk);
-                let ze = gen_shared_for_recepient(epk.to_bytes(), dest)?;
-                trace!("ze: {:?} epk_public: {:?}, dest: {:?}", &ze.as_ref(), epk_public,  dest);
-                // zS (shared for recipient)
-                let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
-                trace!("sk: {:?} shared: {:?} dest: {:?}", sk, &shared.as_ref(), dest);
-
-                // shared secret
-                let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
-                trace!("shared_secret: {:?}", &shared_secret);
-
-                // key encryption key
-                let kek = concat_kdf(&shared_secret, alg, None, None)?;
-                trace!("kek: {:?}", &kek);
+                jwk.alg = KeyAlgorithm::Ecdh1puXc20pkw;
 
                 // initial vector
-                let mut rng = rand::thread_rng();
-                let mut iv = rng.gen::<[u8; 24]>().to_vec();
+                iv = rng.gen::<[u8; 24]>().to_vec();
                 iv.shuffle(&mut rng);
-
-                // start building jwk
-                let mut jwk = Jwk::new();
-                jwk.alg = KeyAlgorithm::Ecdh1puXc20pkw;
-                jwk.kid = Some(key_id_from_didurl( &dest));
-                jwk.add_other_header("iv".to_string(), encode(&iv));
 
                 // encrypt jwk for each recipient using shared secret
                 let kek_key = chacha20poly1305::Key::from_slice(kek.as_slice());
@@ -427,22 +397,23 @@ impl Message {
                 trace!("iv: {:?}", &iv);
                 let nonce = XNonce::from_slice(iv.as_ref());
                 trace!("nonce: {:?}", &nonce);
-                let sealed_cek_and_tag = crypter
+                crypter
                     .encrypt(nonce, cek.as_ref())
-                    .map_err(|e| Error::Generic(e.to_string()))?;
-                trace!("sealed_cek_and_tag: {:?}", &sealed_cek_and_tag);
-                let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
-                jwk.add_other_header("tag".to_string(), encode(&tag));
-
-                // finish jwk and build result
-                let jwk = jwk.ephemeral("OKP".to_string(), "X25519".to_string(), encode(epk_public.as_bytes()), None);
-                Ok(RecipientValue {
-                    header: Some(jwk),
-                    encrypted_key: sealed_cek.to_vec(),
-                })
+                    .map_err(|e| Error::Generic(e.to_string()))?
             },
-            _ => Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))),
-        }
+            _ => { return Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))); },
+        };
+
+        let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
+        jwk.add_other_header("iv".to_string(), encode(&iv));
+        jwk.add_other_header("tag".to_string(), encode(&tag));
+
+        // finish jwk and build result
+        let jwk = jwk.ephemeral("OKP".to_string(), "X25519".to_string(), encode(epk_public.as_bytes()), None);
+        Ok(RecipientValue {
+            header: Some(jwk),
+            encrypted_key: sealed_cek.to_vec(),
+        })
     }
 
     fn decrypt_cek(
@@ -453,97 +424,61 @@ impl Message {
         trace!("decrypting per-recipient JWE value");
         let alg = jwe.alg()
             .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
+        trace!("using algorithm {}", &alg);
+
+        let skid = jwe.skid()
+            .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
+
+        // zE (temporary secret)
+        let epk = recipient.header.epk.as_ref()
+            .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
+        let epk_public_array: [u8; 32] = decode(&epk.x)?
+            .try_into()
+            .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
+        let epk_public = PublicKey::from(epk_public_array);
+        let ss = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
+            .diffie_hellman(&epk_public);
+        let ze = *ss.as_bytes();
+        trace!("ze: {:?}", &ze.as_ref());
+
+        // zS (shared for recipient)
+        let shared = gen_shared_for_recepient(sk.as_ref(), &skid)?;
+        trace!("shared: {:?}", &shared.as_ref());
+
+        // shared secret
+        let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
+        trace!("shared_secret: {:?}", &shared_secret);
+
+        // key encryption key
+        let kek = concat_kdf(&shared_secret, &alg, None, None)?;
+        trace!("kek: {:?}", &kek);
+
+        let iv = recipient.header.other.get("iv")
+            .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
+        let iv_bytes = decode(&iv)?;
+
+        let tag = recipient.header.other.get("tag")
+            .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
+        let mut cyphertext_and_tag: Vec<u8> = vec![];
+        cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
+        cyphertext_and_tag.extend(&decode(&tag)?);
+        
         match alg.as_ref() {
             "ECDH-1PU+XC20PKW" => {
-                trace!("using algorithm ECDH-1PU+XC20PKW");
-                let skid = jwe.skid()
-                    .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
-
-                // zE (temporary secret)
-                let epk = recipient.header.epk.as_ref()
-                    .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
-                let epk_public_array: [u8; 32] = decode(&epk.x)?
-                    .try_into()
-                    .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
-                let epk_public = PublicKey::from(epk_public_array);
-                let ss = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
-                    .diffie_hellman(&epk_public);
-                let ze = *ss.as_bytes();
-                trace!("ze: {:?}", &ze.as_ref());
-
-                // zS (shared for recipient)
-                let shared = gen_shared_for_recepient(sk.as_ref(), &skid)?;
-                trace!("shared: {:?}", &shared.as_ref());
-
-                // shared secret
-                let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
-                trace!("shared_secret: {:?}", &shared_secret);
-
-                // key encryption key
-                let kek = concat_kdf(&shared_secret, &alg, None, None)?;
-                trace!("kek: {:?}", &kek);
-
-                let iv = recipient.header.other.get("iv")
-                    .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
-                let iv_bytes = decode(&iv)?;
-
                 let nonce = XNonce::from_slice(&iv_bytes);
                 let kek_key = chacha20poly1305::Key::from_slice(kek.as_slice());
                 let crypter = XChaCha20Poly1305::new(kek_key);
-                let tag = recipient.header.other.get("tag")
-                    .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
-                let mut cyphertext_and_tag: Vec<u8> = vec![];
-                cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
-                cyphertext_and_tag.extend(&decode(&tag)?);
-
+        
                 let cek = crypter
                     .decrypt(nonce, cyphertext_and_tag.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?;
-
+        
                 Ok(cek)
             },
             "ECDH-1PU+A256KW" => {
-                trace!("using algorithm ECDH-1PU+A256KW");
-                let skid = jwe.skid()
-                    .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
-
-                // zE (temporary secret)
-                let epk = recipient.header.epk.as_ref()
-                    .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
-                let epk_public_array: [u8; 32] = decode(&epk.x)?
-                    .try_into()
-                    .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
-                let epk_public = PublicKey::from(epk_public_array);
-                let ss = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
-                    .diffie_hellman(&epk_public);
-                let ze = *ss.as_bytes();
-                let source_public: PublicKey = (&StaticSecret::from(array_ref!(sk, 0, 32).to_owned())).into();
-                trace!("ze: {:?} epk_public: {:?}, source_public: {:?}", &ze.as_ref(), epk_public, source_public);
-
-                // zS (shared for recipient)
-                let shared = gen_shared_for_recepient(sk.as_ref(), &skid)?;
-                trace!("shared: {:?}", &shared.as_ref());
-
-                // shared secret
-                let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
-                trace!("shared_secret: {:?}", &shared_secret);
-
-                // key encryption key
-                let kek = concat_kdf(&shared_secret, &alg, None, None)?;
-                trace!("kek: {:?}", &kek);
-
-                let iv = recipient.header.other.get("iv")
-                    .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
-                let iv_bytes = decode(&iv)?;
-
                 let nonce = GenericArray::from_slice(&iv_bytes);
                 let kek_key = GenericArray::from_slice(kek.as_slice());
                 let crypter = Aes256Gcm::new(kek_key);
-                let tag = recipient.header.other.get("tag")
-                    .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
-                let mut cyphertext_and_tag: Vec<u8> = vec![];
-                cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
-                cyphertext_and_tag.extend(&decode(&tag)?);
 
                 let cek = crypter
                     .decrypt(nonce, cyphertext_and_tag.as_ref())
