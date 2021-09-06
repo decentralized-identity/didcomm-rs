@@ -166,10 +166,9 @@ mod batteries_tests {
         Ok(())
     }
     #[test]
-    #[ignore]
     fn a256gcm_test() -> Result<(), Error> {
         // Arrange
-        let payload = r#"{ "example": "message's body - can be anything..." }"#;
+        let payload = r#"{"example":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM) // Set jwe header manually - sohuld be preceeded by key properties
             .set_body(&payload);
