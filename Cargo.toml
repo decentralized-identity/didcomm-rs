@@ -22,7 +22,7 @@ k256 = { version = "0.5.10", optional = true, features = ["ecdsa", "sha256", "ze
 p256 = { version = "0.5.2", optional = true, features = ["ecdsa", "zeroize"] }
 ed25519-dalek = { version = "1.0", optional = true }
 hex = { version = "0.4.3", features = ["serde"] }
-ddoresolver-rs = { git = "https://github.com/jolocom/ddoresolver-rs", branch = "main", features = ["all"], optional = true }
+ddoresolver-rs = { git = "https://github.com/jolocom/ddoresolver-rs", rev = "dbbd6b82fcd946283730289a72b3ddce60758ace", features = ["all"], optional = true }
 #ddoresolver-rs = { path = "../ddoresolver-rs", features = ["all"], optional = true }
 x25519-dalek = "1.1"
 arrayref = "0.3"
