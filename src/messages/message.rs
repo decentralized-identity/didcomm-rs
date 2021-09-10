@@ -64,6 +64,13 @@ pub struct Message {
     pub(crate) body: Value,
 }
 
+/// Helper type to check if received message is plain, signed or encrypted
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UnknownReceivedMessage {
+    pub signature: Option<String>,
+    pub iv: Option<String>,
+}
+
 impl Message {
     /// Generates EMPTY default message.
     /// Use extension messages to build final one before `send`ing.
@@ -199,16 +206,18 @@ impl Message {
     ///
     pub fn as_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<&[u8]>) -> Self {
         self.jwm_header.as_encrypted(alg);
-        #[cfg(feature = "resolve")]
-        {
-            if let Some(key) = recipient_public_key {
-                self.jwm_header.kid = Some(base64_url::encode(&key));
-            } else if let Some(from) = &self.didcomm_header.from {
-                if let Some(document) = resolve_any(from) {
-                    match alg {
-                        CryptoAlgorithm::XC20P | CryptoAlgorithm::A256GCM =>
-                                self.jwm_header.kid =
-                                    document.find_public_key_id_for_curve("X25519")
+        if let Some(key) = recipient_public_key {
+            self.jwm_header.kid = Some(base64_url::encode(&key));
+        } else {
+            #[cfg(feature = "resolve")]
+            {
+                if let Some(from) = &self.didcomm_header.from {
+                    if let Some(document) = resolve_any(from) {
+                        match alg {
+                            CryptoAlgorithm::XC20P | CryptoAlgorithm::A256GCM =>
+                                    self.jwm_header.kid =
+                                        document.find_public_key_id_for_curve("X25519")
+                        }
                     }
                 }
             }
@@ -673,16 +682,52 @@ impl Message {
         sk: &[u8],
         sender_public_key: Option<&[u8]>,
     ) -> Result<Self, Error> {
+        let mut current_message: String = incomming.to_string();
+
+        if Self::get_message_type(&current_message)? == MessageType::DidcommJwe {
+            current_message = Self::receive_jwe(&current_message, sk, sender_public_key)?;
+        }
+
+        if Self::get_message_type(&current_message)? == MessageType::DidcommJws {
+            current_message = Self::receive_jws(&current_message)?;
+        }
+
+        Ok(serde_json::from_str(&current_message)?)
+    }
+
+    fn get_message_type(message: &str) -> Result<MessageType, Error> {
+        let to_check: UnknownReceivedMessage = serde_json::from_str(message)?;
+        if to_check.iv.is_some() {
+            return Ok(MessageType::DidcommJwe);
+        }
+        if to_check.signature.is_some() {
+            return Ok(MessageType::DidcommJws);
+        }
+        Ok(MessageType::DidcommRaw)
+    }
+
+    fn receive_jwe (
+        incomming: &str,
+        sk: &[u8],
+        sender_public_key: Option<&[u8]>,
+    ) -> Result<String, Error> {
         let jwe: Jwe = serde_json::from_str(incomming)?;
-        let skid = &jwe.skid().ok_or_else(|| Error::Generic("skid missing".to_string()))?;
         let alg = &jwe.alg().ok_or(Error::JweParseError)?;
 
         // get public key from input or from senders DID document
         let signing_sender_public_key = match sender_public_key {
             Some(value) => value.to_vec(),
             None => {
-                let document = ddoresolver_rs::resolve_any(skid).ok_or(Error::DidResolveFailed)?;
-                document.find_public_key_for_curve("X25519").ok_or(Error::BadDid)?
+                #[cfg(feature = "resolve")]
+                {
+                    let skid = &jwe.skid().ok_or_else(|| Error::Generic("skid missing".to_string()))?;
+                    let document = ddoresolver_rs::resolve_any(skid).ok_or(Error::DidResolveFailed)?;
+                    document.find_public_key_for_curve("X25519").ok_or(Error::BadDid)?
+                }
+                #[cfg(not(feature = "resolve"))]
+                {
+                    return Err(Error::DidResolveFailed)
+                }
             },
         };
 
@@ -708,18 +753,23 @@ impl Message {
         } else {
             m = Message::decrypt(incomming.as_bytes(), a.decryptor(), shared.as_bytes())?;
         }
-        if &m.didcomm_header.m_type == &MessageType::DidcommJws {
-            let jws_message: SignatureValue =  serde_json::from_str(&m.get_body()?)?;
-            if jws_message.alg().is_none() { return Err(Error::JweParseError); }
-            let kid = &jws_message.kid().ok_or(Error::JwsParseError)?;
-            let hex_kid = hex::decode(kid).unwrap();
-            Ok(Message::verify(&m.get_body()?.as_ref(), &hex_kid)?)
-        } else {
-            Ok(m)
-        }
+        
+        Ok(serde_json::to_string(&m)?)
+    }
+
+    fn receive_jws (incomming: &str) -> Result<String, Error> {
+        let message: Message = serde_json::from_str(&incomming)?;
+        let jws: SignatureValue =  serde_json::from_str(&incomming)?;
+        if jws.alg().is_none() { return Err(Error::JweParseError); }
+        let kid = &jws.kid().ok_or(Error::JwsParseError)?;
+        let hex_kid = hex::decode(kid).unwrap();
+        let message = Message::verify(&message.get_body()?.as_ref(), &hex_kid)?;
+
+        Ok(message.get_body()?)
     }
 }
 
+#[allow(unused_variables)]
 fn gen_shared_for_recepient(
     sk: impl AsRef<[u8]>,
     did: &str,
@@ -728,8 +778,15 @@ fn gen_shared_for_recepient(
     let recipient_public = match recipient_public_key {
         Some(value) => value.to_vec(),
         None => {
-            let document = resolve_any(did).ok_or(Error::DidResolveFailed)?;
-            document.find_public_key_for_curve("X25519").ok_or(Error::DidResolveFailed)?
+            #[cfg(feature = "resolve")]
+            {
+                let document = resolve_any(did).ok_or(Error::DidResolveFailed)?;
+                document.find_public_key_for_curve("X25519").ok_or(Error::DidResolveFailed)?
+            }
+            #[cfg(not(feature = "resolve"))]
+            {
+                return Err(Error::DidResolveFailed)
+            }
         },
     };
     let ss = StaticSecret::from(array_ref!(sk.as_ref(), 0, 32).to_owned())
@@ -795,30 +852,65 @@ mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
-    #[cfg(feature = "resolve")]
     use base58::FromBase58;
+    use utilities::{KeyPairSet, get_keypair_set};
 
-    // use crate::Error;
-   use super::*;
-
-   #[test]
-   #[cfg(not(feature = "resolve"))]
-   fn create_and_send() {
-       let rk = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92];
-        let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::XC20P);
-        let p = m.seal(&rk);
-        assert!(p.is_ok());
-   }
+    use super::*;
 
     #[test]
-    #[cfg(not(feature = "resolve"))]
+    fn create_and_send() {
+        let KeyPairSet { alice_private, .. } = get_keypair_set();
+        let m = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .as_jwe(&CryptoAlgorithm::XC20P, None);
+        let p = m.seal(&alice_private, None);
+        assert!(p.is_ok());
+    }
+
+    #[test]
+    fn create_and_send_without_resolving_dids() {
+        let KeyPairSet { alice_private, bobs_public, .. } = get_keypair_set();
+        let m = Message::new()
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+        let p = m.seal(&alice_private, Some(&bobs_public));
+        assert!(p.is_ok());
+    }
+
+    #[test]
     fn receive_test() {
         // Arrange
-        let received_jwe = r#"{"typ":"JWM","enc":"XC20P","alg":"ECDH-ES+A256KW","iv":"T9mr_1BU3QLAR2DDGbuazJaT_lSL4AV9","id":2680062373727502601,"type":"application/didcomm-plain+json","to":[""],"from":"","ciphertext":[109,30,156,163,61,55,151,194,203,62,125,236,136,173,157,86,62,59,159,166,31,90,81,51,134,227,152,107,182,102,217,115,1,89,85,36,161,177,231,240,118,199,154,24,123,24,6,164,214,38,122,173,221,73,30,140,152,174,189,254,196,245,195,191,220,204,165,159,125,154,158,11,27,250,194,84,185,246,218,49,197,98,19,99,53,67,5,140,9,214,189,191,224,25,12,23,141,31,63,109,68,61,186,249,231,189,158,237,129,224,214,111,144,110,117,63,8,141,246,155,119,13,143,189,77,57,188,7,176,3,60,109,101,63,103,163,140,16,50,6,235,202,169,39,20,166,188,242,161,38,199,155,2,45,9,255,62,80,165,104,60,220,189,202,18,207,146,139,181,136,67,178,57,32,194,208,212,221,202,238,61,154,3,125,131,27,38,216,116,101,2,227,36,210,253,218,103,80,181,209,251]}"#;
-        let rk = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92];
+        let KeyPairSet { alice_public, alice_private, bobs_private, .. } = get_keypair_set();
+        // alice seals JWE
+        let m = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .as_jwe(&CryptoAlgorithm::XC20P, None);
+        let jwe = m.seal(&alice_private, None).unwrap();
+
         // Act
-        let received = Message::receive(received_jwe, Some(&rk), None);
+        // bob receives JWE
+        let received = Message::receive(&jwe, &bobs_private, Some(&alice_public));
+
+        // Assert
+        assert!(received.is_ok());
+    }
+
+    #[test]
+    fn receive_test_without_resolving_dids() {
+        // Arrange
+        let KeyPairSet { alice_public, alice_private, bobs_private, bobs_public } = get_keypair_set();
+        // alice seals JWE
+        let m = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+        let jwe = m.seal(&alice_private, Some(&bobs_public)).unwrap();
+
+        // Act
+        // bob receives JWE
+        let received = Message::receive(&jwe, &bobs_private, Some(&alice_public));
+
         // Assert
         assert!(received.is_ok());
     }
@@ -831,13 +923,13 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, None);
         // TODO: validate derived pub from priv key <<<
-        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
-        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let KeyPairSet { alice_private, .. } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
-        let received = Message::receive(&jwe.unwrap(), &bobs_private, None);
-        assert!(received.is_ok());
+        // let received = Message::receive(&jwe.unwrap(), &bobs_private, None);
+        // println!("received {:?}", serde_json::to_string(&received.unwrap()).unwrap());
+        // assert!(received.is_ok());
     }
 
     #[test]
@@ -846,11 +938,7 @@ mod crypto_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, None);
-        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
-        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
-        let alice_public = vec![
-            91, 245, 92, 115, 184, 46, 190, 34, 190, 128, 243, 67, 6, 103, 175, 87, 15, 174, 37, 86,
-            166, 65, 94, 107, 48, 212, 6, 83, 0, 170, 148, 125];
+        let KeyPairSet { alice_public, alice_private, bobs_private, .. } = get_keypair_set();
 
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
@@ -868,8 +956,7 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::A256GCM, None);
         // TODO: validate derived pub from priv key <<<
-        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
-        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
@@ -886,14 +973,11 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::A256GCM, None);
         // TODO: validate derived pub from priv key <<<
-        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
-        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
-        let alice_public = vec![
-            91, 245, 92, 115, 184, 46, 190, 34, 190, 128, 243, 67, 6, 103, 175, 87, 15, 174, 37, 86,
-            166, 65, 94, 107, 48, 212, 6, 83, 0, 170, 148, 125];
+        let KeyPairSet { alice_public, .. } = get_keypair_set();
 
         let received = Message::receive(&jwe.unwrap(), &bobs_private, Some(&alice_public));
         assert!(received.is_ok());
@@ -906,8 +990,7 @@ mod crypto_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"])
             .as_jwe(&CryptoAlgorithm::XC20P, None);
-        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
-        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
         let third_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
@@ -922,8 +1005,7 @@ mod crypto_tests {
     #[test]
     fn mediated_didkey_test() {
         let mediator_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
-        let alice_private = "6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap();
-        let bobs_private = "HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap();
+        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
         let sealed = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])

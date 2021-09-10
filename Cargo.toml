@@ -41,6 +41,7 @@ thiserror = "1.0"
 sodiumoxide = "0.2.6"
 rand_core = "0.5"
 base58 = "0.1.0"
+utilities = { path = "./utilities" }
 
 [features]
 default = ["raw-crypto", "resolve"]

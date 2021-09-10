@@ -2,12 +2,21 @@ use std::convert::TryInto;
 use base64_url::{decode, encode};
 use serde_json::Value;
 
-use crate::{DidcommHeader, Error, Jwe, Jws, Recepient, crypto::{
+use crate::{
+    DidcommHeader,
+    Error,
+    Jwe,
+    Jws,
+    crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
         Signer,
-    }};
+    },
+};
+#[cfg(feature = "resolve")]
+use crate::Recepient;
+
 use super::Message;
 
 #[derive(Serialize, Deserialize)]
