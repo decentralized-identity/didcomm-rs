@@ -865,10 +865,11 @@ mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
-    use base58::FromBase58;
+    use super::*;
     use utilities::{KeyPairSet, get_keypair_set};
 
-    use super::*;
+    #[cfg(feature = "resolve")]
+    use base58::FromBase58;
 
     #[test]
     #[cfg(feature = "resolve")]

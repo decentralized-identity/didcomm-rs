@@ -3,25 +3,24 @@
 
 mod common;
 
-// #[cfg(not(feature = "resolve"))]
 use {
-    common::*,
-    k256::elliptic_curve::rand_core::OsRng,
-    x25519_dalek::{EphemeralSecret, PublicKey},
     didcomm_rs::{
-        crypto::{
-            CryptoAlgorithm,
-            SignatureAlgorithm,
-            Signer
-        },
+        crypto::CryptoAlgorithm,
         Jwe,
         Mediated,
         Message,
     },
     utilities::{KeyPairSet, get_keypair_set},
 };
-use serde_json::Value;
+
+
 #[cfg(not(feature = "resolve"))]
+use {
+    common::*,
+    k256::elliptic_curve::rand_core::OsRng,
+    didcomm_rs::crypto::{SignatureAlgorithm, Signer},
+    serde_json::Value,
+};
 
 #[test]
 #[cfg(not(feature = "resolve"))]
