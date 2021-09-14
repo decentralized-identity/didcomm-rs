@@ -27,17 +27,17 @@ pub const TEST_DID_SIGN_1: &str = r#"{
       "id": "did:uknow:d34db33f#cooked",
       "type": "Secp256k1VerificationKey2018",
       "owner": "did:uknow:d34db33f",
-      "publicKeyHex": "b9c5714089478a327f09197987f16f9e5d936e8a",
-    },
+      "publicKeyHex": "b9c5714089478a327f09197987f16f9e5d936e8a"
+    }
   ],
   "authentication": [
     {
       "type": "Secp256k1SignatureAuthentication2018",
-      "publicKey": "did:uknow:d34db33f#cooked",
-    },
+      "publicKey": "did:uknow:d34db33f#cooked"
+    }
   ],
   "service": [],
-  "created": ''
+  "created": ""
 }"#;
 
 pub const TEST_DID_SIGN_2: &str = r#"{

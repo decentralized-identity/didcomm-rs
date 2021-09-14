@@ -333,20 +333,20 @@ impl Message {
         self,
         ek: &[u8],
         mediator_did: &str,
+        mediator_public_key: Option<&[u8]>,
         recipient_public_key: Option<&[u8]>,
-    )
-        -> Result<String, Error> {
-            let from = &self.didcomm_header.from.clone().unwrap_or_default();
-            let alg = crypter_from_header(&self.jwm_header)?;
-            let body = Mediated::new(self.didcomm_header.to[0].clone().into())
-                .with_payload(self.seal(ek, recipient_public_key)?.as_bytes().to_vec());
-            Message::new()
-                .to(&[mediator_did])
-                .from(&from)
-                .as_jwe(&alg, None)
-                .m_type(MessageType::DidcommForward)
-                .set_body(&serde_json::to_string(&body)?)
-                .seal(ek, recipient_public_key)
+    ) -> Result<String, Error> {
+        let from = &self.didcomm_header.from.clone().unwrap_or_default();
+        let alg = crypter_from_header(&self.jwm_header)?;
+        let body = Mediated::new(self.didcomm_header.to[0].clone().into())
+            .with_payload(self.seal(ek, recipient_public_key)?.as_bytes().to_vec());
+        Message::new()
+            .to(&[mediator_did])
+            .from(&from)
+            .as_jwe(&alg, mediator_public_key)
+            .m_type(MessageType::DidcommForward)
+            .set_body(&serde_json::to_string(&body)?)
+            .seal(ek, mediator_public_key)
     }
 
     /// Creates a key used to encrypt/decrypt keys (key encryption key).
@@ -525,17 +525,17 @@ impl Message {
         let mut cyphertext_and_tag: Vec<u8> = vec![];
         cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
         cyphertext_and_tag.extend(&decode(&tag)?);
-        
+
         match alg.as_ref() {
             "ECDH-1PU+XC20PKW" => {
                 let nonce = XNonce::from_slice(&iv_bytes);
                 let kek_key = chacha20poly1305::Key::from_slice(kek.as_slice());
                 let crypter = XChaCha20Poly1305::new(kek_key);
-        
+
                 let cek = crypter
                     .decrypt(nonce, cyphertext_and_tag.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?;
-        
+
                 Ok(cek)
             },
             "ECDH-1PU+A256KW" => {
@@ -696,6 +696,7 @@ impl Message {
     }
 
     fn get_message_type(message: &str) -> Result<MessageType, Error> {
+        // try to skip parsing by using known fields from jwe/jws
         let to_check: UnknownReceivedMessage = serde_json::from_str(message)?;
         if to_check.iv.is_some() {
             return Ok(MessageType::DidcommJwe);
@@ -703,7 +704,8 @@ impl Message {
         if to_check.signature.is_some() {
             return Ok(MessageType::DidcommJws);
         }
-        Ok(MessageType::DidcommRaw)
+        let message: Message = serde_json::from_str(message)?;
+        Ok(message.didcomm_header.m_type)
     }
 
     fn receive_jwe (
@@ -753,19 +755,30 @@ impl Message {
         } else {
             m = Message::decrypt(incomming.as_bytes(), a.decryptor(), shared.as_bytes())?;
         }
-        
+
         Ok(serde_json::to_string(&m)?)
     }
 
     fn receive_jws (incomming: &str) -> Result<String, Error> {
-        let message: Message = serde_json::from_str(&incomming)?;
-        let jws: SignatureValue =  serde_json::from_str(&incomming)?;
-        if jws.alg().is_none() { return Err(Error::JweParseError); }
-        let kid = &jws.kid().ok_or(Error::JwsParseError)?;
-        let hex_kid = hex::decode(kid).unwrap();
-        let message = Message::verify(&message.get_body()?.as_ref(), &hex_kid)?;
+        // incoming data may be a jws string or a serialized message with jws data
+        let to_verify: String;
+        let kid: String;
+        if let Ok(message) = serde_json::from_str::<Message>(&incomming) {
+            if message.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
+            to_verify = message.get_body()?;
+            kid = message.jwm_header.kid.ok_or(Error::JwsParseError)?;
+        } else if let Ok(jws) = serde_json::from_str::<SignatureValue>(&incomming) {
+            if jws.alg().is_none() { return Err(Error::JweParseError); }
+            to_verify = incomming.to_string();
+            kid = jws.kid().ok_or(Error::JwsParseError)?;
+        } else {
+            return Err(Error::JwsParseError);
+        }
 
-        Ok(message.get_body()?)
+        let hex_kid = hex::decode(kid).unwrap();
+        let message = Message::verify(&to_verify.as_bytes(), &hex_kid)?;
+
+        Ok(serde_json::to_string(&message)?)
     }
 }
 
@@ -858,6 +871,7 @@ mod crypto_tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "resolve")]
     fn create_and_send() {
         let KeyPairSet { alice_private, .. } = get_keypair_set();
         let m = Message::new()
@@ -878,6 +892,7 @@ mod crypto_tests {
     }
 
     #[test]
+    #[cfg(feature = "resolve")]
     fn receive_test() {
         // Arrange
         let KeyPairSet { alice_public, alice_private, bobs_private, .. } = get_keypair_set();
@@ -899,7 +914,7 @@ mod crypto_tests {
     #[test]
     fn receive_test_without_resolving_dids() {
         // Arrange
-        let KeyPairSet { alice_public, alice_private, bobs_private, bobs_public } = get_keypair_set();
+        let KeyPairSet { alice_public, alice_private, bobs_private, bobs_public, .. } = get_keypair_set();
         // alice seals JWE
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -923,24 +938,23 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, None);
         // TODO: validate derived pub from priv key <<<
-        let KeyPairSet { alice_private, .. } = get_keypair_set();
+        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
-        // let received = Message::receive(&jwe.unwrap(), &bobs_private, None);
-        // println!("received {:?}", serde_json::to_string(&received.unwrap()).unwrap());
-        // assert!(received.is_ok());
+        let received = Message::receive(&jwe.unwrap(), &bobs_private, None);
+        assert!(received.is_ok());
     }
 
     #[test]
     fn send_receive_didkey_explicit_pubkey_test() {
+        let KeyPairSet { alice_public, alice_private, bobs_private, bobs_public, .. } = get_keypair_set();
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .as_jwe(&CryptoAlgorithm::XC20P, None);
-        let KeyPairSet { alice_public, alice_private, bobs_private, .. } = get_keypair_set();
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
 
-        let jwe = m.seal(&alice_private, None);
+        let jwe = m.seal(&alice_private, Some(&bobs_public));
         assert!(jwe.is_ok());
 
         let received = Message::receive(&jwe.unwrap(), &bobs_private, Some(&alice_public));
@@ -964,7 +978,7 @@ mod crypto_tests {
         assert!(received.is_ok());
     }
 
-    
+
     #[test]
     #[cfg(feature = "resolve")]
     fn send_receive_didkey_test_1pu_aes256_explicit_pubkey() {
@@ -1003,6 +1017,7 @@ mod crypto_tests {
     }
 
     #[test]
+    #[cfg(feature = "resolve")]
     fn mediated_didkey_test() {
         let mediator_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
         let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
@@ -1010,7 +1025,7 @@ mod crypto_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, None)
-            .routed_by(&alice_private, "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf", None);
+            .routed_by(&alice_private, "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf", None, None);
         assert!(sealed.is_ok());
 
         let mediator_received = Message::receive(&sealed.unwrap(), &mediator_private, None);
