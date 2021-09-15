@@ -18,8 +18,6 @@ use super::{MessageType, PriorClaims};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
     pub id: String,
-    #[serde(rename = "type")]
-    pub m_type: MessageType,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
     pub from: Option<String>,
@@ -40,7 +38,6 @@ impl DidcommHeader {
     pub fn new() -> Self {
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
-            m_type: MessageType::DidcommRaw,
             to: vec!(String::default()),
             from: Some(String::default()),
             created_time: None,
@@ -65,7 +62,6 @@ impl DidcommHeader {
     pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: DidcommHeader::gen_random_id(),
-            m_type: MessageType::DidcommRaw,
             to,
             from,
             created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()),
@@ -91,7 +87,7 @@ impl Default for DidcommHeader {
 ///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct JwmHeader {
-    pub typ: String,
+    pub typ: MessageType,
     // Some(String) if JWM is JWE encrypted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enc: Option<String>,
@@ -128,7 +124,7 @@ impl JwmHeader {
     /// Modifies `typ` and `alg` headers.
     ///
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
-        self.typ = String::from("JWM");
+        self.typ = MessageType::DidcommJws;
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
@@ -145,7 +141,7 @@ impl JwmHeader {
     /// Modifies `enc`, `typ` and `alg` headers.
     ///
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
-        self.typ = String::from("JWM");
+        self.typ = MessageType::DidcommJwe;
         match alg {
             CryptoAlgorithm::A256GCM => {
                 self.enc = Some("A256GCM".into());
@@ -166,7 +162,7 @@ impl Default for JwmHeader {
     // Need to make sure nonce is 192 bit long unigue for each message.
     fn default() -> Self {
         JwmHeader {
-            typ: "JWM".into(),
+            typ: MessageType::DidcommRaw,
             enc: None,
             kid: None,
             skid: None,
