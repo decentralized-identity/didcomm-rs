@@ -1,6 +1,5 @@
 use std::{convert::TryInto, time::SystemTime};
 use aes_gcm::{Aes256Gcm, aead::generic_array::GenericArray};
-use base64_url::{encode, decode};
 use k256::elliptic_curve::rand_core;
 use rand::{Rng, prelude::SliceRandom};
 use serde::{Serialize, Deserialize};
@@ -43,7 +42,7 @@ use crate::crypto::{
 };
 use std::convert::TryFrom;
 use sha2::{Digest, Sha256};
-use crate::{Error, Jwe, MessageType, RecipientValue, SignatureValue};
+use crate::{Error, Jwe, MessageType, SignatureValue};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -262,9 +261,8 @@ impl Message {
         for dest in &self.didcomm_header.to {
             let rv = self.encrypt_cek(&sk.as_ref(), dest, &cek, recipient_public_key)?;
             recepients.push(Recepient::new(
-                rv.header.ok_or_else(
-                    || Error::Generic("could not get recipient header value".to_string()))?,
-                encode(&rv.encrypted_key),
+                rv.header,
+                rv.encrypted_key,
             ));
         }
         self.recepients = Some(recepients);
@@ -401,7 +399,7 @@ impl Message {
         dest: &str,
         cek: &[u8; 32],
         recipient_public_key: Option<&[u8]>,
-    ) -> Result<RecipientValue, Error> {
+    ) -> Result<Recepient, Error> {
         trace!("creating per-recipient JWE value for {}", &dest);
         let alg = self.jwm_header.alg.as_ref()
             .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
@@ -464,14 +462,19 @@ impl Message {
         };
 
         let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
-        jwk.add_other_header("iv".to_string(), encode(&iv));
-        jwk.add_other_header("tag".to_string(), encode(&tag));
+        jwk.add_other_header("iv".to_string(), base64_url::encode(&iv));
+        jwk.add_other_header("tag".to_string(), base64_url::encode(&tag));
 
         // finish jwk and build result
-        let jwk = jwk.ephemeral("OKP".to_string(), "X25519".to_string(), encode(epk_public.as_bytes()), None);
-        Ok(RecipientValue {
-            header: Some(jwk),
-            encrypted_key: sealed_cek.to_vec(),
+        let jwk = jwk.ephemeral(
+            "OKP".to_string(),
+            "X25519".to_string(),
+            base64_url::encode(epk_public.as_bytes()),
+            None,
+        );
+        Ok(Recepient {
+            header: jwk,
+            encrypted_key: base64_url::encode(sealed_cek),
         })
     }
 
@@ -503,7 +506,7 @@ impl Message {
         // zE (temporary secret)
         let epk = recipient.header.epk.as_ref()
             .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
-        let epk_public_array: [u8; 32] = decode(&epk.x)?
+        let epk_public_array: [u8; 32] = base64_url::decode(&epk.x)?
             .try_into()
             .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
         let epk_public = PublicKey::from(epk_public_array);
@@ -518,13 +521,13 @@ impl Message {
 
         let iv = recipient.header.other.get("iv")
             .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
-        let iv_bytes = decode(&iv)?;
+        let iv_bytes = base64_url::decode(&iv)?;
 
         let tag = recipient.header.other.get("tag")
             .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
         let mut cyphertext_and_tag: Vec<u8> = vec![];
-        cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
-        cyphertext_and_tag.extend(&decode(&tag)?);
+        cyphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
+        cyphertext_and_tag.extend(&base64_url::decode(&tag)?);
 
         match alg.as_ref() {
             "ECDH-1PU+XC20PKW" => {
@@ -1083,7 +1086,7 @@ mod message_type_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jws(&SignatureAlgorithm::EdDsa)
             .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
-        
+
         let jws_object: Value = serde_json::from_str(&jws_string)?;
 
         assert_eq!(jws_object["protected"].as_str().is_some(), true);

@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use base64_url::{decode, encode};
 use serde_json::Value;
 
-use crate::{DidcommHeader, Error, Jwe, Jws, MessageType, crypto::{
+use crate::{DidcommHeader, Error, Jwe, Jws, crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
@@ -57,7 +57,6 @@ impl Message {
                 self.recepients.clone(),
                 cyphertext.to_vec(),
                 Some(header),
-                None,
                 Some(tag),
                 Some(iv),
             );

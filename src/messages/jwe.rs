@@ -4,7 +4,7 @@ use crate::{
     Jwk,
     JwmHeader,
     Recepient,
-    messages::serialization::{base64_buffer, base64_jwm_header},
+    messages::serialization::base64_jwm_header,
 };
 
 macro_rules! create_getter {
@@ -23,16 +23,6 @@ macro_rules! create_getter {
             None
         }
     };
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct RecipientValue {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub header: Option<Jwk>,
-
-	#[serde(with="base64_buffer")]
-    #[serde(default)]
-    pub encrypted_key: Vec<u8>,
 }
 
 /// JWE representation of `Message` with public header.
@@ -58,10 +48,6 @@ pub struct Jwe {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
-
-    #[serde(flatten)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub recipient_value: Option<RecipientValue>,
 }
 
 impl Jwe {
@@ -71,7 +57,6 @@ impl Jwe {
         recepients: Option<Vec<Recepient>>,
         ciphertext: impl AsRef<[u8]>,
         protected: Option<JwmHeader>,
-        recipient_value: Option<RecipientValue>,
         tag: Option<impl AsRef<[u8]>>,
         iv_input: Option<String>,
     ) -> Self {
@@ -94,7 +79,6 @@ impl Jwe {
             ciphertext: encode(ciphertext.as_ref()),
             protected,
             iv,
-            recipient_value,
             tag: tag_value,
         }
     }
@@ -136,7 +120,6 @@ fn default_jwe_with_random_iv() {
         None,
         None,
         vec![],
-        None,
         None,
         Some(vec![]),
         None,
