@@ -38,6 +38,14 @@ pub struct Jwe {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unprotected: Option<JwmHeader>,
 
+    /// Top-level recipient data for flat JWE JSON messages.
+    /// Will be ignored if `recepients` is not `None`
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recepient: Option<Recepient>,
+
+    /// Pre-recipient data for flat JWE JSON messages.
+    /// If not `None`, will be preferred over `recepient`.
     #[serde(rename = "recipients")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recepients: Option<Vec<Recepient>>,
@@ -60,26 +68,34 @@ impl Jwe {
         tag: Option<impl AsRef<[u8]>>,
         iv_input: Option<String>,
     ) -> Self {
-        let mut rng = rand::thread_rng();
-        let mut a = rng.gen::<[u8; 24]>().to_vec();
-        a.shuffle(&mut rng);
-        let tag_value = match tag {
-            Some(tag_unencoded) => Some(encode(tag_unencoded.as_ref())),
-            None => None,
-        };
-        let iv = iv_input.unwrap_or_else(|| {
-            let mut rng = rand::thread_rng();
-            let mut a = rng.gen::<[u8; 24]>().to_vec();
-            a.shuffle(&mut rng);
-            encode(&a)
-        });
         Jwe {
             unprotected,
             recepients,
             ciphertext: encode(ciphertext.as_ref()),
             protected,
-            iv,
-            tag: tag_value,
+            iv: Self::ensure_iv(iv_input),
+            tag: tag.map(|tag_unencoded| encode(tag_unencoded.as_ref())),
+            recepient: None,
+        }
+    }
+
+    /// Constructor for creating a flat JWE JSON
+    pub fn new_flat(
+        unprotected: Option<JwmHeader>,
+        recepient: Recepient,
+        ciphertext: impl AsRef<[u8]>,
+        protected: Option<JwmHeader>,
+        tag: Option<impl AsRef<[u8]>>,
+        iv_input: Option<String>,
+    ) -> Self {
+        Jwe {
+            unprotected,
+            recepients: None,
+            ciphertext: encode(ciphertext.as_ref()),
+            protected,
+            iv: Self::ensure_iv(iv_input),
+            tag: tag.map(|tag_unencoded| encode(tag_unencoded.as_ref())),
+            recepient: Some(recepient),
         }
     }
 
@@ -99,6 +115,20 @@ impl Jwe {
     /// `iv` getter
     pub fn get_iv(&self) -> impl AsRef<[u8]> {
         decode(&self.iv).unwrap()
+    }
+
+    /// Gets initial vector from option or creates a new one.
+    ///
+    /// # Parameters
+    ///
+    /// `iv_input` - an option that may contain an initial vector
+    fn ensure_iv(iv_input: Option<String>) -> String {
+        iv_input.unwrap_or_else(|| {
+            let mut rng = rand::thread_rng();
+            let mut a = rng.gen::<[u8; 24]>().to_vec();
+            a.shuffle(&mut rng);
+            encode(&a)
+        })
     }
 
     create_getter!(enc, String);
