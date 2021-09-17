@@ -1280,10 +1280,3 @@ mod jwe_flat_json_tests {
         Ok(())
     }
 }
-
-/*
-
-    pub header: Jwk,
-    pub encrypted_key: Strin
-
-*/
