@@ -21,7 +21,7 @@ macro_rules! create_getter {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SignatureValue {
+pub struct Signature {
     #[serde(skip_serializing_if = "Option::is_none")]
 	#[serde(with="base64_jwm_header")]
     pub protected: Option<JwmHeader>,
@@ -33,8 +33,8 @@ pub struct SignatureValue {
     pub signature: Vec<u8>,
 }
 
-impl SignatureValue {
-    /// Creates a new `SignatureValue` that can be used in JWS `signatures` property or
+impl Signature {
+    /// Creates a new `Signature` that can be used in JWS `signatures` property or
     /// as top-level (flattened) property in flattened JWS JSON serialization.
     /// 
     /// # Parameters
@@ -49,7 +49,7 @@ impl SignatureValue {
         header: Option<JwmHeader>,
         signature: Vec<u8>,
     ) -> Self {
-        SignatureValue {
+        Signature {
             protected,
             header,
             signature,
@@ -69,10 +69,17 @@ impl SignatureValue {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Jws {
     pub payload: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signatures: Option<Vec<SignatureValue>>,
+
+    /// Top-level signature signature for flat JWS JSON messages.
+    /// Will be ignored if `signatures` is not `None`
     #[serde(flatten)]
-    pub signature_value: Option<SignatureValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<Signature>,
+
+    /// Pre-recipient signatures for flat JWs JSON messages.
+    /// If not `None`, will be preferred over `signature`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signatures: Option<Vec<Signature>>,
 }
 
 impl Jws {
@@ -86,11 +93,11 @@ impl Jws {
     /// `signatures` - signature values per recipient
     pub fn new(
         payload: String,
-        signatures: Vec<SignatureValue>,
+        signatures: Vec<Signature>,
     ) -> Self {
         Jws {
             payload,
-            signature_value: None,
+            signature: None,
             signatures: Some(signatures),
         }
     }
@@ -105,11 +112,11 @@ impl Jws {
     /// `signatures` - signature value that is used on JWS top-level
     pub fn new_flat(
         payload: String,
-        signature_value: SignatureValue,
+        signature_value: Signature,
     ) -> Self {
         Jws {
             payload,
-            signature_value: Some(signature_value),
+            signature: Some(signature_value),
             signatures: None,
         }
     }

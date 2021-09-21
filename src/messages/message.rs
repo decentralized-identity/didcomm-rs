@@ -45,7 +45,7 @@ use crate::crypto::{
 };
 use std::convert::TryFrom;
 use sha2::{Digest, Sha256};
-use crate::{Error, Jwe, Jws, MessageType, SignatureValue};
+use crate::{Error, Jwe, Jws, MessageType, Signature};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -735,7 +735,7 @@ impl Message {
         if to_check.iv.is_some() {
             return Ok(MessageType::DidcommJwe);
         }
-        if to_check.signature.is_some() || to_check.signatures.is_some() {
+        if to_check.signatures.is_some() || to_check.signature.is_some() {
             return Ok(MessageType::DidcommJws);
         }
         let message: Message = serde_json::from_str(message)?;
@@ -814,8 +814,8 @@ impl Message {
             ).map_err(|_| Error::JwsParseError)?;
             message_verified = Some(Message::verify(to_verify, &kid)?);
         } else if let Ok(jws) = serde_json::from_str::<Jws>(&incomming) {
-            let signatures_values_to_verify: Vec<SignatureValue>;
-            if let Some(signature_value) = jws.signature_value {
+            let signatures_values_to_verify: Vec<Signature>;
+            if let Some(signature_value) = jws.signature {
                 signatures_values_to_verify = vec![signature_value.clone()];
             } else if let Some(signatures) = &jws.signatures {
                 signatures_values_to_verify = signatures.clone();

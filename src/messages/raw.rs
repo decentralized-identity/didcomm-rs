@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use base64_url::{decode, encode};
 use serde_json::Value;
 
-use crate::{DidcommHeader, Error, Jwe, Jws, SignatureValue, crypto::{
+use crate::{DidcommHeader, Error, Jwe, Jws, Signature, crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
@@ -130,7 +130,7 @@ impl Message {
             base64_url::encode(&payload_json_string);
         let payload_to_sign = format!("{}.{}", &jwm_header_string_base64, &payload_string_base64);
         let signature = signer(signing_key, &payload_to_sign.as_bytes())?;
-        let signature_value = SignatureValue::new(Some(h.clone()), None, signature);
+        let signature_value = Signature::new(Some(h.clone()), None, signature);
 
         let jws: Jws;
         if self.serialize_flat_jws {
@@ -158,11 +158,11 @@ impl Message {
     pub fn verify(jws: &[u8], key: &[u8]) -> Result<Message, Error> {
         let jws: Jws = serde_json::from_slice(jws)?;
 
-        let signatures_values_to_verify: Vec<SignatureValue>;
-        if let Some(signature_value) = jws.signature_value {
-            signatures_values_to_verify = vec![signature_value.clone()];
-        } else if let Some(signatures) = &jws.signatures {
+        let signatures_values_to_verify: Vec<Signature>;
+        if let Some(signatures) = &jws.signatures {
             signatures_values_to_verify = signatures.clone();
+        } else if let Some(signature_value) = jws.signature {
+            signatures_values_to_verify = vec![signature_value.clone()];
         } else {
             return Err(Error::JwsParseError);
         }
