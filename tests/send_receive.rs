@@ -40,10 +40,7 @@ fn send_receive_raw() {
 
 
     // receiving raw message
-    #[cfg(not(feature = "resolve"))]
-    let received = Message::receive(&ready_to_send, &[0; 32], None, None);
-    #[cfg(feature = "resolve")]
-    let received = Message::receive(&ready_to_send, b"", None, None);
+    let received = Message::receive(&ready_to_send, None, None, None);
 
     // Assert
     assert_eq!(m, received.unwrap());
@@ -73,7 +70,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test_new() {
 
     let mediator_received = Message::receive(
         &sealed.unwrap(),
-        &mediators_private,
+        Some(&mediators_private),
         Some(&alice_public),
         None,
     );
@@ -89,7 +86,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test_new() {
 
     let bob_received = Message::receive(
         &String::from_utf8_lossy(&message_to_forward.payload),
-        &bobs_private,
+        Some(&bobs_private),
         Some(&alice_public),
         None,
     );
@@ -221,7 +218,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     #[cfg(not(feature = "resolve"))]
     let received = Message::receive(
         &ready_to_send,
-        &bobs_private,
+        Some(&bobs_private),
         Some(&alice_public),
         None,
     );
