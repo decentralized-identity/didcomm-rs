@@ -4,6 +4,7 @@ use k256::elliptic_curve::rand_core;
 use rand::{Rng, prelude::SliceRandom};
 use serde::{Serialize, Deserialize};
 use serde_json::{
+    json,
     Value,
     value::RawValue,
 };
@@ -95,7 +96,7 @@ impl Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
             recepients: None,
-            body: Value::Null,
+            body: json!({}),
             serialize_flat_jwe: false,
             serialize_flat_jws: false,
         }
@@ -1202,7 +1203,7 @@ mod crypto_tests {
 }
 
 #[cfg(test)]
-mod message_type_tests {
+mod serialization_type_tests {
     use super::*;
 
     use k256::elliptic_curve::rand_core::OsRng;
@@ -1325,10 +1326,47 @@ mod message_type_tests {
         
         Ok(())
     }
+
+    #[test]
+    fn serializes_missing_body_as_empty_object() -> Result<(), Error> {
+        let message = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"]);
+        
+        let jwm_string: String = serde_json::to_string(&message)?;
+        let jwm_object: Value = serde_json::from_str(&jwm_string)?;
+
+        assert_eq!(jwm_object["body"].as_object().is_some(), true);
+        assert_eq!(
+            serde_json::to_string(&jwm_object["body"])?,
+            "{}",
+        );
+        
+        Ok(())
+    }
+
+    #[test]
+    fn serializes_existing_body_as_object() -> Result<(), Error> {
+        let message = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .set_body(r#"{"foo":"bar"}"#);
+        
+        let jwm_string: String = serde_json::to_string(&message)?;
+        let jwm_object: Value = serde_json::from_str(&jwm_string)?;
+
+        assert_eq!(jwm_object["body"].as_object().is_some(), true);
+        assert_eq!(
+            serde_json::to_string(&jwm_object["body"])?,
+            r#"{"foo":"bar"}"#,
+        );
+        
+        Ok(())
+    }
 }
 
 #[cfg(test)]
-mod jwe_flat_json_tests {
+mod jwe_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
@@ -1410,7 +1448,7 @@ mod jwe_flat_json_tests {
 }
 
 #[cfg(test)]
-mod jws {
+mod jws_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
