@@ -115,8 +115,8 @@ impl Cypher for CryptoAlgorithm {
 
 impl TryFrom<&String> for CryptoAlgorithm {
     type Error = Error;
-    fn try_from(incomming: &String) -> Result<Self, Error> {
-        match &incomming[..] {
+    fn try_from(incoming: &String) -> Result<Self, Error> {
+        match &incoming[..] {
             "ECDH-1PU+A256KW" => Ok(Self::A256GCM),
             "ECDH-1PU+XC20PKW" => Ok(Self::XC20P),
             _ => return Err(Error::JweParseError),

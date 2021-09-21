@@ -712,11 +712,11 @@ impl Message {
     // }
     // #[cfg(feature = "resolve")]
     pub fn receive(
-        incomming: &str,
+        incoming: &str,
         sk: &[u8],
         sender_public_key: Option<&[u8]>,
     ) -> Result<Self, Error> {
-        let mut current_message: String = incomming.to_string();
+        let mut current_message: String = incoming.to_string();
 
         if Self::get_message_type(&current_message)? == MessageType::DidcommJwe {
             current_message = Self::receive_jwe(&current_message, sk, sender_public_key)?;
@@ -743,11 +743,11 @@ impl Message {
     }
 
     fn receive_jwe (
-        incomming: &str,
+        incoming: &str,
         sk: &[u8],
         sender_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
-        let jwe: Jwe = serde_json::from_str(incomming)?;
+        let jwe: Jwe = serde_json::from_str(incoming)?;
         let alg = &jwe.alg().ok_or(Error::JweParseError)?;
 
         // get public key from input or from senders DID document
@@ -789,21 +789,21 @@ impl Message {
                 }
             }
             if !key.is_empty() {
-                m = Message::decrypt(incomming.as_bytes(), a.decryptor(), &key)?;
+                m = Message::decrypt(incoming.as_bytes(), a.decryptor(), &key)?;
             } else {
                 return Err(Error::JweParseError);
             }
         } else {
-            m = Message::decrypt(incomming.as_bytes(), a.decryptor(), shared.as_bytes())?;
+            m = Message::decrypt(incoming.as_bytes(), a.decryptor(), shared.as_bytes())?;
         }
 
         Ok(serde_json::to_string(&m)?)
     }
 
-    fn receive_jws (incomming: &str) -> Result<String, Error> {
+    fn receive_jws (incoming: &str) -> Result<String, Error> {
         // incoming data may be a jws string or a serialized message with jws data
         let mut message_verified = None::<Message>;
-        if let Ok(message) = serde_json::from_str::<Message>(&incomming) {
+        if let Ok(message) = serde_json::from_str::<Message>(&incoming) {
             if message.jwm_header.alg.is_none() {
                 return Err(Error::JweParseError);
             }
@@ -813,7 +813,7 @@ impl Message {
                 &message.jwm_header.kid.ok_or(Error::JwsParseError)?,
             ).map_err(|_| Error::JwsParseError)?;
             message_verified = Some(Message::verify(to_verify, &kid)?);
-        } else if let Ok(jws) = serde_json::from_str::<Jws>(&incomming) {
+        } else if let Ok(jws) = serde_json::from_str::<Jws>(&incoming) {
             let signatures_values_to_verify: Vec<Signature>;
             if let Some(signature_value) = jws.signature {
                 signatures_values_to_verify = vec![signature_value.clone()];
@@ -823,8 +823,8 @@ impl Message {
                 return Err(Error::JwsParseError);
             }
             
-            let incomming_string = incomming.to_string();
-            let to_verify = incomming_string.as_bytes();
+            let incoming_string = incoming.to_string();
+            let to_verify = incoming_string.as_bytes();
             for signature_value in signatures_values_to_verify {
                 if signature_value.alg().is_none() { continue; }
                 let kid = hex::decode(
