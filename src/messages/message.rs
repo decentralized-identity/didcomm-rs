@@ -3,7 +3,10 @@ use aes_gcm::{Aes256Gcm, aead::generic_array::GenericArray};
 use k256::elliptic_curve::rand_core;
 use rand::{Rng, prelude::SliceRandom};
 use serde::{Serialize, Deserialize};
-use serde_json::Value;
+use serde_json::{
+    Value,
+    value::RawValue,
+};
 use super::{
     mediated::Mediated,
     headers::{DidcommHeader, JwmHeader},
@@ -42,7 +45,7 @@ use crate::crypto::{
 };
 use std::convert::TryFrom;
 use sha2::{Digest, Sha256};
-use crate::{Error, Jwe, MessageType, SignatureValue};
+use crate::{Error, Jwe, Jws, MessageType, SignatureValue};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -54,7 +57,7 @@ pub struct Message {
     pub jwm_header: JwmHeader,
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
-    didcomm_header: DidcommHeader,
+    pub didcomm_header: DidcommHeader,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
@@ -65,13 +68,21 @@ pub struct Message {
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
     pub serialize_flat_jwe: bool,
+    /// Flag that toggles JWs serialization to flat JSON.
+    /// Not part of the serialized JSON and ignored when deserializing.
+    #[serde(skip)]
+    pub serialize_flat_jws: bool,
 }
 
 /// Helper type to check if received message is plain, signed or encrypted
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UnknownReceivedMessage {
-    pub signature: Option<String>,
-    pub iv: Option<String>,
+pub struct UnknownReceivedMessage<'a> {
+    #[serde(borrow)]
+    pub signature: Option<&'a RawValue>,
+    #[serde(borrow)]
+    pub signatures: Option<&'a RawValue>,
+    #[serde(borrow)]
+    pub iv: Option<&'a RawValue>,
 }
 
 impl Message {
@@ -86,6 +97,7 @@ impl Message {
             recepients: None,
             body: Value::Null,
             serialize_flat_jwe: false,
+            serialize_flat_jws: false,
         }
     }
     /// Setter of `from` header
@@ -200,6 +212,12 @@ impl Message {
         self.jwm_header.as_signed(alg);
         self
     }
+    /// Sets message to be serialized as flat JWS JSON and then calls `as_jws`.
+    /// If this message has multiple targets, `seal`ing it will result in an Error.
+    pub fn as_flat_jws(mut self, alg: &SignatureAlgorithm) -> Self {
+        self.serialize_flat_jws = true;
+        self.as_jws(alg)
+    }
     /// Creates set of Jwm related headers for the JWS
     /// Modifies JWM related header portion to match
     ///     signature implementation and leaves Other
@@ -228,11 +246,11 @@ impl Message {
         }
         self
     }
-    /// Sets message to be serialized as flat JSON.
+    /// Sets message to be serialized as flat JWE JSON.
     /// If this message has multiple targets, `seal`ing it will result in an Error.
-    pub fn as_flat_jwe(mut self) -> Self {
+    pub fn as_flat_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<&[u8]>) -> Self {
         self.serialize_flat_jwe = true;
-        self
+        self.as_jwe(alg, recipient_public_key)
     }
     /// Serializez current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
@@ -717,7 +735,7 @@ impl Message {
         if to_check.iv.is_some() {
             return Ok(MessageType::DidcommJwe);
         }
-        if to_check.signature.is_some() {
+        if to_check.signature.is_some() || to_check.signatures.is_some() {
             return Ok(MessageType::DidcommJws);
         }
         let message: Message = serde_json::from_str(message)?;
@@ -784,24 +802,44 @@ impl Message {
 
     fn receive_jws (incomming: &str) -> Result<String, Error> {
         // incoming data may be a jws string or a serialized message with jws data
-        let to_verify: String;
-        let kid: String;
+        let mut message_verified = None::<Message>;
         if let Ok(message) = serde_json::from_str::<Message>(&incomming) {
-            if message.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
-            to_verify = message.get_body()?;
-            kid = message.jwm_header.kid.ok_or(Error::JwsParseError)?;
-        } else if let Ok(jws) = serde_json::from_str::<SignatureValue>(&incomming) {
-            if jws.alg().is_none() { return Err(Error::JweParseError); }
-            to_verify = incomming.to_string();
-            kid = jws.kid().ok_or(Error::JwsParseError)?;
+            if message.jwm_header.alg.is_none() {
+                return Err(Error::JweParseError);
+            }
+            let body = message.get_body()?;
+            let to_verify = body.as_bytes();
+            let kid = hex::decode(
+                &message.jwm_header.kid.ok_or(Error::JwsParseError)?,
+            ).map_err(|_| Error::JwsParseError)?;
+            message_verified = Some(Message::verify(to_verify, &kid)?);
+        } else if let Ok(jws) = serde_json::from_str::<Jws>(&incomming) {
+            let signatures_values_to_verify: Vec<SignatureValue>;
+            if let Some(signature_value) = jws.signature_value {
+                signatures_values_to_verify = vec![signature_value.clone()];
+            } else if let Some(signatures) = &jws.signatures {
+                signatures_values_to_verify = signatures.clone();
+            } else {
+                return Err(Error::JwsParseError);
+            }
+            
+            let incomming_string = incomming.to_string();
+            let to_verify = incomming_string.as_bytes();
+            for signature_value in signatures_values_to_verify {
+                if signature_value.alg().is_none() { continue; }
+                let kid = hex::decode(
+                    &signature_value.kid().ok_or(Error::JwsParseError)?,
+                ).map_err(|_| Error::JwsParseError)?;
+                if let Ok(message_result) = Message::verify(&to_verify, &kid) {
+                    message_verified = Some(message_result);
+                    break;
+                }
+            }
         } else {
             return Err(Error::JwsParseError);
         }
 
-        let hex_kid = hex::decode(kid).unwrap();
-        let message = Message::verify(&to_verify.as_bytes(), &hex_kid)?;
-
-        Ok(serde_json::to_string(&message)?)
+        Ok(serde_json::to_string(&message_verified.ok_or(Error::JwsParseError)?)?)
     }
 }
 
@@ -1104,11 +1142,10 @@ mod message_type_tests {
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .as_jws(&SignatureAlgorithm::EdDsa)
+            .as_flat_jws(&SignatureAlgorithm::EdDsa)
             .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
 
         let jws_object: Value = serde_json::from_str(&jws_string)?;
-
         assert_eq!(jws_object["protected"].as_str().is_some(), true);
         let protected_encoded = jws_object["protected"].as_str().ok_or(Error::JwmHeaderParseError)?;
         let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
@@ -1216,8 +1253,7 @@ mod jwe_flat_json_tests {
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
-            .as_flat_jwe()
+            .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
             .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
         let jwe_string = message.seal_signed(
@@ -1251,8 +1287,7 @@ mod jwe_flat_json_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .set_body(&body) // packing in some payload
-            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
-            .as_flat_jwe()
+            .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
             .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
         let jwe_string = message.seal_signed(
@@ -1276,6 +1311,100 @@ mod jwe_flat_json_tests {
             sample_body.to_string(),
             received_body.to_string(),
         );
+        
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod jws {
+    extern crate chacha20poly1305;
+    extern crate sodiumoxide;
+
+    use super::*;
+
+    use k256::elliptic_curve::rand_core::OsRng;
+
+    #[test]
+    fn can_create_flattened_jws_jsons() -> Result<(), Error> {
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let jws_string = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .kid(&hex::encode(sign_keypair.public.to_bytes()))
+            .as_flat_jws(&SignatureAlgorithm::EdDsa)
+            .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
+
+        let jws_object: Value = serde_json::from_str(&jws_string)?;
+
+        assert_eq!(jws_object["signature"].as_str().is_some(), true);
+        assert_eq!(jws_object["signatures"].as_array().is_some(), false);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn can_create_general_jws_jsons() -> Result<(), Error> {
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let jws_string = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .kid(&hex::encode(sign_keypair.public.to_bytes()))
+            .as_jws(&SignatureAlgorithm::EdDsa)
+            .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
+
+        let jws_object: Value = serde_json::from_str(&jws_string)?;
+
+        assert_eq!(jws_object["signature"].as_str().is_some(), false);
+        assert_eq!(jws_object["signatures"].as_array().is_some(), true);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn can_receive_flattened_jws_jsons() -> Result<(), Error> {
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let jws_string = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .kid(&hex::encode(sign_keypair.public.to_bytes()))
+            .as_flat_jws(&SignatureAlgorithm::EdDsa)
+            .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
+
+        // 'verify' style receive
+        let received = Message::verify(&jws_string.as_bytes(), &sign_keypair.public.to_bytes());
+        assert_eq!(received.is_ok(), true);
+
+        // generic 'receive' style
+        let received = Message::receive(
+            &jws_string,
+            &vec![],
+            Some(&sign_keypair.public.to_bytes())); // and now we parse received
+        assert_eq!(received.is_ok(), true);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn can_receive_general_jws_jsons() -> Result<(), Error> {
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let jws_string = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .kid(&hex::encode(sign_keypair.public.to_bytes()))
+            .as_jws(&SignatureAlgorithm::EdDsa)
+            .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
+
+        // 'verify' style receive
+        let received = Message::verify(&jws_string.as_bytes(), &sign_keypair.public.to_bytes());
+        assert_eq!(received.is_ok(), true);
+
+        // generic 'receive' style
+        let received = Message::receive(
+            &jws_string,
+            &vec![],
+            Some(&sign_keypair.public.to_bytes())); // and now we parse received
+        assert_eq!(received.is_ok(), true);
         
         Ok(())
     }

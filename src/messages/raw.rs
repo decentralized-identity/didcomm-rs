@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use base64_url::{decode, encode};
 use serde_json::Value;
 
-use crate::{DidcommHeader, Error, Jwe, Jws, crypto::{
+use crate::{DidcommHeader, Error, Jwe, Jws, SignatureValue, crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
@@ -115,25 +115,41 @@ impl Message {
     pub fn sign(self, signer: SigningMethod, signing_key: &[u8]) -> Result<String, Error> {
         let h = self.jwm_header.clone();
         if h.alg.is_none() {
-            Err(Error::JwsParseError)
-        } else {
-            let jwm_header_string_base64 = base64_url::encode(&serde_json::to_string(&self.jwm_header)?);
-            let payload: PayloadToVerify = PayloadToVerify {
-                didcomm_header: self.get_didcomm_header().clone(),
-                #[cfg(feature = "resolve")]
-                recepients: self.recepients.clone(),
-                body: serde_json::from_str(&self.get_body()?)?,
-            };
-            let payload_json_string = serde_json::to_string(&payload)?;
-            let payload_string_base64 =
-                base64_url::encode(&payload_json_string);
-            let payload_to_sign = format!("{}.{}", &jwm_header_string_base64, &payload_string_base64);
-            let signature = signer(signing_key, &payload_to_sign.as_bytes())?;
-            let jws = Jws::new(payload_string_base64, Some(h.clone()), None, signature);
-            let serialized_jws = serde_json::to_string(&jws)?;
-
-            Ok(serialized_jws)
+            return Err(Error::JwsParseError);
         }
+
+        let jwm_header_string_base64 = base64_url::encode(&serde_json::to_string(&self.jwm_header)?);
+        let payload: PayloadToVerify = PayloadToVerify {
+            didcomm_header: self.get_didcomm_header().clone(),
+            #[cfg(feature = "resolve")]
+            recepients: self.recepients.clone(),
+            body: serde_json::from_str(&self.get_body()?)?,
+        };
+        let payload_json_string = serde_json::to_string(&payload)?;
+        let payload_string_base64 =
+            base64_url::encode(&payload_json_string);
+        let payload_to_sign = format!("{}.{}", &jwm_header_string_base64, &payload_string_base64);
+        let signature = signer(signing_key, &payload_to_sign.as_bytes())?;
+        let signature_value = SignatureValue::new(Some(h.clone()), None, signature);
+
+        let jws: Jws;
+        if self.serialize_flat_jws {
+            jws = Jws::new_flat(
+                payload_string_base64,
+                signature_value,
+            );
+        } else {
+            let signature_values = self.didcomm_header.to
+              .iter()
+              .map(|_| signature_value.clone())
+              .collect();
+            jws = Jws::new(
+                payload_string_base64,
+                signature_values,
+            );
+        }
+
+        Ok(serde_json::to_string(&jws)?)
     }
     /// Verifyes signature and returns payload message on verification success.
     /// `Err` return if signature invalid or data is malformed.
@@ -141,19 +157,37 @@ impl Message {
     ///
     pub fn verify(jws: &[u8], key: &[u8]) -> Result<Message, Error> {
         let jws: Jws = serde_json::from_slice(jws)?;
-        if let Some(alg) = &jws.signature_value.alg() {
+
+        let signatures_values_to_verify: Vec<SignatureValue>;
+        if let Some(signature_value) = jws.signature_value {
+            signatures_values_to_verify = vec![signature_value.clone()];
+        } else if let Some(signatures) = &jws.signatures {
+            signatures_values_to_verify = signatures.clone();
+        } else {
+            return Err(Error::JwsParseError);
+        }
+        let payload = &jws.payload;
+
+        let mut verified = false;
+        for signature_value in signatures_values_to_verify {
+            let alg = &signature_value.alg().ok_or(Error::JweParseError)?;
+            let signature = &signature_value.signature[..];
             let verifyer: SignatureAlgorithm = alg.try_into()?;
-            let encoded_header = base64_url::encode(&serde_json::to_string(&jws.signature_value.protected)?);
-            let payload_to_verify = format!("{}.{}", &encoded_header, &jws.payload);
-            if verifyer.validator()(key, &payload_to_verify.as_bytes(), &jws.signature_value.signature[..])? {
-                let payload: PayloadToVerify = serde_json::from_slice(&base64_url::decode(&jws.payload)?)?;
-                let mut message = Message::new();
-                message = message.set_didcomm_header(payload.didcomm_header);
-                message = message.set_body(&serde_json::to_string(&payload.body)?);
-                Ok(message)
-            } else {
-                Err(Error::JwsParseError)
+            let protected_header = signature_value.protected.as_ref().ok_or(Error::JwsParseError)?;
+            let encoded_header = base64_url::encode(&serde_json::to_string(&protected_header)?);
+            let payload_to_verify = format!("{}.{}", &encoded_header, &payload);
+            if verifyer.validator()(key, &payload_to_verify.as_bytes(), signature)? {
+                verified = true;
+                break;
             }
+        }
+
+        if verified {
+            let payload: PayloadToVerify = serde_json::from_slice(&base64_url::decode(&jws.payload)?)?;
+            let mut message = Message::new();
+            message = message.set_didcomm_header(payload.didcomm_header);
+            message = message.set_body(&serde_json::to_string(&payload.body)?);
+            Ok(message)
         } else {
             Err(Error::JwsParseError)
         }
