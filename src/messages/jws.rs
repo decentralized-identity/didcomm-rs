@@ -70,13 +70,13 @@ impl Signature {
 pub struct Jws {
     pub payload: String,
 
-    /// Top-level signature signature for flat JWS JSON messages.
+    /// Top-level signature for flat JWS JSON messages.
     /// Will be ignored if `signatures` is not `None`
     #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<Signature>,
 
-    /// Pre-recipient signatures for flat JWs JSON messages.
+    /// Pre-recipient signatures for flat JWS JSON messages.
     /// If not `None`, will be preferred over `signature`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signatures: Option<Vec<Signature>>,

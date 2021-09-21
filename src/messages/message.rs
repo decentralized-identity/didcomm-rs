@@ -68,7 +68,7 @@ pub struct Message {
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
     pub serialize_flat_jwe: bool,
-    /// Flag that toggles JWs serialization to flat JSON.
+    /// Flag that toggles JWS serialization to flat JSON.
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
     pub serialize_flat_jws: bool,
