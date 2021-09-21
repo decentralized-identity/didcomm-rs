@@ -112,7 +112,11 @@ impl Message {
     /// Signs message and turns it into `Jws` envelope.
     /// `Err` is returned if message is not properly prepared or data is malformed.
     /// Jws enveloped payload is base64_url encoded
-    pub fn sign(self, signer: SigningMethod, signing_key: &[u8]) -> Result<String, Error> {
+    pub fn sign(
+        self,
+        signer: SigningMethod,
+        signing_sender_private_key: &[u8],
+    ) -> Result<String, Error> {
         let h = self.jwm_header.clone();
         if h.alg.is_none() {
             return Err(Error::JwsParseError);
@@ -129,7 +133,7 @@ impl Message {
         let payload_string_base64 =
             base64_url::encode(&payload_json_string);
         let payload_to_sign = format!("{}.{}", &jwm_header_string_base64, &payload_string_base64);
-        let signature = signer(signing_key, &payload_to_sign.as_bytes())?;
+        let signature = signer(signing_sender_private_key, &payload_to_sign.as_bytes())?;
         let signature_value = Signature::new(Some(h.clone()), None, signature);
 
         let jws: Jws;
@@ -155,7 +159,10 @@ impl Message {
     /// `Err` return if signature invalid or data is malformed.
     /// Expects Jws's payload to be a valid serialized `Message` and base64_url encoded.
     ///
-    pub fn verify(jws: &[u8], key: &[u8]) -> Result<Message, Error> {
+    pub fn verify(
+        jws: &[u8],
+        signing_sender_public_key: &[u8],
+    ) -> Result<Message, Error> {
         let jws: Jws = serde_json::from_slice(jws)?;
 
         let signatures_values_to_verify: Vec<Signature>;
@@ -176,7 +183,7 @@ impl Message {
             let protected_header = signature_value.protected.as_ref().ok_or(Error::JwsParseError)?;
             let encoded_header = base64_url::encode(&serde_json::to_string(&protected_header)?);
             let payload_to_verify = format!("{}.{}", &encoded_header, &payload);
-            if verifyer.validator()(key, &payload_to_verify.as_bytes(), signature)? {
+            if verifyer.validator()(signing_sender_public_key, &payload_to_verify.as_bytes(), signature)? {
                 verified = true;
                 break;
             }
