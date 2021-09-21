@@ -1210,7 +1210,7 @@ mod jwe_flat_json_tests {
     use utilities::{KeyPairSet, get_keypair_set};
 
     #[test]
-    fn can_create_flat_jwe_jsons() -> Result<(), Error> {
+    fn can_create_flat_jwe_json() -> Result<(), Error> {
         let KeyPairSet { alice_private, bobs_public, ..  } = get_keypair_set();
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let message = Message::new()
@@ -1237,7 +1237,7 @@ mod jwe_flat_json_tests {
     }
 
     #[test]
-    fn can_receive_flat_jwe_jsons() -> Result<(), Error> {
+    fn can_receive_flat_jwe_json() -> Result<(), Error> {
         let KeyPairSet {
             alice_private,
             alice_public,
