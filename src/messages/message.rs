@@ -1203,7 +1203,7 @@ mod crypto_tests {
 }
 
 #[cfg(test)]
-mod serialization_type_tests {
+mod serialization_tests {
     use super::*;
 
     use k256::elliptic_curve::rand_core::OsRng;
