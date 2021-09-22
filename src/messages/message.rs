@@ -806,10 +806,10 @@ impl Message {
             message_verified = Some(Message::verify(to_verify, &key)?);
         } else if let Ok(jws) = serde_json::from_str::<Jws>(&incoming) {
             let signatures_values_to_verify: Vec<Signature>;
-            if let Some(signature_value) = jws.signature {
-                signatures_values_to_verify = vec![signature_value.clone()];
-            } else if let Some(signatures) = &jws.signatures {
+            if let Some(signatures) = &jws.signatures {
                 signatures_values_to_verify = signatures.clone();
+            } else if let Some(signature_value) = jws.signature {
+                signatures_values_to_verify = vec![signature_value.clone()];
             } else {
                 return Err(Error::JwsParseError);
             }
@@ -1253,8 +1253,6 @@ mod serialization_tests {
         Ok(())
     }
 
-    // ignored until proper `typ` handling has been clarified
-    #[ignore]
     #[test]
     fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(), Error> {
         let KeyPairSet { alice_private, bobs_public, ..  } = get_keypair_set();
@@ -1323,6 +1321,42 @@ mod serialization_tests {
             protected_object["typ"].as_str().ok_or(Error::JwmHeaderParseError)?,
             "https://didcomm.org/routing/2.0/forward",
         );
+        
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_inner_message_type_as_plain_for_signed_messages() -> Result<(), Error> {
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let jws_string = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .as_jws(&SignatureAlgorithm::EdDsa)
+            .kid(&hex::encode(sign_keypair.public.to_bytes()))
+            .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
+
+        let jws_object: Value = serde_json::from_str(&jws_string)?;
+        let jws_protected_encoded = jws_object
+            .get("signatures").ok_or(Error::JwsParseError)?
+            .as_array().ok_or(Error::JwsParseError)?[0]
+            .as_object().ok_or(Error::JwsParseError)?
+            .get("protected").ok_or(Error::JwsParseError)?
+            .as_str().ok_or(Error::JwsParseError)?
+        ;
+        let jws_protected_string_decoded = base64_url::decode(&jws_protected_encoded)?;
+        let jws_jwm_header: JwmHeader = serde_json::from_slice(&jws_protected_string_decoded)?;
+
+        let payload_string_encoded = jws_object
+            .get("payload").ok_or(Error::JwsParseError)?
+            .as_str().ok_or(Error::JwsParseError)?
+        ;
+        let payload_string_decoded = base64_url::decode(&payload_string_encoded)?;
+        let payload_jwm_header: JwmHeader = serde_json::from_slice(&payload_string_decoded)?;
+        let received_message = Message::receive(&jws_string, None, None, None)?;
+
+        assert_eq!(jws_jwm_header.typ, MessageType::DidcommJws);
+        assert_eq!(payload_jwm_header.typ, MessageType::DidcommRaw);
+        assert_eq!(received_message.jwm_header.typ, MessageType::DidcommRaw);
         
         Ok(())
     }

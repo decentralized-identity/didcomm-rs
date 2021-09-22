@@ -124,7 +124,6 @@ impl JwmHeader {
     /// Modifies `typ` and `alg` headers.
     ///
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
-        self.typ = MessageType::DidcommJws;
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
@@ -141,7 +140,6 @@ impl JwmHeader {
     /// Modifies `enc`, `typ` and `alg` headers.
     ///
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
-        self.typ = MessageType::DidcommJwe;
         match alg {
             CryptoAlgorithm::A256GCM => {
                 self.enc = Some("A256GCM".into());

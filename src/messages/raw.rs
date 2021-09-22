@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use base64_url::{decode, encode};
 use serde_json::Value;
 
-use crate::{DidcommHeader, Error, Jwe, Jws, Signature, crypto::{
+use crate::{DidcommHeader, Error, Jwe, JwmHeader, Jws, MessageType, Signature, crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
@@ -34,16 +34,19 @@ impl Message {
     ///
     pub fn encrypt(self, crypter: SymmetricCypherMethod, encryption_key: &[u8])
         -> Result<String, Error> {
-            let mut header = self.jwm_header.clone();
+            let mut jwe_header = self.jwm_header.clone();
+            if jwe_header.typ != MessageType::DidcommForward {
+                jwe_header.typ = MessageType::DidcommJwe;
+            }
             let d_header = self.get_didcomm_header();
             let iv = Jwe::generate_iv();
             let multi = self.recepients.is_some();
-            header.skid = Some(d_header.from.clone().unwrap_or_default());
+            jwe_header.skid = Some(d_header.from.clone().unwrap_or_default());
             if !multi {
-                header.kid = Some(d_header.to[0].clone());
+                jwe_header.kid = Some(d_header.to[0].clone());
             }
-            header.skid = d_header.from.clone();
-            let aad_string = encode(&serde_json::to_string(&header)?.as_bytes());
+            jwe_header.skid = d_header.from.clone();
+            let aad_string = encode(&serde_json::to_string(&jwe_header)?.as_bytes());
             let aad = aad_string.as_bytes();
             let cyphertext_and_tag = crypter(
                 &decode(&iv)?,
@@ -66,7 +69,7 @@ impl Message {
                     None,
                     recepients[0].clone(),
                     cyphertext.to_vec(),
-                    Some(header),
+                    Some(jwe_header),
                     Some(tag),
                     Some(iv),
                 );
@@ -75,7 +78,7 @@ impl Message {
                     None,
                     self.recepients.clone(),
                     cyphertext.to_vec(),
-                    Some(header),
+                    Some(jwe_header),
                     Some(tag),
                     Some(iv),
                 );
@@ -113,28 +116,25 @@ impl Message {
     /// `Err` is returned if message is not properly prepared or data is malformed.
     /// Jws enveloped payload is base64_url encoded
     pub fn sign(
-        self,
+        mut self,
         signer: SigningMethod,
         signing_sender_private_key: &[u8],
     ) -> Result<String, Error> {
-        let h = self.jwm_header.clone();
-        if h.alg.is_none() {
+        let mut jws_header = self.jwm_header.clone();
+        jws_header.typ = MessageType::DidcommJws;
+        if jws_header.alg.is_none() {
             return Err(Error::JwsParseError);
         }
 
-        let jwm_header_string_base64 = base64_url::encode(&serde_json::to_string(&self.jwm_header)?);
-        let payload: PayloadToVerify = PayloadToVerify {
-            didcomm_header: self.get_didcomm_header().clone(),
-            #[cfg(feature = "resolve")]
-            recepients: self.recepients.clone(),
-            body: serde_json::from_str(&self.get_body()?)?,
-        };
-        let payload_json_string = serde_json::to_string(&payload)?;
-        let payload_string_base64 =
-            base64_url::encode(&payload_json_string);
-        let payload_to_sign = format!("{}.{}", &jwm_header_string_base64, &payload_string_base64);
+        // drop non jwm plain message header info
+        self.jwm_header = JwmHeader::default();
+
+        let jws_header_string_base64 = base64_url::encode(&serde_json::to_string(&jws_header)?);
+        let payload_json_string = serde_json::to_string(&self)?;
+        let payload_string_base64 = base64_url::encode(&payload_json_string);
+        let payload_to_sign = format!("{}.{}", &jws_header_string_base64, &payload_string_base64);
         let signature = signer(signing_sender_private_key, &payload_to_sign.as_bytes())?;
-        let signature_value = Signature::new(Some(h.clone()), None, signature);
+        let signature_value = Signature::new(Some(jws_header.clone()), None, signature);
 
         let jws: Jws;
         if self.serialize_flat_jws {
@@ -168,7 +168,7 @@ impl Message {
         let signatures_values_to_verify: Vec<Signature>;
         if let Some(signatures) = &jws.signatures {
             signatures_values_to_verify = signatures.clone();
-        } else if let Some(signature_value) = jws.signature {
+        } else if let Some(signature_value) = &jws.signature {
             signatures_values_to_verify = vec![signature_value.clone()];
         } else {
             return Err(Error::JwsParseError);
@@ -176,7 +176,7 @@ impl Message {
         let payload = &jws.payload;
 
         let mut verified = false;
-        for signature_value in signatures_values_to_verify {
+        for signature_value in signatures_values_to_verify.clone() {
             let alg = &signature_value.alg().ok_or(Error::JweParseError)?;
             let signature = &signature_value.signature[..];
             let verifyer: SignatureAlgorithm = alg.try_into()?;
@@ -190,10 +190,8 @@ impl Message {
         }
 
         if verified {
-            let payload: PayloadToVerify = serde_json::from_slice(&base64_url::decode(&jws.payload)?)?;
-            let mut message = Message::new();
-            message = message.set_didcomm_header(payload.didcomm_header);
-            message = message.set_body(&serde_json::to_string(&payload.body)?);
+            // body in JWS envelope should be a valid JWM message, so parse it into message
+            let message: Message = serde_json::from_slice(&base64_url::decode(&jws.payload)?)?;
             Ok(message)
         } else {
             Err(Error::JwsParseError)
