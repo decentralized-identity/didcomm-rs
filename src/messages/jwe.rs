@@ -30,7 +30,7 @@ pub struct RecipientValue {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<Jwk>,
 
-	#[serde(with="base64_buffer")]
+    #[serde(with="base64_buffer")]
     #[serde(default)]
     pub encrypted_key: Vec<u8>,
 }
@@ -41,7 +41,7 @@ pub struct RecipientValue {
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Jwe {
     #[serde(skip_serializing_if = "Option::is_none")]
-	#[serde(with="base64_jwm_header")]
+    #[serde(with="base64_jwm_header")]
     #[serde(default)]
     pub protected: Option<JwmHeader>,
 
