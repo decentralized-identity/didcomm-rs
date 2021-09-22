@@ -19,7 +19,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
     let m = Message::new()
         // setting `from` header (sender) - Optional
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
-        // setting `to` header (recepients) - Optional
+        // setting `to` header (recipients) - Optional
         .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
         // populating body with some data - `Vec<bytes>`
         .set_body(some_payload.as_bytes());
@@ -83,7 +83,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 4. Prepare JWE message to be mediated -> mediate -> receive
-* Message should be encrypted by destination key first in `.routed_by()` method call using key for the recepient.
+* Message should be encrypted by destination key first in `.routed_by()` method call using key for the recipient.
 * Next it should be encrypted by mediator key in `.seal()` method call - this can be done multiple times - once for each mediator in chain but should be strictly sequentual to match mediators sequence in the chain.
 * Method call `.seal()` **MUST** be preceeded by  `.as_jwe(CryptoAlgorithm)` as mediators may use different algorithms and key types than destination and this is not automatically predicted or populated.
 * Keys used for encryption should be used in reverse order - final destination - last mediator - second to last mediator - etc. Onion style.
@@ -165,13 +165,13 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         Some(decryption_key.as_bytes()),
         Some(&pub_sign_verify_key.to_bytes())); // and now we parse received
 ```
-## 6. Multiple receivers static key wrap per recepient with shared secret
-* ! Works with `resolve` feature only - requires resolution of public keys for each recepient for shared secret generation.
-* Static key generated randomly in the background (`to` field has >1 recepient).
+## 6. Multiple receivers static key wrap per recipient with shared secret
+* ! Works with `resolve` feature only - requires resolution of public keys for each recipient for shared secret generation.
+* Static key generated randomly in the background (`to` field has >1 recipient).
 
 ### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/src/messages/message.rs#L597)
 ```rust
-// Creating message with multiple recepients.
+// Creating message with multiple recipients.
 let m = Message::new()
     .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
     .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"])
@@ -183,7 +183,7 @@ assert!(jwe.is_ok());
 
 let jwe = jwe.unwrap();
 
-// Each of the recepients receive it in same way as before (direct with single receiver)
+// Each of the recipients receive it in same way as before (direct with single receiver)
 let received_first = Message::receive(&jwe, &first_private);
 let received_second = Message::receive(&jwe, &second_private);
 

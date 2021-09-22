@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use super::Message;
 #[cfg(feature = "resolve")]
-use crate::Recepient;
+use crate::Recipient;
 use crate::{
     crypto::{SignatureAlgorithm, Signer, SigningMethod, SymmetricCypherMethod},
     DidcommHeader,
@@ -24,7 +24,7 @@ pub struct PayloadToVerify {
 
     #[cfg(feature = "resolve")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) recepients: Option<Vec<Recepient>>,
+    pub(crate) recipients: Option<Vec<Recipient>>,
 
     body: Value,
 }
@@ -48,7 +48,7 @@ impl Message {
         }
         let d_header = self.get_didcomm_header();
         let iv = Jwe::generate_iv();
-        let multi = self.recepients.is_some();
+        let multi = self.recipients.is_some();
         jwe_header.skid = Some(d_header.from.clone().unwrap_or_default());
         if !multi {
             jwe_header.kid = Some(d_header.to[0].clone());
@@ -65,10 +65,10 @@ impl Message {
         let (cyphertext, tag) = cyphertext_and_tag.split_at(cyphertext_and_tag.len() - 16);
         let jwe;
         if self.serialize_flat_jwe {
-            let recepients = self.recepients.ok_or_else(|| {
+            let recipients = self.recipients.ok_or_else(|| {
                 Error::Generic("flat JWE JSON serialization needs a recipient".to_string())
             })?;
-            if recepients.len() != 1 {
+            if recipients.len() != 1 {
                 return Err(Error::Generic(
                     "flat JWE JSON serialization needs exactly one recipient".to_string(),
                 ));
@@ -76,7 +76,7 @@ impl Message {
 
             jwe = Jwe::new_flat(
                 None,
-                recepients[0].clone(),
+                recipients[0].clone(),
                 cyphertext.to_vec(),
                 Some(jwe_header),
                 Some(tag),
@@ -85,7 +85,7 @@ impl Message {
         } else {
             jwe = Jwe::new(
                 None,
-                self.recepients.clone(),
+                self.recipients.clone(),
                 cyphertext.to_vec(),
                 Some(jwe_header),
                 Some(tag),

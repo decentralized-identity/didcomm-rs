@@ -27,7 +27,7 @@ use super::{
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
-use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recepient, Signature};
+use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recipient, Signature};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -43,7 +43,7 @@ pub struct Message {
     pub didcomm_header: DidcommHeader,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) recepients: Option<Vec<Recepient>>,
+    pub(crate) recipients: Option<Vec<Recipient>>,
 
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as base64url String of raw bytes of data.
@@ -84,7 +84,7 @@ impl Message {
         Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
-            recepients: None,
+            recipients: None,
             body: json!({}),
             serialize_flat_jwe: false,
             serialize_flat_jws: false,
@@ -294,13 +294,13 @@ impl Message {
             ));
         }
 
-        let mut recepients: Vec<Recepient> = vec![];
-        // create jwk from static secret per recepient
+        let mut recipients: Vec<Recipient> = vec![];
+        // create jwk from static secret per recipient
         for dest in &self.didcomm_header.to {
             let rv = self.encrypt_cek(&sk.as_ref(), dest, &cek, recipient_public_key)?;
-            recepients.push(Recepient::new(rv.header, rv.encrypted_key));
+            recipients.push(Recipient::new(rv.header, rv.encrypted_key));
         }
-        self.recepients = Some(recepients);
+        self.recipients = Some(recipients);
         // encrypt original message with static secret
         let alg = crypter_from_header(&self.jwm_header)?;
         self.encrypt(alg.encryptor(), cek.as_ref())
@@ -347,7 +347,7 @@ impl Message {
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
     ///
-    /// `to` - list of destination recepients. can be empty (Optional) `String::default()`
+    /// `to` - list of destination recipients. can be empty (Optional) `String::default()`
     ///
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
@@ -395,7 +395,7 @@ impl Message {
         recipient_public_key: Option<&[u8]>,
     ) -> Result<Vec<u8>, Error> {
         // zS (shared for recipient)
-        let shared = gen_shared_for_recepient(sk.as_ref(), did, recipient_public_key)?;
+        let shared = gen_shared_for_recipient(sk.as_ref(), did, recipient_public_key)?;
         trace!(
             "sk: {:?} shared: {:?} dest: {:?}",
             sk,
@@ -431,7 +431,7 @@ impl Message {
         dest: &str,
         cek: &[u8; 32],
         recipient_public_key: Option<&[u8]>,
-    ) -> Result<Recepient, Error> {
+    ) -> Result<Recipient, Error> {
         trace!("creating per-recipient JWE value for {}", &dest);
         let alg = self
             .jwm_header
@@ -443,7 +443,7 @@ impl Message {
         // zE (temporary secret)
         let epk = StaticSecret::new(rand_core::OsRng);
         let epk_public = PublicKey::from(&epk);
-        let ze = gen_shared_for_recepient(epk.to_bytes(), dest, recipient_public_key)?;
+        let ze = gen_shared_for_recipient(epk.to_bytes(), dest, recipient_public_key)?;
         trace!(
             "ze: {:?} epk_public: {:?}, dest: {:?}",
             &ze.as_ref(),
@@ -517,7 +517,7 @@ impl Message {
             base64_url::encode(epk_public.as_bytes()),
             None,
         );
-        Ok(Recepient {
+        Ok(Recipient {
             header: jwk,
             encrypted_key: base64_url::encode(sealed_cek),
         })
@@ -537,7 +537,7 @@ impl Message {
     fn decrypt_cek(
         jwe: &Jwe,
         sk: &[u8],
-        recipient: &Recepient,
+        recipient: &Recipient,
         recipient_public_key: Option<&[u8]>,
     ) -> Result<Vec<u8>, Error> {
         trace!("decrypting per-recipient JWE value");
@@ -785,21 +785,21 @@ impl Message {
             ));
         let a: CryptoAlgorithm = alg.try_into()?;
         let m: Message;
-        let recipients_from_jwe: Option<Vec<Recepient>>;
-        if jwe.recepients.as_ref().is_some() {
-            recipients_from_jwe = jwe.recepients.clone();
-        } else if let Some(recepient) = jwe.recepient.as_ref() {
-            recipients_from_jwe = Some(vec![recepient.clone()]);
+        let recipients_from_jwe: Option<Vec<Recipient>>;
+        if jwe.recipients.as_ref().is_some() {
+            recipients_from_jwe = jwe.recipients.clone();
+        } else if let Some(recipient) = jwe.recipient.as_ref() {
+            recipients_from_jwe = Some(vec![recipient.clone()]);
         } else {
             recipients_from_jwe = None;
         }
-        if let Some(recepients) = recipients_from_jwe {
+        if let Some(recipients) = recipients_from_jwe {
             let mut key: Vec<u8> = vec![];
-            for recepient in recepients {
+            for recipient in recipients {
                 let decrypted_key = Message::decrypt_cek(
                     &jwe,
                     &receiver_private_key,
-                    &recepient,
+                    &recipient,
                     encryption_sender_public_key,
                 );
                 if decrypted_key.is_ok() {
@@ -894,7 +894,7 @@ impl Message {
 }
 
 #[allow(unused_variables)]
-fn gen_shared_for_recepient(
+fn gen_shared_for_recipient(
     sk: impl AsRef<[u8]>,
     did: &str,
     recipient_public_key: Option<&[u8]>,

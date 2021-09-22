@@ -1,7 +1,7 @@
 use base64_url::{decode, encode};
 use rand::{prelude::SliceRandom, Rng};
 
-use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recepient};
+use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recipient};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {
@@ -34,16 +34,15 @@ pub struct Jwe {
     pub unprotected: Option<JwmHeader>,
 
     /// Top-level recipient data for flat JWE JSON messages.
-    /// Will be ignored if `recepients` is not `None`
+    /// Will be ignored if `recipients` is not `None`
     #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub recepient: Option<Recepient>,
+    pub recipient: Option<Recipient>,
 
     /// Pre-recipient data for flat JWE JSON messages.
-    /// If not `None`, will be preferred over `recepient`.
-    #[serde(rename = "recipients")]
+    /// If not `None`, will be preferred over `recipient`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub recepients: Option<Vec<Recepient>>,
+    pub recipients: Option<Vec<Recipient>>,
 
     ciphertext: String,
 
@@ -57,7 +56,7 @@ impl Jwe {
     /// Constructor, which should be used after message is encrypted.
     pub fn new(
         unprotected: Option<JwmHeader>,
-        recepients: Option<Vec<Recepient>>,
+        recipients: Option<Vec<Recipient>>,
         ciphertext: impl AsRef<[u8]>,
         protected: Option<JwmHeader>,
         tag: Option<impl AsRef<[u8]>>,
@@ -65,19 +64,19 @@ impl Jwe {
     ) -> Self {
         Jwe {
             unprotected,
-            recepients,
+            recipients,
             ciphertext: encode(ciphertext.as_ref()),
             protected,
             iv: Self::ensure_iv(iv_input),
             tag: tag.map(|tag_unencoded| encode(tag_unencoded.as_ref())),
-            recepient: None,
+            recipient: None,
         }
     }
 
     /// Constructor for creating a flat JWE JSON
     pub fn new_flat(
         unprotected: Option<JwmHeader>,
-        recepient: Recepient,
+        recipient: Recipient,
         ciphertext: impl AsRef<[u8]>,
         protected: Option<JwmHeader>,
         tag: Option<impl AsRef<[u8]>>,
@@ -85,12 +84,12 @@ impl Jwe {
     ) -> Self {
         Jwe {
             unprotected,
-            recepients: None,
+            recipients: None,
             ciphertext: encode(ciphertext.as_ref()),
             protected,
             iv: Self::ensure_iv(iv_input),
             tag: tag.map(|tag_unencoded| encode(tag_unencoded.as_ref())),
-            recepient: Some(recepient),
+            recipient: Some(recipient),
         }
     }
 
