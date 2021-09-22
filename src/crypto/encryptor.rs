@@ -26,7 +26,8 @@ impl Cypher for CryptoAlgorithm {
                     check_nonce(nonce, 24)?;
                     use chacha20poly1305::{
                         aead::{Aead, NewAead, Payload},
-                        XChaCha20Poly1305, XNonce,
+                        XChaCha20Poly1305,
+                        XNonce,
                     };
                     let nonce = XNonce::from_slice(nonce);
                     let aead = XChaCha20Poly1305::new(key.into());
@@ -59,7 +60,8 @@ impl Cypher for CryptoAlgorithm {
                     check_nonce(nonce, 24)?;
                     use chacha20poly1305::{
                         aead::{Aead, NewAead, Payload},
-                        XChaCha20Poly1305, XNonce,
+                        XChaCha20Poly1305,
+                        XNonce,
                     };
                     let aead = XChaCha20Poly1305::new(key.into());
                     let nonce = XNonce::from_slice(&nonce);

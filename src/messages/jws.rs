@@ -1,5 +1,8 @@
-use crate::messages::serialization::{base64_buffer, base64_jwm_header};
-use crate::{Jwk, JwmHeader};
+use crate::{
+    messages::serialization::{base64_buffer, base64_jwm_header},
+    Jwk,
+    JwmHeader,
+};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {
@@ -72,7 +75,6 @@ impl Signature {
     create_getter!(kid, String);
 
     create_getter!(skid, String);
-
 }
 
 #[derive(Serialize, Deserialize, Debug)]

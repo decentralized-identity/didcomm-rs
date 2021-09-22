@@ -1,10 +1,8 @@
 /// Integration tests of full cycles of message lifetime.
 mod common;
 
-use {
-    didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message},
-    utilities::{get_keypair_set, KeyPairSet},
-};
+use didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message};
+use utilities::{get_keypair_set, KeyPairSet};
 
 #[cfg(not(feature = "resolve"))]
 use {

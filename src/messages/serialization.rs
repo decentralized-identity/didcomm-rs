@@ -1,7 +1,6 @@
 // see https://users.rust-lang.org/t/serialize-a-vec-u8-to-json-as-base64/57781/2
 pub(crate) mod base64_buffer {
-    use serde::{Deserialize, Serialize};
-    use serde::{Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S: Serializer>(v: &Vec<u8>, s: S) -> Result<S::Ok, S::Error> {
         let base64 = base64_url::encode(v);

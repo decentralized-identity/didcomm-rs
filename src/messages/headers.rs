@@ -1,7 +1,8 @@
 use super::{MessageType, PriorClaims};
 use crate::{
     crypto::{CryptoAlgorithm, SignatureAlgorithm},
-    Error, Jwk,
+    Error,
+    Jwk,
 };
 use rand::Rng;
 use std::{collections::HashMap, time::SystemTime};

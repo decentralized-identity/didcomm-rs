@@ -5,28 +5,27 @@ use super::{
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
-use crate::{Error, Jwe, Jws, MessageType, Signature};
+use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recepient, Signature};
 use aes_gcm::{aead::generic_array::GenericArray, Aes256Gcm};
 use arrayref::array_ref;
+use chacha20poly1305::{
+    aead::{Aead, NewAead},
+    XChaCha20Poly1305,
+    XNonce,
+};
 #[cfg(feature = "resolve")]
 pub use ddoresolver_rs::*;
 use k256::elliptic_curve::rand_core;
-use rand::{prelude::SliceRandom, Rng};
+use rand::{prelude::SliceRandom, Rng, RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, value::RawValue, Value};
 use sha2::{Digest, Sha256};
-use std::convert::TryFrom;
-use std::{convert::TryInto, time::SystemTime};
-use {
-    crate::{Jwk, KeyAlgorithm, Recepient},
-    chacha20poly1305::{
-        aead::{Aead, NewAead},
-        XChaCha20Poly1305, XNonce,
-    },
-    rand::{RngCore, SeedableRng},
-    rand_chacha::ChaCha20Rng,
-    x25519_dalek::{PublicKey, StaticSecret},
+use std::{
+    convert::{TryFrom, TryInto},
+    time::SystemTime,
 };
+use x25519_dalek::{PublicKey, StaticSecret};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)

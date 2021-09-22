@@ -6,7 +6,13 @@ use std::convert::TryInto;
 use crate::Recepient;
 use crate::{
     crypto::{SignatureAlgorithm, Signer, SigningMethod, SymmetricCypherMethod},
-    DidcommHeader, Error, Jwe, JwmHeader, Jws, MessageType, Signature,
+    DidcommHeader,
+    Error,
+    Jwe,
+    JwmHeader,
+    Jws,
+    MessageType,
+    Signature,
 };
 
 use super::Message;
@@ -221,8 +227,12 @@ mod raw_tests {
     use super::{Error, Message};
 
     use crate::crypto::CryptoAlgorithm;
-    use chacha20poly1305::aead::{Aead, NewAead};
-    use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{
+        aead::{Aead, NewAead},
+        Key,
+        XChaCha20Poly1305,
+        XNonce,
+    };
     use sodiumoxide::crypto::secretbox;
     use x25519_dalek::{EphemeralSecret, PublicKey};
 
