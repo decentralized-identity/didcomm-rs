@@ -4,14 +4,14 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 
 ![tests](https://github.com/decentralized-identity/didcomm-rs/workflows/tests/badge.svg)
 
-
-#License
+# License
 
 [Apache-2.0](LICENSE.md)
 
 # Examples of usage
 
 ## 1. Prepare raw message for send and receive
+
 ### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/tests/send_receive.rs#L12)
 
 ```rust
@@ -35,6 +35,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 2. Prepare JWE message for direct send
+
 ### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/tests/send_receive.rs#L35)
 
 ```rust
@@ -53,7 +54,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         .add_header_field("my_custom_key".into(), "my_custom_value".into())
         .add_header_field("another_key".into(), "another_value".into());
     // set `kid` property
-    message.jwm_header.kid = 
+    message.jwm_header.kid =
         Some(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#));
     // encrypt and serialize message with JOSE header included
     let ready_to_send = message.seal(ek.as_bytes())?;
@@ -64,6 +65,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 3. Prepare JWS message -> send -> receive
+
 * Here `Message` is signed but not encrypted.
 * In such scenarios explicit use of `.sign(...)` and `Message::verify(...)` required.
 
@@ -83,6 +85,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 4. Prepare JWE message to be mediated -> mediate -> receive
+
 * Message should be encrypted by destination key first in `.routed_by()` method call using key for the recipient.
 * Next it should be encrypted by mediator key in `.seal()` method call - this can be done multiple times - once for each mediator in chain but should be strictly sequentual to match mediators sequence in the chain.
 * Method call `.seal()` **MUST** be preceeded by  `.as_jwe(CryptoAlgorithm)` as mediators may use different algorithms and key types than destination and this is not automatically predicted or populated.
@@ -107,7 +110,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         .add_header_field("another_key".into(), "another_value".into())
         // set kid header
         .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#))
-        // here we use destination key to bob and `to` header of mediator - 
+        // here we use destination key to bob and `to` header of mediator -
         //**THISH MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
         // `ek_to_bob` - destination targeted encryption key
         .routed_by(ek_to_bob.as_bytes(), vec!("did:mediator:suetcpl23pt23rp2teu995t98u"));
@@ -133,6 +136,7 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
 ```
 
 ## 5. Prepare JWS envelope wrapped into JWE -> sign -> pack -> receive
+
 * JWS header is set automatically based on signing algorythm type.
 * Message forming and encryption happens in same way as in other JWE examples.
 * ED25519-dalek signature is used in this example with keypair for signing and public key for verification.
@@ -165,11 +169,14 @@ Rust implementation of DIDComm v2 [spec](https://identity.foundation/didcomm-mes
         Some(decryption_key.as_bytes()),
         Some(&pub_sign_verify_key.to_bytes())); // and now we parse received
 ```
+
 ## 6. Multiple receivers static key wrap per recipient with shared secret
+
 * ! Works with `resolve` feature only - requires resolution of public keys for each recipient for shared secret generation.
 * Static key generated randomly in the background (`to` field has >1 recipient).
 
 ### GoTo: [full test](https://github.com/decentralized-identity/didcomm-rs/blob/master/src/messages/message.rs#L597)
+
 ```rust
 // Creating message with multiple recipients.
 let m = Message::new()
@@ -212,6 +219,7 @@ In most cases apllication implementation would prefer to have strongly typed bod
 For this scenario `Shape` trait should be implemented for target type.
 
 * First, let's define our target type. JSON in this example.
+
 ```rust
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct DesiredShape {
@@ -221,6 +229,7 @@ struct DesiredShape {
 ```
 
 * Next, implement `Shape` trait for it
+
 ```rust
 impl Shape for DesiredShape {
     type Err = Error;
@@ -233,6 +242,7 @@ impl Shape for DesiredShape {
 
 * Now we can call `shape()` on our `Message` and shape in in.
 * In this example we expect JSON payload and use it's Deserializer to get our data, but your implementation can work with any serialization.
+
 ```rust
 let received_typed_body = DesiredShape::shape(&m).unwrap(); // Where m = Message
 ```
