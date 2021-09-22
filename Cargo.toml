@@ -8,6 +8,11 @@ documentation = "https://docs.rs/didcomm-rs/"
 description = "DIDComm messaging v2 specifications implementation: https://identity.foundation/didcomm-messaging/spec/"
 license = "Apache-2.0"
 
+[workspace]
+members = [
+    "utilities",
+]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -43,8 +48,12 @@ rand_core = "0.5"
 base58 = "0.1.0"
 utilities = { path = "./utilities" }
 
+[dev-dependencies.cargo-husky]
+version = "1"
+default-features = false
+features = ["user-hooks"]
+
 [features]
 default = ["raw-crypto", "resolve"]
 raw-crypto = ["chacha20poly1305", "aes-gcm", "k256", "p256", "ed25519-dalek"]
 resolve = ["ddoresolver-rs"]
-

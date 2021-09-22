@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# remember to use the `--all` flag to include utilities
+
+# run basic checks
+cargo check --workspace
+
+# check formatting
+cargo fmt --all -- --check
+
+# test once with default feature setup and once without resolve
+cargo test --workspace
+cargo test --no-default-features --features=raw-crypto
