@@ -10,7 +10,6 @@ use std::convert::TryFrom;
 ///
 /// Allowed (and implemented) cryptographical algorithms (JWA).
 /// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
-///
 #[derive(Copy, Clone)]
 pub enum CryptoAlgorithm {
     XC20P,
@@ -20,7 +19,6 @@ pub enum CryptoAlgorithm {
 impl Cypher for CryptoAlgorithm {
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms encryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    ///
     fn encryptor(&self) -> SymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => Box::new(
@@ -51,9 +49,9 @@ impl Cypher for CryptoAlgorithm {
             ),
         }
     }
+
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    ///
     fn decryptor(&self) -> SymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => Box::new(
@@ -84,6 +82,7 @@ impl Cypher for CryptoAlgorithm {
             ),
         }
     }
+
     /// Not implemented - no usecase atm...
     fn assymetric_encryptor(&self) -> AssymetricCyptherMethod {
         match self {
@@ -107,6 +106,7 @@ impl TryFrom<&String> for CryptoAlgorithm {
         }
     }
 }
+
 // inner helper function
 fn check_nonce(nonce: &[u8], expected_len: usize) -> Result<(), Error> {
     if nonce.len() < expected_len {
@@ -146,6 +146,7 @@ mod batteries_tests {
         assert_eq!(payload, received_payload);
         Ok(())
     }
+
     #[test]
     fn a256gcm_test() -> Result<(), Error> {
         // Arrange

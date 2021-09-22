@@ -1,10 +1,12 @@
 mod common;
+
 use common::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 struct DesiredShape {
     num_field: usize,
+
     string_field: String,
 }
 

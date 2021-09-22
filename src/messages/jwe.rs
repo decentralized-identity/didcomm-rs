@@ -22,12 +22,11 @@ macro_rules! create_getter {
 
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
-///
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Jwe {
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "base64_jwm_header")]
-    #[serde(default)]
     pub protected: Option<JwmHeader>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,7 +101,6 @@ impl Jwe {
     }
 
     /// Getter for ciphered payload of JWE.
-    ///
     pub fn payload(&self) -> Vec<u8> {
         decode(&self.ciphertext).unwrap()
     }
@@ -126,14 +124,21 @@ impl Jwe {
         })
     }
 
-    create_getter!(enc, String);
-    create_getter!(kid, String);
-    create_getter!(skid, String);
     create_getter!(alg, String);
-    create_getter!(jku, String);
-    create_getter!(jwk, Jwk);
-    create_getter!(epk, Jwk);
+
     create_getter!(cty, String);
+
+    create_getter!(enc, String);
+
+    create_getter!(epk, Jwk);
+
+    create_getter!(jku, String);
+
+    create_getter!(jwk, Jwk);
+
+    create_getter!(kid, String);
+
+    create_getter!(skid, String);
 }
 
 #[test]

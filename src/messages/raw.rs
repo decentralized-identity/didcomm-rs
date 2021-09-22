@@ -29,7 +29,6 @@ impl Message {
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
-    ///
     pub fn encrypt(
         self,
         crypter: SymmetricCypherMethod,
@@ -87,11 +86,11 @@ impl Message {
         }
         Ok(serde_json::to_string(&jwe)?)
     }
+
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
     /// Returns `Ok(Message)` if decryption / deserialization
     ///     succeded. `Error` othervice.
-    ///
     pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
@@ -121,6 +120,7 @@ impl Message {
             }
         };
     }
+
     /// Signs message and turns it into `Jws` envelope.
     /// `Err` is returned if message is not properly prepared or data is malformed.
     /// Jws enveloped payload is base64_url encoded
@@ -160,10 +160,10 @@ impl Message {
 
         Ok(serde_json::to_string(&jws)?)
     }
+
     /// Verifyes signature and returns payload message on verification success.
     /// `Err` return if signature invalid or data is malformed.
     /// Expects Jws's payload to be a valid serialized `Message` and base64_url encoded.
-    ///
     pub fn verify(jws: &[u8], signing_sender_public_key: &[u8]) -> Result<Message, Error> {
         let jws: Jws = serde_json::from_slice(jws)?;
 
@@ -219,6 +219,7 @@ impl Message {
 #[cfg(test)]
 mod raw_tests {
     use super::{Error, Message};
+
     use crate::crypto::CryptoAlgorithm;
     use chacha20poly1305::aead::{Aead, NewAead};
     use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};

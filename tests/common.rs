@@ -1,16 +1,6 @@
 extern crate didcomm_rs;
-// extern crate did_doc;
 
 pub use didcomm_rs::{Error, Message, Shape};
-
-// pub use did_doc::{
-//   Document,
-//   fields::{
-//     PublicKey,
-//     PublicKeyEncoding,
-//     PublicKeyType,
-//   },
-// };
 pub use std::str::FromStr;
 
 #[allow(dead_code)]

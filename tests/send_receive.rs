@@ -1,5 +1,4 @@
 /// Integration tests of full cycles of message lifetime.
-///
 mod common;
 
 use {

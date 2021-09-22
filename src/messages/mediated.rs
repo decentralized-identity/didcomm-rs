@@ -4,6 +4,7 @@ use crate::Error;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mediated {
     pub next: String,
+
     #[serde(rename = "payloads~attach")]
     pub payload: Vec<u8>,
 }
@@ -19,6 +20,7 @@ impl Mediated {
             payload: vec![],
         }
     }
+
     /// Payload setter to be chained in forwarding calls.
     ///
     /// # Example
@@ -36,6 +38,7 @@ impl Mediated {
 
 impl Shape for Mediated {
     type Err = Error;
+
     fn shape(m: &Message) -> Result<Self, Self::Err> {
         serde_json::from_str::<Mediated>(&serde_json::to_string(&m.get_body()?)?)
             .map_err(|e| Error::SerdeError(e))

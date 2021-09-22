@@ -36,19 +36,24 @@ pub struct Message {
     /// JOSE header, which is sent as public part with JWE.
     #[serde(flatten)]
     pub jwm_header: JwmHeader,
+
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
     pub didcomm_header: DidcommHeader,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
+
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as base64url String of raw bytes of data.
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
     pub(crate) body: Value,
+
     /// Flag that toggles JWE serialization to flat JSON.
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
     pub serialize_flat_jwe: bool,
+
     /// Flag that toggles JWS serialization to flat JSON.
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
@@ -60,8 +65,10 @@ pub struct Message {
 pub struct UnknownReceivedMessage<'a> {
     #[serde(borrow)]
     pub signature: Option<&'a RawValue>,
+
     #[serde(borrow)]
     pub signatures: Option<&'a RawValue>,
+
     #[serde(borrow)]
     pub iv: Option<&'a RawValue>,
 }
@@ -69,7 +76,6 @@ pub struct UnknownReceivedMessage<'a> {
 impl Message {
     /// Generates EMPTY default message.
     /// Use extension messages to build final one before `send`ing.
-    ///
     pub fn new() -> Self {
         match env_logger::try_init() {
             Ok(_) | Err(_) => (),
@@ -83,16 +89,16 @@ impl Message {
             serialize_flat_jws: false,
         }
     }
+
     /// Setter of `from` header
     /// Helper method.
-    ///
     pub fn from(mut self, from: &str) -> Self {
         self.didcomm_header.from = Some(String::from(from));
         self
     }
+
     /// Setter of `to` header
     /// Helper method.
-    ///
     pub fn to(mut self, to: &[&str]) -> Self {
         for s in to {
             self.didcomm_header.to.push(s.to_string());
@@ -107,29 +113,29 @@ impl Message {
         }
         self
     }
+
     /// Setter of `m_type` @type header
     /// Helper method.
-    ///
     pub fn m_type(mut self, m_type: MessageType) -> Self {
         self.jwm_header.typ = m_type;
         self
     }
+
     /// Getter of the `body` as ref of bytes slice.
     /// Helpe method.
-    ///
     pub fn get_body(&self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self.body)?)
     }
+
     /// Setter of the `body`
     /// Helper method.
-    ///
     pub fn set_body(mut self, body: &str) -> Self {
         self.body = serde_json::from_str(body).unwrap();
         self
     }
+
     // Setter of the `kid` header
     // Helper method.
-    //
     pub fn kid(mut self, kid: &str) -> Self {
         match &mut self.jwm_header.kid {
             Some(h) => *h = kid.into(),
@@ -139,11 +145,11 @@ impl Message {
         }
         self
     }
+
     /// Sets times of creation as now and, optional, expires time.
     /// # Parameters
     /// * `expires` - time in seconds since Unix Epoch when message is
     /// considered to be invalid.
-    ///
     pub fn timed(mut self, expires: Option<u64>) -> Self {
         self.didcomm_header.expires_time = expires;
         self.didcomm_header.created_time =
@@ -153,15 +159,15 @@ impl Message {
             };
         self
     }
+
     /// Checks if message is rotation one.
     /// Exposed for explicit checks on calling code level.
-    ///
     pub fn is_rotation(&self) -> bool {
         self.didcomm_header.from_prior().is_some()
     }
+
     /// If message `is_rotation()` true - returns from_prion claims.
     /// Errors otherwise with `Error::NoRotationData`
-    ///
     pub fn get_prior(&self) -> Result<PriorClaims, Error> {
         if self.is_rotation() {
             Ok(self.didcomm_header.from_prior().clone().unwrap())
@@ -169,22 +175,22 @@ impl Message {
             Err(Error::NoRotationData)
         }
     }
+
     /// `&DidcommHeader` getter.
-    ///
     pub fn get_didcomm_header(&self) -> &DidcommHeader {
         &self.didcomm_header
     }
+
     /// Setter of `didcomm_header`.
     /// Replaces existing one with provided by consuming both values.
     /// Returns modified instance of `Self`.
-    ///
     pub fn set_didcomm_header(mut self, h: DidcommHeader) -> Self {
         self.didcomm_header = h;
         self
     }
+
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
-    ///
     pub fn add_header_field(mut self, key: String, value: String) -> Self {
         if key.len() == 0 {
             return self;
@@ -192,6 +198,7 @@ impl Message {
         self.didcomm_header.other.insert(key, value);
         self
     }
+
     /// Creates set of Jwm related headers for the JWE
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
@@ -200,12 +207,14 @@ impl Message {
         self.jwm_header.as_signed(alg);
         self
     }
+
     /// Sets message to be serialized as flat JWS JSON and then calls `as_jws`.
     /// If this message has multiple targets, `seal`ing it will result in an Error.
     pub fn as_flat_jws(mut self, alg: &SignatureAlgorithm) -> Self {
         self.serialize_flat_jws = true;
         self.as_jws(alg)
     }
+
     /// Creates set of Jwm related headers for the JWS
     /// Modifies JWM related header portion to match
     ///     signature implementation and leaves Other
@@ -213,7 +222,6 @@ impl Message {
     ///
     /// For `resolve` feature will set `kid` header automatically
     ///     based on the did document resolved.
-    ///
     pub fn as_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<&[u8]>) -> Self {
         self.jwm_header.as_encrypted(alg);
         if let Some(key) = recipient_public_key {
@@ -235,6 +243,7 @@ impl Message {
         }
         self
     }
+
     /// Sets message to be serialized as flat JWE JSON.
     /// If this message has multiple targets, `seal`ing it will result in an Error.
     pub fn as_flat_jwe(
@@ -245,12 +254,13 @@ impl Message {
         self.serialize_flat_jwe = true;
         self.as_jwe(alg, recipient_public_key)
     }
+
     /// Serializez current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
-    ///
     pub fn as_raw_json(self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self)?)
     }
+
     /// Seals self and returns ready to send JWE
     ///
     /// # Parameters
@@ -261,7 +271,6 @@ impl Message {
     //     let alg = crypter_from_header(&self.jwm_header)?;
     //     self.encrypt(alg.encryptor(), ek.as_ref())
     // }
-    //  #[cfg(feature = "resolve")]
     pub fn seal(
         mut self,
         sk: impl AsRef<[u8]>,
@@ -295,6 +304,7 @@ impl Message {
         let alg = crypter_from_header(&self.jwm_header)?;
         self.encrypt(alg.encryptor(), cek.as_ref())
     }
+
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
     ///
@@ -307,8 +317,7 @@ impl Message {
     /// `alg` - encryption algorithm used
     ///
     /// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
-    // TODO: Adde examples
-    //
+    /// TODO: Adde examples
     pub fn seal_signed(
         self,
         ek: &[u8],
@@ -325,15 +334,7 @@ impl Message {
             .m_type(MessageType::DidcommJws)
             .seal(ek, encryption_recipient_public_key);
     }
-    // #[cfg(feature = "resolve")]
-    // pub fn seal_signed(
-    //     self,
-    //     ek: &[u8],
-    //     sk
-    //     signing_algorithm: SignatureAlgorithm
-    // ) -> Result<String, Error> {
 
-    // }
     /// Wrap self to be mediated by some mediator.
     /// Warning: Should be called on a `Message` instance which is ready to be sent!
     /// If message is not properly set up for crypto - this method will propogate error from
@@ -664,7 +665,6 @@ fn concat_kdf(
 
 /// Associated functions implementations.
 /// Possibly not required as Jwe serialization covers this.
-///
 impl Message {
     /// Parses `iv` value as `Vec<u8>` from public header.
     /// Both regular JSON and Compact representations are accepted.
@@ -964,6 +964,7 @@ mod parse_tests {
             &String::from_utf8(iv.unwrap()).unwrap()
         );
     }
+
     #[test]
     fn iv_from_compact_json_test() {
         // Arrange

@@ -1,4 +1,3 @@
-// use std::convert::{ TryFrom, TryInto };
 use crate::messages::serialization::{base64_buffer, base64_jwm_header};
 use crate::{Jwk, JwmHeader};
 
@@ -22,14 +21,16 @@ macro_rules! create_getter {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Signature {
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "base64_jwm_header")]
-    #[serde(default)]
     pub protected: Option<JwmHeader>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<JwmHeader>,
-    #[serde(with = "base64_buffer")]
+
     #[serde(default)]
+    #[serde(with = "base64_buffer")]
     pub signature: Vec<u8>,
 }
 
@@ -56,14 +57,22 @@ impl Signature {
         }
     }
 
-    create_getter!(enc, String);
-    create_getter!(kid, String);
-    create_getter!(skid, String);
     create_getter!(alg, String);
-    create_getter!(jku, String);
-    create_getter!(jwk, Jwk);
-    create_getter!(epk, Jwk);
+
     create_getter!(cty, String);
+
+    create_getter!(enc, String);
+
+    create_getter!(epk, Jwk);
+
+    create_getter!(jku, String);
+
+    create_getter!(jwk, Jwk);
+
+    create_getter!(kid, String);
+
+    create_getter!(skid, String);
+
 }
 
 #[derive(Serialize, Deserialize, Debug)]
