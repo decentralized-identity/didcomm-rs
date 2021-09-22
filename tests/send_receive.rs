@@ -40,10 +40,7 @@ fn send_receive_raw() {
 
 
     // receiving raw message
-    #[cfg(not(feature = "resolve"))]
-    let received = Message::receive(&ready_to_send, &[0; 32], None);
-    #[cfg(feature = "resolve")]
-    let received = Message::receive(&ready_to_send, b"");
+    let received = Message::receive(&ready_to_send, None, None, None);
 
     // Assert
     assert_eq!(m, received.unwrap());
@@ -71,7 +68,12 @@ fn send_receive_mediated_encrypted_xc20p_json_test_new() {
         );
     assert!(sealed.is_ok());
 
-    let mediator_received = Message::receive(&sealed.unwrap(), &mediators_private, Some(&alice_public));
+    let mediator_received = Message::receive(
+        &sealed.unwrap(),
+        Some(&mediators_private),
+        Some(&alice_public),
+        None,
+    );
     assert!(mediator_received.is_ok());
 
     let mediator_received_unwrapped = mediator_received.unwrap().get_body().unwrap();
@@ -83,7 +85,10 @@ fn send_receive_mediated_encrypted_xc20p_json_test_new() {
     assert!(str_jwe.is_ok());
 
     let bob_received = Message::receive(
-        &String::from_utf8_lossy(&message_to_forward.payload), &bobs_private, Some(&alice_public),
+        &String::from_utf8_lossy(&message_to_forward.payload),
+        Some(&bobs_private),
+        Some(&alice_public),
+        None,
     );
     assert!(bob_received.is_ok());
 }
@@ -213,10 +218,17 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     #[cfg(not(feature = "resolve"))]
     let received = Message::receive(
         &ready_to_send,
-        &bobs_private,
-        Some(&alice_public)); // and now we parse received
+        Some(&bobs_private),
+        Some(&alice_public),
+        None,
+    );
     #[cfg(feature = "resolve")]
-    let received = Message::receive(&ready_to_send, &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap());
+    let received = Message::receive(
+        &ready_to_send,
+        &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap(),
+        None,
+        None,
+    );
 
     // Assert
     assert!(&received.is_ok());
