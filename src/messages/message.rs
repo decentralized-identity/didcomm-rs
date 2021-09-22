@@ -123,7 +123,7 @@ impl Message {
     }
 
     /// Getter of the `body` as ref of bytes slice.
-    /// Helpe method.
+    /// Helper method.
     pub fn get_body(&self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self.body)?)
     }
@@ -256,7 +256,7 @@ impl Message {
         self.as_jwe(alg, recipient_public_key)
     }
 
-    /// Serializez current state of the message into json.
+    /// Serializes current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
     pub fn as_raw_json(self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self)?)
@@ -268,10 +268,6 @@ impl Message {
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
     // TODO: Add examples
-    // pub fn seal(self, ek: impl AsRef<[u8]>) -> Result<String, Error> {
-    //     let alg = crypter_from_header(&self.jwm_header)?;
-    //     self.encrypt(alg.encryptor(), ek.as_ref())
-    // }
     pub fn seal(
         mut self,
         sk: impl AsRef<[u8]>,
@@ -318,7 +314,7 @@ impl Message {
     /// `alg` - encryption algorithm used
     ///
     /// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
-    /// TODO: Adde examples
+    /// TODO: Add examples
     pub fn seal_signed(
         self,
         ek: &[u8],
@@ -338,7 +334,7 @@ impl Message {
 
     /// Wrap self to be mediated by some mediator.
     /// Warning: Should be called on a `Message` instance which is ready to be sent!
-    /// If message is not properly set up for crypto - this method will propogate error from
+    /// If message is not properly set up for crypto - this method will propagate error from
     ///     called `.seal()` method.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
@@ -580,9 +576,9 @@ impl Message {
             .other
             .get("tag")
             .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
-        let mut cyphertext_and_tag: Vec<u8> = vec![];
-        cyphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
-        cyphertext_and_tag.extend(&base64_url::decode(&tag)?);
+        let mut ciphertext_and_tag: Vec<u8> = vec![];
+        ciphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
+        ciphertext_and_tag.extend(&base64_url::decode(&tag)?);
 
         match alg.as_ref() {
             "ECDH-1PU+XC20PKW" => {
@@ -591,7 +587,7 @@ impl Message {
                 let crypter = XChaCha20Poly1305::new(kek_key);
 
                 let cek = crypter
-                    .decrypt(nonce, cyphertext_and_tag.as_ref())
+                    .decrypt(nonce, ciphertext_and_tag.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?;
 
                 Ok(cek)
@@ -602,7 +598,7 @@ impl Message {
                 let crypter = Aes256Gcm::new(kek_key);
 
                 let cek = crypter
-                    .decrypt(nonce, cyphertext_and_tag.as_ref())
+                    .decrypt(nonce, ciphertext_and_tag.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?;
 
                 Ok(cek)
@@ -944,7 +940,7 @@ mod parse_tests {
     fn iv_from_json_test() {
         // Arrange
         // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
-        // Extendet twice to be 192bit (24byte) nonce.
+        // Extended twice to be 192bit (24byte) nonce.
         let raw_json = r#"{
             "protected": "eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiLU5oN1NoUkJfeGFDQlpSZElpVkN1bDNTb1IwWXc0VEdFUXFxR2lqMXZKcyIsInkiOiI5dEx4ODFQTWZRa3JPdzh5dUkyWXdJMG83TXROemFDR2ZDQmJaQlc1WXJNIn19",
             "recipients": [
@@ -1605,7 +1601,7 @@ mod jws_tests {
     use super::*;
 
     #[test]
-    fn can_create_flattened_jws_jsons() -> Result<(), Error> {
+    fn can_create_flattened_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1623,7 +1619,7 @@ mod jws_tests {
     }
 
     #[test]
-    fn can_create_general_jws_jsons() -> Result<(), Error> {
+    fn can_create_general_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1641,7 +1637,7 @@ mod jws_tests {
     }
 
     #[test]
-    fn can_receive_flattened_jws_jsons() -> Result<(), Error> {
+    fn can_receive_flattened_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1667,7 +1663,7 @@ mod jws_tests {
     }
 
     #[test]
-    fn can_receive_general_jws_jsons() -> Result<(), Error> {
+    fn can_receive_general_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")

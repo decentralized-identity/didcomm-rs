@@ -2,8 +2,8 @@ use std::convert::TryFrom;
 
 use super::*;
 
-/// Plugable closure generator enum, which creates instance of crypto function
-///     based on selected algorythm types.
+/// Pluggable closure generator enum, which creates instance of crypto function
+///     based on selected algorithm types.
 /// # Attention:
 /// Immutable by design and should be instance per invocation to make sure no
 ///     sensitive data is been stored in memory longer than necessary.
@@ -18,7 +18,7 @@ pub enum CryptoAlgorithm {
 }
 
 impl Cypher for CryptoAlgorithm {
-    /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms encryption.
+    /// Generates + invokes crypto of `SymmetricCypherMethod` which performs encryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
     fn encryptor(&self) -> SymmetricCypherMethod {
         match self {
@@ -52,7 +52,7 @@ impl Cypher for CryptoAlgorithm {
         }
     }
 
-    /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms decryption.
+    /// Generates + invokes crypto of `SymmetricCypherMethod` which performs decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
     fn decryptor(&self) -> SymmetricCypherMethod {
         match self {
@@ -86,8 +86,8 @@ impl Cypher for CryptoAlgorithm {
         }
     }
 
-    /// Not implemented - no usecase atm...
-    fn assymetric_encryptor(&self) -> AssymetricCyptherMethod {
+    /// Not implemented - no use case atm...
+    fn asymmetric_encryptor(&self) -> AsymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => {
                 todo!()
@@ -128,7 +128,7 @@ mod batteries_tests {
         // Arrange
         let payload = r#"{"test":"message's body - can be anything..."}"#;
         let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::XC20P, None) // Set jwe header manually - sohuld be preceeded by key properties
+            .as_jwe(&CryptoAlgorithm::XC20P, None) // Set jwe header manually - should be preceded by key properties
             .set_body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
@@ -155,7 +155,7 @@ mod batteries_tests {
         // Arrange
         let payload = r#"{"example":"message's body - can be anything..."}"#;
         let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::A256GCM, None) // Set jwe header manually - sohuld be preceeded by key properties
+            .as_jwe(&CryptoAlgorithm::A256GCM, None) // Set jwe header manually - should be preceded by key properties
             .set_body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";

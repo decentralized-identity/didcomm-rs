@@ -33,7 +33,7 @@ pub struct PayloadToVerify {
 impl Message {
     /// Encrypts current message by consuming it.
     /// Uses provided cryptography function to perform
-    ///     the encryption. Agnostic of actual algorythm used.
+    ///     the encryption. Agnostic of actual algorithm used.
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
@@ -56,13 +56,13 @@ impl Message {
         jwe_header.skid = d_header.from.clone();
         let aad_string = encode(&serde_json::to_string(&jwe_header)?.as_bytes());
         let aad = aad_string.as_bytes();
-        let cyphertext_and_tag = crypter(
+        let ciphertext_and_tag = crypter(
             &decode(&iv)?,
             encryption_key,
             serde_json::to_string(&self)?.as_bytes(),
             aad,
         )?;
-        let (cyphertext, tag) = cyphertext_and_tag.split_at(cyphertext_and_tag.len() - 16);
+        let (ciphertext, tag) = ciphertext_and_tag.split_at(ciphertext_and_tag.len() - 16);
         let jwe;
         if self.serialize_flat_jwe {
             let recipients = self.recipients.ok_or_else(|| {
@@ -77,7 +77,7 @@ impl Message {
             jwe = Jwe::new_flat(
                 None,
                 recipients[0].clone(),
-                cyphertext.to_vec(),
+                ciphertext.to_vec(),
                 Some(jwe_header),
                 Some(tag),
                 Some(iv),
@@ -86,7 +86,7 @@ impl Message {
             jwe = Jwe::new(
                 None,
                 self.recipients.clone(),
-                cyphertext.to_vec(),
+                ciphertext.to_vec(),
                 Some(jwe_header),
                 Some(tag),
                 Some(iv),
@@ -98,7 +98,7 @@ impl Message {
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
     /// Returns `Ok(Message)` if decryption / deserialization
-    ///     succeded. `Error` othervice.
+    ///     succeeded. `Error` otherwise.
     pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
@@ -116,11 +116,11 @@ impl Message {
             .as_ref()
             .ok_or_else(|| "JWE is missing tag")
             .map_err(|e| Error::Generic(e.to_string()))?;
-        let mut cyphertext_and_tag: Vec<u8> = vec![];
-        cyphertext_and_tag.extend(&jwe.payload());
-        cyphertext_and_tag.extend(&decode(&tag)?);
+        let mut ciphertext_and_tag: Vec<u8> = vec![];
+        ciphertext_and_tag.extend(&jwe.payload());
+        ciphertext_and_tag.extend(&decode(&tag)?);
 
-        return match decrypter(jwe.get_iv().as_ref(), key, &cyphertext_and_tag, &aad) {
+        return match decrypter(jwe.get_iv().as_ref(), key, &ciphertext_and_tag, &aad) {
             Ok(raw_message_bytes) => Ok(serde_json::from_slice(&raw_message_bytes)?),
             Err(e) => {
                 error!("decryption failed; {}", &e);
@@ -169,7 +169,7 @@ impl Message {
         Ok(serde_json::to_string(&jws)?)
     }
 
-    /// Verifyes signature and returns payload message on verification success.
+    /// Verifies signature and returns payload message on verification success.
     /// `Err` return if signature invalid or data is malformed.
     /// Expects Jws's payload to be a valid serialized `Message` and base64_url encoded.
     pub fn verify(jws: &[u8], signing_sender_public_key: &[u8]) -> Result<Message, Error> {
@@ -189,14 +189,14 @@ impl Message {
         for signature_value in signatures_values_to_verify.clone() {
             let alg = &signature_value.alg().ok_or(Error::JweParseError)?;
             let signature = &signature_value.signature[..];
-            let verifyer: SignatureAlgorithm = alg.try_into()?;
+            let verifier: SignatureAlgorithm = alg.try_into()?;
             let protected_header = signature_value
                 .protected
                 .as_ref()
                 .ok_or(Error::JwsParseError)?;
             let encoded_header = base64_url::encode(&serde_json::to_string(&protected_header)?);
             let payload_to_verify = format!("{}.{}", &encoded_header, &payload);
-            if verifyer.validator()(
+            if verifier.validator()(
                 signing_sender_public_key,
                 &payload_to_verify.as_bytes(),
                 signature,
@@ -244,7 +244,7 @@ mod raw_tests {
     fn plugin_crypto_xChaCha20Paly1305_dummy_key() {
         // Arrange
         let key = Key::from_slice(b"an example very very secret key.");
-        // Plugable encryptor function to encrypt data
+        // Pluggable encryptor function to encrypt data
         let my_crypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let aead = XChaCha20Poly1305::new(k.into());
@@ -253,7 +253,7 @@ mod raw_tests {
                     .map_err(|e| Error::Generic(e.to_string()))
             },
         );
-        // Plugable decryptor function to decrypt data
+        // Pluggable decryptor function to decrypt data
         let my_decrypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let aead = XChaCha20Poly1305::new(k.into());
@@ -265,18 +265,18 @@ mod raw_tests {
         let id = m.get_didcomm_header().id.to_owned();
 
         // Act and Assert
-        let crypted = m.encrypt(my_crypter, key);
-        assert!(&crypted.is_ok()); // Encryption check
-        let raw_m = Message::decrypt(&crypted.unwrap().as_bytes(), my_decrypter, key);
+        let encrypted = m.encrypt(my_crypter, key);
+        assert!(&encrypted.is_ok()); // Encryption check
+        let raw_m = Message::decrypt(&encrypted.unwrap().as_bytes(), my_decrypter, key);
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistency check
     }
 
     #[test]
     #[cfg(feature = "raw-crypto")]
     fn plugin_crypto_libsodium_box() {
         // Arrange
-        // Plugable encryptor function to encrypt data
+        // Pluggable encryptor function to encrypt data
         let my_crypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let nonce = secretbox::Nonce::from_slice(n).unwrap();
@@ -287,7 +287,7 @@ mod raw_tests {
                 ))
             },
         );
-        // Plugable decryptor function to decrypt data
+        // Pluggable decryptor function to decrypt data
         let my_decrypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let nonce = secretbox::Nonce::from_slice(n).unwrap();
@@ -299,13 +299,13 @@ mod raw_tests {
         let key = secretbox::gen_key();
 
         // Act and Assert
-        let crypted = m.encrypt(my_crypter, &key.as_ref());
-        assert!(&crypted.is_ok()); // Encryption checkp();
-        let crypted = crypted.unwrap();
-        println!("{}", &crypted);
-        let raw_m = Message::decrypt(&crypted.as_bytes(), my_decrypter, &key.as_ref());
+        let encrypted = m.encrypt(my_crypter, &key.as_ref());
+        assert!(&encrypted.is_ok()); // Encryption check
+        let encrypted = encrypted.unwrap();
+        println!("{}", &encrypted);
+        let raw_m = Message::decrypt(&encrypted.as_bytes(), my_decrypter, &key.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistency check
     }
 
     #[test]
@@ -321,7 +321,7 @@ mod raw_tests {
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
         let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, None);
         let id = m.get_didcomm_header().id.to_owned();
-        // Plugable encryptor function to encrypt data
+        // Pluggable encryptor function to encrypt data
         let my_crypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let aead = XChaCha20Poly1305::new(k.into());
@@ -330,7 +330,7 @@ mod raw_tests {
                     .map_err(|e| Error::Generic(e.to_string()))
             },
         );
-        // Plugable decryptor function to decrypt data
+        // Pluggable decryptor function to decrypt data
         let my_decrypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let aead = XChaCha20Poly1305::new(k.into());
@@ -341,14 +341,14 @@ mod raw_tests {
         );
 
         // Act and Assert
-        let crypted = m.encrypt(my_crypter, sender_shared.as_bytes());
-        assert!(&crypted.is_ok()); // Encryption check
+        let encrypted = m.encrypt(my_crypter, sender_shared.as_bytes());
+        assert!(&encrypted.is_ok()); // Encryption check
         let raw_m = Message::decrypt(
-            &crypted.unwrap().as_bytes(),
+            &encrypted.unwrap().as_bytes(),
             my_decrypter,
             receiver_shared.as_bytes(),
         );
         assert!(&raw_m.is_ok()); // Decryption check
-        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
+        assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistency check
     }
 }

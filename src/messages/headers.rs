@@ -55,7 +55,7 @@ impl DidCommHeader {
         format!("{}", id_number)
     }
 
-    /// Getter method for `from_prior` retreival
+    /// Getter method for `from_prior` retrieval
     pub fn from_prior(&self) -> &Option<PriorClaims> {
         &self.from_prior
     }
@@ -87,7 +87,7 @@ impl Default for DidCommHeader {
     }
 }
 
-/// JWM Header as specifiead in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
+/// JWM Header as specified in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
 ///
 /// Designed to work for both [JWE](https://tools.ietf.org/html/rfc7516) and [JWS](https://tools.ietf.org/html/rfc7515) message types.
@@ -153,7 +153,7 @@ impl JwmHeader {
         }
     }
 
-    /// Setter of JOSE header preperties to identify which crypto alg and key type used.
+    /// Setter of JOSE header properties to identify which crypto alg and key type used.
     /// Modifies `enc`, `typ` and `alg` headers.
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         match alg {
@@ -174,7 +174,7 @@ impl JwmHeader {
 }
 
 impl Default for JwmHeader {
-    // Need to make sure nonce is 192 bit long unigue for each message.
+    // Need to make sure nonce is 192 bit long unique for each message.
     fn default() -> Self {
         JwmHeader {
             typ: MessageType::DidCommRaw,
@@ -191,7 +191,7 @@ impl Default for JwmHeader {
 }
 
 /// This struct presents single recipient of JWE `recipients` collection.
-/// Each recipient should have same body cypher key ecrypted with shared secret.
+/// Each recipient should have same body cypher key encrypted with shared secret.
 /// [Spec](https://tools.ietf.org/html/rfc7516#section-7.2.1)
 ///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
