@@ -1,0 +1,12 @@
+[package]
+name = "utilities"
+version = "0.0.1"
+authors = ["BlockchainsInc"]
+edition = "2018"
+license = "Apache-2.0"
+
+[dependencies]
+arrayref = "0.3"
+base58 = "0.1.0"
+x25519-dalek = "1.1"
+

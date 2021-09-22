@@ -20,24 +20,24 @@ pub use std::str::FromStr;
 #[allow(dead_code)]
 pub mod sample_dids {
 pub const TEST_DID_SIGN_1: &str = r#"{
-  '@context': 'https://w3id.org/did/v1',
-  id: 'did:uknow:d34db33f',
-  publicKey: [
+  "@context": "https://w3id.org/did/v1",
+  "id": "did:uknow:d34db33f",
+  "publicKey": [
     {
-      id: 'did:uknow:d34db33f#cooked',
-      type: 'Secp256k1VerificationKey2018',
-      owner: 'did:uknow:d34db33f',
-      publicKeyHex: 'b9c5714089478a327f09197987f16f9e5d936e8a',
-    },
+      "id": "did:uknow:d34db33f#cooked",
+      "type": "Secp256k1VerificationKey2018",
+      "owner": "did:uknow:d34db33f",
+      "publicKeyHex": "b9c5714089478a327f09197987f16f9e5d936e8a"
+    }
   ],
-  authentication: [
+  "authentication": [
     {
-      type: 'Secp256k1SignatureAuthentication2018',
-      publicKey: 'did:uknow:d34db33f#cooked',
-    },
+      "type": "Secp256k1SignatureAuthentication2018",
+      "publicKey": "did:uknow:d34db33f#cooked"
+    }
   ],
-  service: [],
-  created: '',
+  "service": [],
+  "created": ""
 }"#;
 
 pub const TEST_DID_SIGN_2: &str = r#"{
@@ -123,40 +123,40 @@ pub const TEST_DID_SIGN_2: &str = r#"{
   "id": "did:elem:ropsten:EiAS3mqC4OLMKOwcz3ItIL7XfWduPT7q3Fa4vHgiCfSG2A"
 }"#;
 
-pub const TEST_DID_ENCRYPT_1: &'static str = r#"{
-  '@context': 'https://www.w3.org/ns/did/v1',
-  id: 'did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw',
-  verificationMethod: [
+pub const TEST_DID_ENCRYPT_1: &'static str = r###"{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw",
+  "verificationMethod": [
     {
-      id: '#DDMt6ythjG9pyuKcyFYHPC62gw6KjL8EdouCuNRm0GbU',
-      type: 'Ed25519VerificationKey2018',
-      controller: 'did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw',
-      publicKeyBase64: 'DMt6ythjG9pyuKcyFYHPC62gw6KjL8EdouCuNRm0GbU='
+      "id": "#DDMt6ythjG9pyuKcyFYHPC62gw6KjL8EdouCuNRm0GbU",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw",
+      "publicKeyBase64": "DMt6ythjG9pyuKcyFYHPC62gw6KjL8EdouCuNRm0GbU="
     },
     {
-      id: '#CpPUgqlFBYtyXuCe6t8tXqeKo_wisONT9OzX-tRWNuGA',
-      type: 'X25519KeyAgreementKey2019',
-      controller: 'did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw',
-      publicKeyBase64: 'pPUgqlFBYtyXuCe6t8tXqeKo_wisONT9OzX-tRWNuGA='
+      "id": "#CpPUgqlFBYtyXuCe6t8tXqeKo_wisONT9OzX-tRWNuGA",
+      "type": "X25519KeyAgreementKey2019",
+      "controller": "did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw",
+      "publicKeyBase64": "pPUgqlFBYtyXuCe6t8tXqeKo_wisONT9OzX-tRWNuGA="
     }
   ]
-}"#;
+}"###;
 
-pub const TEST_DID_ENCRYPT_2: &'static str = r#"{
-  '@context': 'https://www.w3.org/ns/did/v1',
-  id: 'did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ',
-  verificationMethod: [
-    {
-      id: '#DJ-0_czJ5HuGj-rzi2PLen2SR6B7EjGBcOmPu_WyVp90',
-      type: 'Ed25519VerificationKey2018',
-      controller: 'did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ',
-      publicKeyBase64: 'J-0_czJ5HuGj-rzi2PLen2SR6B7EjGBcOmPu_WyVp90='
+pub const TEST_DID_ENCRYPT_2: &'static str = r###"{
+  '@context': "https://www.w3.org/ns/did/v1",
+  "id": "did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ",
+  "verificationMethod": [
+    {"
+      "id: "#DJ-0_czJ5HuGj-rzi2PLen2SR6B7EjGBcOmPu_WyVp90","
+      "type: "Ed25519VerificationKey2018",
+      "controller": "did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ",
+      "publicKeyBase64": "J-0_czJ5HuGj-rzi2PLen2SR6B7EjGBcOmPu_WyVp90="
     },
     {
-      id: '#CSFgdHTP5cCCKY7p1GQY5h7C29htmbcVyX1a3ryqT3hM',
-      type: 'X25519KeyAgreementKey2019',
-      controller: 'did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ',
-      publicKeyBase64: 'SFgdHTP5cCCKY7p1GQY5h7C29htmbcVyX1a3ryqT3hM='
+      "id": "#CSFgdHTP5cCCKY7p1GQY5h7C29htmbcVyX1a3ryqT3hM"
+      "type": "X25519KeyAgreementKey2019",
+      "controller": "did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ",
+      "publicKeyBase64": "SFgdHTP5cCCKY7p1GQY5h7C29htmbcVyX1a3ryqT3hM="
     }
-  ]}"#;
+  ]}"###;
 }

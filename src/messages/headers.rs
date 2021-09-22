@@ -1,6 +1,5 @@
 use rand::{
     Rng,
-    seq::SliceRandom,
 };
 use std::{
     time::SystemTime,
@@ -14,14 +13,11 @@ use crate::{
         SignatureAlgorithm
     },
 };
-use base64_url::{encode, decode};
 use super::{MessageType, PriorClaims};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
-    pub id: usize,
-    #[serde(rename = "type")]
-    pub m_type: MessageType,
+    pub id: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
     pub from: Option<String>,
@@ -31,7 +27,7 @@ pub struct DidcommHeader {
     pub expires_time: Option<u64>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub(crate) other: HashMap<String, String>,
-    /// A JWT, with sub: new DID and iss: prior DID, 
+    /// A JWT, with sub: new DID and iss: prior DID,
     /// with a signature from a key authorized by prior DID.
     #[serde(skip_serializing_if = "Option::is_none")]
     from_prior: Option<PriorClaims>,
@@ -42,7 +38,6 @@ impl DidcommHeader {
     pub fn new() -> Self {
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
-            m_type: MessageType::DidcommRaw,
             to: vec!(String::default()),
             from: Some(String::default()),
             created_time: None,
@@ -53,8 +48,9 @@ impl DidcommHeader {
     }
     /// Generates random `id`
     /// TODO: Should this be public?
-    pub fn gen_random_id() -> usize {
-            rand::thread_rng().gen()
+    pub fn gen_random_id() -> String {
+        let id_number: usize = rand::thread_rng().gen();
+        format!("{}", id_number)
     }
     /// Getter method for `from_prior` retreival
     ///
@@ -65,8 +61,7 @@ impl DidcommHeader {
     ///
     pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
         Ok(DidcommHeader {
-            id: rand::thread_rng().gen(),
-            m_type: MessageType::DidcommRaw,
+            id: DidcommHeader::gen_random_id(),
             to,
             from,
             created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()),
@@ -92,7 +87,7 @@ impl Default for DidcommHeader {
 ///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct JwmHeader {
-    pub typ: String,
+    pub typ: MessageType,
     // Some(String) if JWM is JWE encrypted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enc: Option<String>,
@@ -122,22 +117,14 @@ pub struct JwmHeader {
     // None otherwise is *STRONGLY RECOMMENDED* by RFC.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cty: Option<String>,
-    // Nonce!
-    // FIXME: should this be optional?
-    iv: String,
 }
 
 impl JwmHeader {
-    /// `iv` getter
-    ///
-    pub fn get_iv(&self) -> impl AsRef<[u8]> {
-        decode(&self.iv).unwrap()
-    }
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
     ///
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
-        self.typ = String::from("JWM");
+        self.typ = MessageType::DidcommJws;
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
@@ -154,15 +141,15 @@ impl JwmHeader {
     /// Modifies `enc`, `typ` and `alg` headers.
     ///
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
-        self.typ = String::from("JWM");
+        self.typ = MessageType::DidcommJwe;
         match alg {
-            CryptoAlgorithm::A256GCM => { 
+            CryptoAlgorithm::A256GCM => {
                 self.enc = Some("A256GCM".into());
-                self.alg = Some("ECDH-ES+A256KW".into());
+                self.alg = Some("ECDH-1PU+A256KW".into());
             },
             CryptoAlgorithm::XC20P => {
                 self.enc = Some("XC20P".into());
-                self.alg = Some("ECDH-ES+A256KW".into());
+                self.alg = Some("ECDH-1PU+XC20PKW".into());
             }
         }
     }
@@ -174,12 +161,8 @@ impl JwmHeader {
 impl Default for JwmHeader {
     // Need to make sure nonce is 192 bit long unigue for each message.
     fn default() -> Self {
-        let mut rng = rand::thread_rng();
-        let mut a = rng.gen::<[u8; 24]>().to_vec();
-        a.shuffle(&mut rng);
         JwmHeader {
-            typ: "JWM".into(),
-            iv: encode(&a),
+            typ: MessageType::DidcommRaw,
             enc: None,
             kid: None,
             skid: None,
@@ -209,14 +192,4 @@ impl Recepient {
             encrypted_key
         }
     }
-}
-
-#[test]
-fn default_jwm_header_with_random_iv() {
-    // Arrange
-    let not_expected: Vec<u8> = vec![0; 24];
-    // Act
-    let h = JwmHeader::default();
-    // Assert
-    assert_ne!(not_expected, decode(&h.iv).unwrap());
 }

@@ -10,7 +10,7 @@ pub use signer::SignatureAlgorithm;
 /// Return `FnOnce` signature definition for symmetric cryptography method.
 /// Arguments sequence: Nonce, Key, Message.
 ///
-pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
+pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
 /// Return `FnOnce` signature definition for assymmetric cryptography method.
 /// Arguments sequence: Nonce, Key, Message.
 ///
