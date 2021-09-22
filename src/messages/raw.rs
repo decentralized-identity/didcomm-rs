@@ -8,7 +8,7 @@ use super::Message;
 use crate::Recipient;
 use crate::{
     crypto::{SignatureAlgorithm, Signer, SigningMethod, SymmetricCypherMethod},
-    DidcommHeader,
+    DidCommHeader,
     Error,
     Jwe,
     JwmHeader,
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Serialize, Deserialize)]
 pub struct PayloadToVerify {
     #[serde(flatten)]
-    didcomm_header: DidcommHeader,
+    didcomm_header: DidCommHeader,
 
     #[cfg(feature = "resolve")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -43,8 +43,8 @@ impl Message {
         encryption_key: &[u8],
     ) -> Result<String, Error> {
         let mut jwe_header = self.jwm_header.clone();
-        if jwe_header.typ != MessageType::DidcommForward {
-            jwe_header.typ = MessageType::DidcommJwe;
+        if jwe_header.typ != MessageType::DidCommForward {
+            jwe_header.typ = MessageType::DidCommJwe;
         }
         let d_header = self.get_didcomm_header();
         let iv = Jwe::generate_iv();
@@ -138,7 +138,7 @@ impl Message {
         signing_sender_private_key: &[u8],
     ) -> Result<String, Error> {
         let mut jws_header = self.jwm_header.clone();
-        jws_header.typ = MessageType::DidcommJws;
+        jws_header.typ = MessageType::DidCommJws;
         if jws_header.alg.is_none() {
             return Err(Error::JwsParseError);
         }

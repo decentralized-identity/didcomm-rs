@@ -21,7 +21,7 @@ use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::{
-    headers::{DidcommHeader, JwmHeader},
+    headers::{DidCommHeader, JwmHeader},
     mediated::Mediated,
     prior_claims::PriorClaims,
 };
@@ -40,7 +40,7 @@ pub struct Message {
 
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
-    pub didcomm_header: DidcommHeader,
+    pub didcomm_header: DidCommHeader,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recipients: Option<Vec<Recipient>>,
@@ -83,7 +83,7 @@ impl Message {
         }
         Message {
             jwm_header: JwmHeader::default(),
-            didcomm_header: DidcommHeader::new(),
+            didcomm_header: DidCommHeader::new(),
             recipients: None,
             body: json!({}),
             serialize_flat_jwe: false,
@@ -177,15 +177,15 @@ impl Message {
         }
     }
 
-    /// `&DidcommHeader` getter.
-    pub fn get_didcomm_header(&self) -> &DidcommHeader {
+    /// `&DidCommHeader` getter.
+    pub fn get_didcomm_header(&self) -> &DidCommHeader {
         &self.didcomm_header
     }
 
     /// Setter of `didcomm_header`.
     /// Replaces existing one with provided by consuming both values.
     /// Returns modified instance of `Self`.
-    pub fn set_didcomm_header(mut self, h: DidcommHeader) -> Self {
+    pub fn set_didcomm_header(mut self, h: DidCommHeader) -> Self {
         self.didcomm_header = h;
         self
     }
@@ -332,7 +332,7 @@ impl Message {
             .sign(signing_algorithm.signer(), signing_sender_private_key)?;
         to.body = serde_json::from_str(&signed)?;
         return to
-            .m_type(MessageType::DidcommJws)
+            .m_type(MessageType::DidCommJws)
             .seal(ek, encryption_recipient_public_key);
     }
 
@@ -369,7 +369,7 @@ impl Message {
             .to(&[mediator_did])
             .from(&from)
             .as_jwe(&alg, mediator_public_key)
-            .m_type(MessageType::DidcommForward)
+            .m_type(MessageType::DidCommForward)
             .set_body(&serde_json::to_string(&body)?)
             .seal(ek, mediator_public_key)
     }
@@ -719,7 +719,7 @@ impl Message {
     ) -> Result<Self, Error> {
         let mut current_message: String = incoming.to_string();
 
-        if Self::get_message_type(&current_message)? == MessageType::DidcommJwe {
+        if Self::get_message_type(&current_message)? == MessageType::DidCommJwe {
             current_message = Self::receive_jwe(
                 &current_message,
                 encryption_receiver_private_key,
@@ -727,7 +727,7 @@ impl Message {
             )?;
         }
 
-        if Self::get_message_type(&current_message)? == MessageType::DidcommJws {
+        if Self::get_message_type(&current_message)? == MessageType::DidCommJws {
             current_message = Self::receive_jws(&current_message, signing_sender_public_key)?;
         }
 
@@ -738,10 +738,10 @@ impl Message {
         // try to skip parsing by using known fields from jwe/jws
         let to_check: UnknownReceivedMessage = serde_json::from_str(message)?;
         if to_check.iv.is_some() {
-            return Ok(MessageType::DidcommJwe);
+            return Ok(MessageType::DidCommJwe);
         }
         if to_check.signatures.is_some() || to_check.signature.is_some() {
-            return Ok(MessageType::DidcommJws);
+            return Ok(MessageType::DidCommJws);
         }
         let message: Message = serde_json::from_str(message)?;
         Ok(message.jwm_header.typ)
@@ -1462,9 +1462,9 @@ mod serialization_tests {
         let payload_jwm_header: JwmHeader = serde_json::from_slice(&payload_string_decoded)?;
         let received_message = Message::receive(&jws_string, None, None, None)?;
 
-        assert_eq!(jws_jwm_header.typ, MessageType::DidcommJws);
-        assert_eq!(payload_jwm_header.typ, MessageType::DidcommRaw);
-        assert_eq!(received_message.jwm_header.typ, MessageType::DidcommRaw);
+        assert_eq!(jws_jwm_header.typ, MessageType::DidCommJws);
+        assert_eq!(payload_jwm_header.typ, MessageType::DidCommRaw);
+        assert_eq!(received_message.jwm_header.typ, MessageType::DidCommRaw);
 
         Ok(())
     }

@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct DidcommHeader {
+pub struct DidCommHeader {
     pub id: String,
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -34,11 +34,11 @@ pub struct DidcommHeader {
     from_prior: Option<PriorClaims>,
 }
 
-impl DidcommHeader {
+impl DidCommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
-        DidcommHeader {
-            id: DidcommHeader::gen_random_id(),
+        DidCommHeader {
+            id: DidCommHeader::gen_random_id(),
             to: vec![String::default()],
             from: Some(String::default()),
             created_time: None,
@@ -66,8 +66,8 @@ impl DidcommHeader {
         from: Option<String>,
         expires_time: Option<u64>,
     ) -> Result<Self, Error> {
-        Ok(DidcommHeader {
-            id: DidcommHeader::gen_random_id(),
+        Ok(DidCommHeader {
+            id: DidCommHeader::gen_random_id(),
             to,
             from,
             created_time: Some(
@@ -76,14 +76,14 @@ impl DidcommHeader {
                     .as_secs(),
             ),
             expires_time,
-            ..DidcommHeader::new()
+            ..DidCommHeader::new()
         })
     }
 }
 
-impl Default for DidcommHeader {
+impl Default for DidCommHeader {
     fn default() -> Self {
-        DidcommHeader::new()
+        DidCommHeader::new()
     }
 }
 
@@ -177,7 +177,7 @@ impl Default for JwmHeader {
     // Need to make sure nonce is 192 bit long unigue for each message.
     fn default() -> Self {
         JwmHeader {
-            typ: MessageType::DidcommRaw,
+            typ: MessageType::DidCommRaw,
             enc: None,
             kid: None,
             skid: None,
