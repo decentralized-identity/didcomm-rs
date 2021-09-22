@@ -2,3 +2,4 @@ error_on_line_overflow = true
 group_imports = "StdExternalCrate"
 imports_granularity = "Crate"
 imports_layout = "HorizontalVertical"
+reorder_modules = true

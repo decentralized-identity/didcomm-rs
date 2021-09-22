@@ -21,9 +21,11 @@ use crate::{
 pub struct PayloadToVerify {
     #[serde(flatten)]
     didcomm_header: DidcommHeader,
+
     #[cfg(feature = "resolve")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
+
     body: Value,
 }
 
