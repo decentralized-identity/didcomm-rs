@@ -1,24 +1,17 @@
 /// Integration tests of full cycles of message lifetime.
 ///
-
 mod common;
 
 use {
-    didcomm_rs::{
-        crypto::CryptoAlgorithm,
-        Jwe,
-        Mediated,
-        Message,
-    },
-    utilities::{KeyPairSet, get_keypair_set},
+    didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message},
+    utilities::{get_keypair_set, KeyPairSet},
 };
-
 
 #[cfg(not(feature = "resolve"))]
 use {
     common::*,
-    k256::elliptic_curve::rand_core::OsRng,
     didcomm_rs::crypto::{SignatureAlgorithm, Signer},
+    k256::elliptic_curve::rand_core::OsRng,
     serde_json::Value,
 };
 
@@ -28,7 +21,10 @@ fn send_receive_raw() {
     // Arrange
     let m = Message::new()
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
+        .to(&[
+            "did::xyz:34r3cu403hnth03r49g03",
+            "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
+        ])
         .set_body(sample_dids::TEST_DID_ENCRYPT_1);
 
     // Act
@@ -37,7 +33,6 @@ fn send_receive_raw() {
     // checking if encryption fails on it
     let packed = m.clone().seal(b"anuhcphus", None);
     assert!(packed.is_err());
-
 
     // receiving raw message
     let received = Message::receive(&ready_to_send, None, None, None);
@@ -160,7 +155,10 @@ fn send_receive_signed_json_test() {
     // Message construction an JWS wrapping
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
+        .to(&[
+            "did::xyz:34r3cu403hnth03r49g03",
+            "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
+        ]) // setting to
         .set_body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
         .as_jws(&SignatureAlgorithm::EdDsa)
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes());
@@ -168,16 +166,17 @@ fn send_receive_signed_json_test() {
     assert!(&message.is_ok());
 
     // Receiving JWS
-    let received = Message::verify(&message.unwrap().as_bytes(), &sign_keypair.public.to_bytes());
+    let received = Message::verify(
+        &message.unwrap().as_bytes(),
+        &sign_keypair.public.to_bytes(),
+    );
     // Assert
     assert!(&received.is_ok());
     // convert to serde values to compare contents and not formatting
     let sample_body: Value = serde_json::from_str(sample_dids::TEST_DID_SIGN_1).unwrap();
-    let received_body: Value = serde_json::from_str(&received.unwrap().get_body().unwrap()).unwrap();
-    assert_eq!(
-        sample_body.to_string(),
-        received_body.to_string(),
-    );
+    let received_body: Value =
+        serde_json::from_str(&received.unwrap().get_body().unwrap()).unwrap();
+    assert_eq!(sample_body.to_string(), received_body.to_string(),);
 }
 
 #[test]
@@ -197,7 +196,10 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     // Message construction
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
+        .to(&[
+            "did::xyz:34r3cu403hnth03r49g03",
+            "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
+        ]) // setting to
         .set_body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
@@ -206,12 +208,13 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
 
     // Act
     // Send
-    let ready_to_send = message.seal_signed(
-        &alice_private,
-        &sign_keypair.to_bytes(),
-        SignatureAlgorithm::EdDsa,
-        Some(&bobs_public),
-    )
+    let ready_to_send = message
+        .seal_signed(
+            &alice_private,
+            &sign_keypair.to_bytes(),
+            SignatureAlgorithm::EdDsa,
+            Some(&bobs_public),
+        )
         .unwrap();
 
     //Receive
@@ -225,7 +228,9 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     #[cfg(feature = "resolve")]
     let received = Message::receive(
         &ready_to_send,
-        &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap(),
+        &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP"
+            .from_base58()
+            .unwrap(),
         None,
         None,
     );
@@ -237,8 +242,5 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     // convert to serde values to compare contents and not formatting
     let sample_body: Value = serde_json::from_str(sample_dids::TEST_DID_SIGN_1).unwrap();
     let received_body: Value = serde_json::from_str(&received.get_body().unwrap()).unwrap();
-    assert_eq!(
-        sample_body.to_string(),
-        received_body.to_string(),
-    );
+    assert_eq!(sample_body.to_string(), received_body.to_string(),);
 }

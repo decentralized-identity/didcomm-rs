@@ -1,11 +1,7 @@
 extern crate didcomm_rs;
 // extern crate did_doc;
 
-pub use didcomm_rs::{
-    Error,
-    Message,
-    Shape,
-};
+pub use didcomm_rs::{Error, Message, Shape};
 
 // pub use did_doc::{
 //   Document,
@@ -19,7 +15,7 @@ pub use std::str::FromStr;
 
 #[allow(dead_code)]
 pub mod sample_dids {
-pub const TEST_DID_SIGN_1: &str = r#"{
+    pub const TEST_DID_SIGN_1: &str = r#"{
   "@context": "https://w3id.org/did/v1",
   "id": "did:uknow:d34db33f",
   "publicKey": [
@@ -40,7 +36,7 @@ pub const TEST_DID_SIGN_1: &str = r#"{
   "created": ""
 }"#;
 
-pub const TEST_DID_SIGN_2: &str = r#"{
+    pub const TEST_DID_SIGN_2: &str = r#"{
   "service": [
     {
       "id": "did:elem:ropsten:EiAS3mqC4OLMKOwcz3ItIL7XfWduPT7q3Fa4vHgiCfSG2A#openid",
@@ -123,7 +119,7 @@ pub const TEST_DID_SIGN_2: &str = r#"{
   "id": "did:elem:ropsten:EiAS3mqC4OLMKOwcz3ItIL7XfWduPT7q3Fa4vHgiCfSG2A"
 }"#;
 
-pub const TEST_DID_ENCRYPT_1: &'static str = r###"{
+    pub const TEST_DID_ENCRYPT_1: &'static str = r###"{
   "@context": "https://www.w3.org/ns/did/v1",
   "id": "did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw",
   "verificationMethod": [
@@ -142,7 +138,7 @@ pub const TEST_DID_ENCRYPT_1: &'static str = r###"{
   ]
 }"###;
 
-pub const TEST_DID_ENCRYPT_2: &'static str = r###"{
+    pub const TEST_DID_ENCRYPT_2: &'static str = r###"{
   '@context': "https://www.w3.org/ns/did/v1",
   "id": "did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ",
   "verificationMethod": [

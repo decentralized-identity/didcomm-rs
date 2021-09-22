@@ -1,6 +1,6 @@
 // use std::convert::{ TryFrom, TryInto };
-use crate::{Jwk, JwmHeader};
 use crate::messages::serialization::{base64_buffer, base64_jwm_header};
+use crate::{Jwk, JwmHeader};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {
@@ -23,12 +23,12 @@ macro_rules! create_getter {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Signature {
     #[serde(skip_serializing_if = "Option::is_none")]
-	  #[serde(with="base64_jwm_header")]
+    #[serde(with = "base64_jwm_header")]
     #[serde(default)]
     pub protected: Option<JwmHeader>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<JwmHeader>,
-	  #[serde(with="base64_buffer")]
+    #[serde(with = "base64_buffer")]
     #[serde(default)]
     pub signature: Vec<u8>,
 }
@@ -36,7 +36,7 @@ pub struct Signature {
 impl Signature {
     /// Creates a new `Signature` that can be used in JWS `signatures` property or
     /// as top-level (flattened) property in flattened JWS JSON serialization.
-    /// 
+    ///
     /// # Parameters
     ///
     /// `protected` - JWM header protected by signing
@@ -85,16 +85,13 @@ pub struct Jws {
 impl Jws {
     /// Creates a new [general JWS](https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.1)
     /// object with signature values per recipient.
-    /// 
+    ///
     /// # Parameters
     ///
     /// `payload` - payload with encoded data
     ///
     /// `signatures` - signature values per recipient
-    pub fn new(
-        payload: String,
-        signatures: Vec<Signature>,
-    ) -> Self {
+    pub fn new(payload: String, signatures: Vec<Signature>) -> Self {
         Jws {
             payload,
             signature: None,
@@ -104,16 +101,13 @@ impl Jws {
 
     /// Creates a new [flattened JWS](https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.2)
     /// object with signature information on JWS' top level.
-    /// 
+    ///
     /// # Parameters
     ///
     /// `payload` - payload with encoded data
     ///
     /// `signatures` - signature value that is used on JWS top-level
-    pub fn new_flat(
-        payload: String,
-        signature_value: Signature,
-    ) -> Self {
+    pub fn new_flat(payload: String, signature_value: Signature) -> Self {
         Jws {
             payload,
             signature: Some(signature_value),

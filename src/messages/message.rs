@@ -1,52 +1,32 @@
-use std::{convert::TryInto, time::SystemTime};
-use aes_gcm::{Aes256Gcm, aead::generic_array::GenericArray};
-use k256::elliptic_curve::rand_core;
-use rand::{Rng, prelude::SliceRandom};
-use serde::{Serialize, Deserialize};
-use serde_json::{
-    json,
-    Value,
-    value::RawValue,
-};
 use super::{
-    mediated::Mediated,
     headers::{DidcommHeader, JwmHeader},
+    mediated::Mediated,
     prior_claims::PriorClaims,
 };
+#[cfg(feature = "raw-crypto")]
+use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
+use crate::{Error, Jwe, Jws, MessageType, Signature};
+use aes_gcm::{aead::generic_array::GenericArray, Aes256Gcm};
 use arrayref::array_ref;
 #[cfg(feature = "resolve")]
 pub use ddoresolver_rs::*;
-use {
-    x25519_dalek::{
-        StaticSecret,
-        PublicKey
-    },
-    rand_chacha::ChaCha20Rng,
-    rand::{RngCore, SeedableRng},
-    chacha20poly1305::{
-        XChaCha20Poly1305,
-        XNonce,
-        aead::{
-            Aead,
-            NewAead
-        },
-    },
-    crate::{
-        Jwk,
-        Recepient,
-        KeyAlgorithm,
-    },
-};
-#[cfg(feature = "raw-crypto")]
-use crate::crypto::{
-    CryptoAlgorithm,
-    SignatureAlgorithm,
-    Cypher,
-    Signer,
-};
-use std::convert::TryFrom;
+use k256::elliptic_curve::rand_core;
+use rand::{prelude::SliceRandom, Rng};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, value::RawValue, Value};
 use sha2::{Digest, Sha256};
-use crate::{Error, Jwe, Jws, MessageType, Signature};
+use std::convert::TryFrom;
+use std::{convert::TryInto, time::SystemTime};
+use {
+    crate::{Jwk, KeyAlgorithm, Recepient},
+    chacha20poly1305::{
+        aead::{Aead, NewAead},
+        XChaCha20Poly1305, XNonce,
+    },
+    rand::{RngCore, SeedableRng},
+    rand_chacha::ChaCha20Rng,
+    x25519_dalek::{PublicKey, StaticSecret},
+};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -91,7 +71,9 @@ impl Message {
     /// Use extension messages to build final one before `send`ing.
     ///
     pub fn new() -> Self {
-        match env_logger::try_init() { Ok(_) | Err(_) => () }
+        match env_logger::try_init() {
+            Ok(_) | Err(_) => (),
+        }
         Message {
             jwm_header: JwmHeader::default(),
             didcomm_header: DidcommHeader::new(),
@@ -115,7 +97,12 @@ impl Message {
         for s in to {
             self.didcomm_header.to.push(s.to_string());
         }
-        while let Some(a) = self.didcomm_header.to.iter().position(|e| e == &String::default()) {
+        while let Some(a) = self
+            .didcomm_header
+            .to
+            .iter()
+            .position(|e| e == &String::default())
+        {
             self.didcomm_header.to.remove(a);
         }
         self
@@ -179,7 +166,7 @@ impl Message {
         if self.is_rotation() {
             Ok(self.didcomm_header.from_prior().clone().unwrap())
         } else {
-           Err(Error::NoRotationData)
+            Err(Error::NoRotationData)
         }
     }
     /// `&DidcommHeader` getter.
@@ -237,9 +224,10 @@ impl Message {
                 if let Some(from) = &self.didcomm_header.from {
                     if let Some(document) = resolve_any(from) {
                         match alg {
-                            CryptoAlgorithm::XC20P | CryptoAlgorithm::A256GCM =>
-                                    self.jwm_header.kid =
-                                        document.find_public_key_id_for_curve("X25519")
+                            CryptoAlgorithm::XC20P | CryptoAlgorithm::A256GCM => {
+                                self.jwm_header.kid =
+                                    document.find_public_key_id_for_curve("X25519")
+                            }
                         }
                     }
                 }
@@ -249,7 +237,11 @@ impl Message {
     }
     /// Sets message to be serialized as flat JWE JSON.
     /// If this message has multiple targets, `seal`ing it will result in an Error.
-    pub fn as_flat_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<&[u8]>) -> Self {
+    pub fn as_flat_jwe(
+        mut self,
+        alg: &CryptoAlgorithm,
+        recipient_public_key: Option<&[u8]>,
+    ) -> Self {
         self.serialize_flat_jwe = true;
         self.as_jwe(alg, recipient_public_key)
     }
@@ -269,13 +261,15 @@ impl Message {
     //     let alg = crypter_from_header(&self.jwm_header)?;
     //     self.encrypt(alg.encryptor(), ek.as_ref())
     // }
-  //  #[cfg(feature = "resolve")]
+    //  #[cfg(feature = "resolve")]
     pub fn seal(
         mut self,
         sk: impl AsRef<[u8]>,
         recipient_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
-        if sk.as_ref().len() != 32 { return Err(Error::InvalidKeySize("!32".into())); }
+        if sk.as_ref().len() != 32 {
+            return Err(Error::InvalidKeySize("!32".into()));
+        }
         // generate content encryption key
         let mut cek = [0u8; 32];
         let mut rng = ChaCha20Rng::from_seed(Default::default());
@@ -285,17 +279,16 @@ impl Message {
         if self.didcomm_header.to.len() == 0 as usize {
             todo!(); // What should happen in this scenario?
         } else if self.serialize_flat_jwe && self.didcomm_header.to.len() > 1 {
-            return Err(Error::Generic("flat JWE serialization only supports a single `to`".to_string()));
+            return Err(Error::Generic(
+                "flat JWE serialization only supports a single `to`".to_string(),
+            ));
         }
 
-        let mut recepients: Vec<Recepient> = vec!();
+        let mut recepients: Vec<Recepient> = vec![];
         // create jwk from static secret per recepient
         for dest in &self.didcomm_header.to {
             let rv = self.encrypt_cek(&sk.as_ref(), dest, &cek, recipient_public_key)?;
-            recepients.push(Recepient::new(
-                rv.header,
-                rv.encrypted_key,
-            ));
+            recepients.push(Recepient::new(rv.header, rv.encrypted_key));
         }
         self.recepients = Some(recepients);
         // encrypt original message with static secret
@@ -401,7 +394,12 @@ impl Message {
     ) -> Result<Vec<u8>, Error> {
         // zS (shared for recipient)
         let shared = gen_shared_for_recepient(sk.as_ref(), did, recipient_public_key)?;
-        trace!("sk: {:?} shared: {:?} dest: {:?}", sk, &shared.as_ref(), did);
+        trace!(
+            "sk: {:?} shared: {:?} dest: {:?}",
+            sk,
+            &shared.as_ref(),
+            did
+        );
 
         // shared secret
         let shared_secret = [ze.as_ref(), shared.as_ref()].concat();
@@ -433,7 +431,10 @@ impl Message {
         recipient_public_key: Option<&[u8]>,
     ) -> Result<Recepient, Error> {
         trace!("creating per-recipient JWE value for {}", &dest);
-        let alg = self.jwm_header.alg.as_ref()
+        let alg = self
+            .jwm_header
+            .alg
+            .as_ref()
             .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
         trace!("using algorithm {}", &alg);
 
@@ -441,7 +442,12 @@ impl Message {
         let epk = StaticSecret::new(rand_core::OsRng);
         let epk_public = PublicKey::from(&epk);
         let ze = gen_shared_for_recepient(epk.to_bytes(), dest, recipient_public_key)?;
-        trace!("ze: {:?} epk_public: {:?}, dest: {:?}", &ze.as_ref(), epk_public,  dest);
+        trace!(
+            "ze: {:?} epk_public: {:?}, dest: {:?}",
+            &ze.as_ref(),
+            epk_public,
+            dest
+        );
 
         // key encryption key
         let kek = Self::get_kek(dest, sk, ze, alg, recipient_public_key)?;
@@ -453,7 +459,7 @@ impl Message {
 
         // start building jwk
         let mut jwk = Jwk::new();
-        jwk.kid = Some(key_id_from_didurl( &dest));
+        jwk.kid = Some(key_id_from_didurl(&dest));
 
         let sealed_cek_and_tag: Vec<u8> = match alg.as_ref() {
             "ECDH-1PU+A256KW" => {
@@ -472,7 +478,7 @@ impl Message {
                 crypter
                     .encrypt(nonce, cek.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?
-            },
+            }
             "ECDH-1PU+XC20PKW" => {
                 jwk.alg = KeyAlgorithm::Ecdh1puXc20pkw;
 
@@ -489,8 +495,13 @@ impl Message {
                 crypter
                     .encrypt(nonce, cek.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?
-            },
-            _ => { return Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))); },
+            }
+            _ => {
+                return Err(Error::Generic(format!(
+                    "encryption algorithm '{}' not implemented",
+                    &alg
+                )));
+            }
         };
 
         let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
@@ -528,22 +539,26 @@ impl Message {
         recipient_public_key: Option<&[u8]>,
     ) -> Result<Vec<u8>, Error> {
         trace!("decrypting per-recipient JWE value");
-        let alg = jwe.alg()
+        let alg = jwe
+            .alg()
             .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
         trace!("using algorithm {}", &alg);
 
-        let skid = jwe.skid()
+        let skid = jwe
+            .skid()
             .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
 
         // zE (temporary secret)
-        let epk = recipient.header.epk.as_ref()
+        let epk = recipient
+            .header
+            .epk
+            .as_ref()
             .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
         let epk_public_array: [u8; 32] = base64_url::decode(&epk.x)?
             .try_into()
             .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
         let epk_public = PublicKey::from(epk_public_array);
-        let ss = StaticSecret::from(array_ref!(sk, 0, 32).to_owned())
-            .diffie_hellman(&epk_public);
+        let ss = StaticSecret::from(array_ref!(sk, 0, 32).to_owned()).diffie_hellman(&epk_public);
         let ze = *ss.as_bytes();
         trace!("ze: {:?}", &ze.as_ref());
 
@@ -551,11 +566,17 @@ impl Message {
         let kek = Self::get_kek(&skid, sk, ze, &alg, recipient_public_key)?;
         trace!("kek: {:?}", &kek);
 
-        let iv = recipient.header.other.get("iv")
+        let iv = recipient
+            .header
+            .other
+            .get("iv")
             .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
         let iv_bytes = base64_url::decode(&iv)?;
 
-        let tag = recipient.header.other.get("tag")
+        let tag = recipient
+            .header
+            .other
+            .get("tag")
             .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
         let mut cyphertext_and_tag: Vec<u8> = vec![];
         cyphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
@@ -572,7 +593,7 @@ impl Message {
                     .map_err(|e| Error::Generic(e.to_string()))?;
 
                 Ok(cek)
-            },
+            }
             "ECDH-1PU+A256KW" => {
                 let nonce = GenericArray::from_slice(&iv_bytes);
                 let kek_key = GenericArray::from_slice(kek.as_slice());
@@ -583,8 +604,11 @@ impl Message {
                     .map_err(|e| Error::Generic(e.to_string()))?;
 
                 Ok(cek)
-            },
-            _ => Err(Error::Generic(format!("encryption algorithm '{}' not implemented", &alg))),
+            }
+            _ => Err(Error::Generic(format!(
+                "encryption algorithm '{}' not implemented",
+                &alg
+            ))),
         }
     }
 }
@@ -592,7 +616,7 @@ impl Message {
 fn crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgorithm, Error> {
     match &header.alg {
         None => Err(Error::JweParseError),
-        Some(alg) => alg.try_into()
+        Some(alg) => alg.try_into(),
     }
 }
 
@@ -636,7 +660,7 @@ fn concat_kdf(
     let hashed = hash_result.as_slice();
 
     Ok(hashed.to_vec())
-  }
+}
 
 /// Associated functions implementations.
 /// Possibly not required as Jwe serialization covers this.
@@ -649,23 +673,23 @@ impl Message {
     pub fn get_iv(received: &[u8]) -> Result<Vec<u8>, Error> {
         // parse from compact
         let as_str = String::from_utf8(received.to_vec())?;
-        let json: serde_json::Value =
-            if let Some(header_end) = as_str.find('.') {
-                    serde_json::from_str(
-                        &String::from_utf8(
-                            base64_url::decode(&as_str[..header_end])?
-                        )?
-                    )?
-            } else {
-                serde_json::from_str(&as_str)?
-            };
+        let json: serde_json::Value = if let Some(header_end) = as_str.find('.') {
+            serde_json::from_str(&String::from_utf8(base64_url::decode(
+                &as_str[..header_end],
+            )?)?)?
+        } else {
+            serde_json::from_str(&as_str)?
+        };
         if let Some(iv) = json.get("iv") {
             if let Some(t) = iv.as_str() {
-            if t.len() != 24 {
-                Err(Error::Generic(format!("IV [nonce] size is incorrect: {}", t.len())))
-            } else {
-                Ok(t.as_bytes().to_vec())
-            }
+                if t.len() != 24 {
+                    Err(Error::Generic(format!(
+                        "IV [nonce] size is incorrect: {}",
+                        t.len()
+                    )))
+                } else {
+                    Ok(t.as_bytes().to_vec())
+                }
             } else {
                 Err(Error::Generic("wrong nonce format".into()))
             }
@@ -676,7 +700,7 @@ impl Message {
 
     /// Construct a message from received data.
     /// Raw, JWS or JWE payload is accepted.
-    /// 
+    ///
     /// # Parameters
     ///
     /// `incoming` - serialized message as `Message`/`Jws`/`Jws`
@@ -736,24 +760,31 @@ impl Message {
             None => {
                 #[cfg(feature = "resolve")]
                 {
-                    let skid = &jwe.skid().ok_or_else(|| Error::Generic("skid missing".to_string()))?;
-                    let document = ddoresolver_rs::resolve_any(skid).ok_or(Error::DidResolveFailed)?;
-                    document.find_public_key_for_curve("X25519").ok_or(Error::BadDid)?
+                    let skid = &jwe
+                        .skid()
+                        .ok_or_else(|| Error::Generic("skid missing".to_string()))?;
+                    let document =
+                        ddoresolver_rs::resolve_any(skid).ok_or(Error::DidResolveFailed)?;
+                    document
+                        .find_public_key_for_curve("X25519")
+                        .ok_or(Error::BadDid)?
                 }
                 #[cfg(not(feature = "resolve"))]
                 {
-                    return Err(Error::DidResolveFailed)
+                    return Err(Error::DidResolveFailed);
                 }
-            },
+            }
         };
         let receiver_private_key = encryption_receiver_private_key
             .ok_or_else(|| Error::Generic("missing encryption receiver private key".to_string()))?;
 
         let shared = StaticSecret::from(array_ref!(receiver_private_key, 0, 32).to_owned())
-            .diffie_hellman(&PublicKey::from(array_ref!(sender_public_key, 0, 32).to_owned()));
+            .diffie_hellman(&PublicKey::from(
+                array_ref!(sender_public_key, 0, 32).to_owned(),
+            ));
         let a: CryptoAlgorithm = alg.try_into()?;
         let m: Message;
-        let recipients_from_jwe: Option<Vec<Recepient>>; 
+        let recipients_from_jwe: Option<Vec<Recepient>>;
         if jwe.recepients.as_ref().is_some() {
             recipients_from_jwe = jwe.recepients.clone();
         } else if let Some(recepient) = jwe.recepient.as_ref() {
@@ -788,7 +819,7 @@ impl Message {
     }
 
     fn receive_jws(
-        incoming: &str, 
+        incoming: &str,
         signing_sender_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
         // incoming data may be a jws string or a serialized message with jws data
@@ -813,11 +844,13 @@ impl Message {
             } else {
                 return Err(Error::JwsParseError);
             }
-            
+
             let incoming_string = incoming.to_string();
             let to_verify = incoming_string.as_bytes();
             for signature_value in signatures_values_to_verify {
-                if signature_value.alg().is_none() { continue; }
+                if signature_value.alg().is_none() {
+                    continue;
+                }
                 let key = Self::get_signing_sender_public_key(
                     signing_sender_public_key,
                     signature_value.kid().as_ref(),
@@ -831,7 +864,9 @@ impl Message {
             return Err(Error::JwsParseError);
         }
 
-        Ok(serde_json::to_string(&message_verified.ok_or(Error::JwsParseError)?)?)
+        Ok(serde_json::to_string(
+            &message_verified.ok_or(Error::JwsParseError)?,
+        )?)
     }
 
     /// Use given key from `signing_sender_public_key` or if `None`, use key from "kid".
@@ -869,31 +904,34 @@ fn gen_shared_for_recepient(
             #[cfg(feature = "resolve")]
             {
                 let document = resolve_any(did).ok_or(Error::DidResolveFailed)?;
-                document.find_public_key_for_curve("X25519").ok_or(Error::DidResolveFailed)?
+                document
+                    .find_public_key_for_curve("X25519")
+                    .ok_or(Error::DidResolveFailed)?
             }
             #[cfg(not(feature = "resolve"))]
             {
-                return Err(Error::DidResolveFailed)
+                return Err(Error::DidResolveFailed);
             }
-        },
+        }
     };
-    let ss = StaticSecret::from(array_ref!(sk.as_ref(), 0, 32).to_owned())
-        .diffie_hellman(&PublicKey::from(array_ref!(recipient_public, 0, 32).to_owned()));
+    let ss = StaticSecret::from(array_ref!(sk.as_ref(), 0, 32).to_owned()).diffie_hellman(
+        &PublicKey::from(array_ref!(recipient_public, 0, 32).to_owned()),
+    );
 
     Ok(*ss.as_bytes())
 }
 
 fn key_id_from_didurl(url: &str) -> String {
-    let re = regex::Regex::new(r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$").unwrap();
-    match  re.captures(url) {
-        Some(s) =>
-            match s.name("key_id") {
-                Some(name) =>
-                    format!("did:key:{}", name.as_str()),
-                None => String::default(),
-            },
-        None =>
-            String::default()
+    let re = regex::Regex::new(
+        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$",
+    )
+    .unwrap();
+    match re.captures(url) {
+        Some(s) => match s.name("key_id") {
+            Some(name) => format!("did:key:{}", name.as_str()),
+            None => String::default(),
+        },
+        None => String::default(),
     }
 }
 
@@ -920,7 +958,10 @@ mod parse_tests {
         let iv = Message::get_iv(raw_json.as_bytes());
         // Assert
         assert!(iv.is_ok());
-        assert_eq!("u5kIzo0m_d2PjI4mu5kIzo0m", &String::from_utf8(iv.unwrap()).unwrap());
+        assert_eq!(
+            "u5kIzo0m_d2PjI4mu5kIzo0m",
+            &String::from_utf8(iv.unwrap()).unwrap()
+        );
     }
     #[test]
     fn iv_from_compact_json_test() {
@@ -931,7 +972,10 @@ mod parse_tests {
         let iv = Message::get_iv(compact.as_bytes());
         // Assert
         assert!(iv.is_ok());
-        assert_eq!("u5kIzo0m_d2PjI4mu5kIzo0m", &String::from_utf8(iv.unwrap()).unwrap());
+        assert_eq!(
+            "u5kIzo0m_d2PjI4mu5kIzo0m",
+            &String::from_utf8(iv.unwrap()).unwrap()
+        );
     }
 }
 
@@ -943,7 +987,7 @@ mod crypto_tests {
     use super::*;
 
     use k256::elliptic_curve::rand_core::OsRng;
-    use utilities::{KeyPairSet, get_keypair_set};
+    use utilities::{get_keypair_set, KeyPairSet};
 
     #[cfg(feature = "resolve")]
     use base58::FromBase58;
@@ -962,9 +1006,12 @@ mod crypto_tests {
 
     #[test]
     fn create_and_send_without_resolving_dids() {
-        let KeyPairSet { alice_private, bobs_public, .. } = get_keypair_set();
-        let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+        let KeyPairSet {
+            alice_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
+        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
         let p = m.seal(&alice_private, Some(&bobs_public));
         assert!(p.is_ok());
     }
@@ -973,7 +1020,12 @@ mod crypto_tests {
     #[cfg(feature = "resolve")]
     fn receive_test() {
         // Arrange
-        let KeyPairSet { alice_public, alice_private, bobs_private, .. } = get_keypair_set();
+        let KeyPairSet {
+            alice_public,
+            alice_private,
+            bobs_private,
+            ..
+        } = get_keypair_set();
         // alice seals JWE
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -992,7 +1044,13 @@ mod crypto_tests {
     #[test]
     fn receive_test_without_resolving_dids() {
         // Arrange
-        let KeyPairSet { alice_public, alice_private, bobs_private, bobs_public, .. } = get_keypair_set();
+        let KeyPairSet {
+            alice_public,
+            alice_private,
+            bobs_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
         // alice seals JWE
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1016,7 +1074,11 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, None);
         // TODO: validate derived pub from priv key <<<
-        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
+        let KeyPairSet {
+            alice_private,
+            bobs_private,
+            ..
+        } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
@@ -1026,7 +1088,13 @@ mod crypto_tests {
 
     #[test]
     fn send_receive_didkey_explicit_pubkey_test() {
-        let KeyPairSet { alice_public, alice_private, bobs_private, bobs_public, .. } = get_keypair_set();
+        let KeyPairSet {
+            alice_public,
+            alice_private,
+            bobs_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
@@ -1044,7 +1112,6 @@ mod crypto_tests {
         assert!(received.is_ok());
     }
 
-
     #[test]
     #[cfg(feature = "resolve")]
     fn send_receive_didkey_test_1pu_aes256() {
@@ -1053,14 +1120,17 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::A256GCM, None);
         // TODO: validate derived pub from priv key <<<
-        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
+        let KeyPairSet {
+            alice_private,
+            bobs_private,
+            ..
+        } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
         let received = Message::receive(&jwe.unwrap(), Some(&bobs_private), None, None);
         assert!(received.is_ok());
     }
-
 
     #[test]
     #[cfg(feature = "resolve")]
@@ -1070,7 +1140,11 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::A256GCM, None);
         // TODO: validate derived pub from priv key <<<
-        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
+        let KeyPairSet {
+            alice_private,
+            bobs_private,
+            ..
+        } = get_keypair_set();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
@@ -1090,10 +1164,19 @@ mod crypto_tests {
     fn send_receive_didkey_multiple_receivers_test() {
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
-            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG", "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"])
+            .to(&[
+                "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
+                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
+            ])
             .as_jwe(&CryptoAlgorithm::XC20P, None);
-        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
-        let third_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
+        let KeyPairSet {
+            alice_private,
+            bobs_private,
+            ..
+        } = get_keypair_set();
+        let third_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2"
+            .from_base58()
+            .unwrap();
         let jwe = m.seal(&alice_private, None);
         assert!(jwe.is_ok());
 
@@ -1107,21 +1190,28 @@ mod crypto_tests {
     #[test]
     #[cfg(feature = "resolve")]
     fn mediated_didkey_test() {
-        let mediator_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap();
-        let KeyPairSet { alice_private, bobs_private, .. } = get_keypair_set();
+        let mediator_private = "ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2"
+            .from_base58()
+            .unwrap();
+        let KeyPairSet {
+            alice_private,
+            bobs_private,
+            ..
+        } = get_keypair_set();
         let sealed = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, None)
-            .routed_by(&alice_private, "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf", None, None);
+            .routed_by(
+                &alice_private,
+                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
+                None,
+                None,
+            );
         assert!(sealed.is_ok());
 
-        let mediator_received = Message::receive(
-            &sealed.unwrap(),
-            Some(&mediator_private),
-            None,
-            None,
-        );
+        let mediator_received =
+            Message::receive(&sealed.unwrap(), Some(&mediator_private), None, None);
         assert!(mediator_received.is_ok());
 
         use crate::Mediated;
@@ -1167,12 +1257,8 @@ mod crypto_tests {
             Some(&bobs_public),
         )?;
 
-        let received_failure_no_key = Message::receive(
-            &jwe_string,
-            Some(&bobs_private),
-            Some(&alice_public),
-            None,
-        );
+        let received_failure_no_key =
+            Message::receive(&jwe_string, Some(&bobs_private), Some(&alice_public), None);
         let received_failure_wrong_key = Message::receive(
             &jwe_string,
             Some(&bobs_private),
@@ -1193,11 +1279,8 @@ mod crypto_tests {
         let received = received_success.unwrap();
         let sample_body: Value = serde_json::from_str(&body).unwrap();
         let received_body: Value = serde_json::from_str(&received.get_body().unwrap()).unwrap();
-        assert_eq!(
-            sample_body.to_string(),
-            received_body.to_string(),
-        );
-        
+        assert_eq!(sample_body.to_string(), received_body.to_string(),);
+
         Ok(())
     }
 }
@@ -1208,23 +1291,25 @@ mod serialization_tests {
 
     use k256::elliptic_curve::rand_core::OsRng;
     use std::str::from_utf8;
-    use utilities::{KeyPairSet, get_keypair_set};
+    use utilities::{get_keypair_set, KeyPairSet};
 
     #[test]
     fn sets_message_type_correctly_for_plain_messages() -> Result<(), Error> {
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"]);
-        
+
         let jwm_string: String = serde_json::to_string(&message)?;
         let jwm_object: Value = serde_json::from_str(&jwm_string)?;
 
         assert_eq!(jwm_object["typ"].as_str().is_some(), true);
         assert_eq!(
-            jwm_object["typ"].as_str().ok_or(Error::JwmHeaderParseError)?,
+            jwm_object["typ"]
+                .as_str()
+                .ok_or(Error::JwmHeaderParseError)?,
             "application/didcomm-plain+json",
         );
-        
+
         Ok(())
     }
 
@@ -1239,23 +1324,31 @@ mod serialization_tests {
 
         let jws_object: Value = serde_json::from_str(&jws_string)?;
         assert_eq!(jws_object["protected"].as_str().is_some(), true);
-        let protected_encoded = jws_object["protected"].as_str().ok_or(Error::JwmHeaderParseError)?;
+        let protected_encoded = jws_object["protected"]
+            .as_str()
+            .ok_or(Error::JwmHeaderParseError)?;
         let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
-        let protected_decoded_string = from_utf8(&protected_decoded_buffer)
-            .map_err(|_| Error::JwsParseError)?;
+        let protected_decoded_string =
+            from_utf8(&protected_decoded_buffer).map_err(|_| Error::JwsParseError)?;
         let protected_object: Value = serde_json::from_str(&protected_decoded_string)?;
 
         assert_eq!(
-            protected_object["typ"].as_str().ok_or(Error::JwmHeaderParseError)?,
+            protected_object["typ"]
+                .as_str()
+                .ok_or(Error::JwmHeaderParseError)?,
             "application/didcomm-signed+json",
         );
-        
+
         Ok(())
     }
 
     #[test]
     fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(), Error> {
-        let KeyPairSet { alice_private, bobs_public, ..  } = get_keypair_set();
+        let KeyPairSet {
+            alice_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1273,17 +1366,21 @@ mod serialization_tests {
         let jwe_object: Value = serde_json::from_str(&jwe_string)?;
 
         assert_eq!(jwe_object["protected"].as_str().is_some(), true);
-        let protected_encoded = jwe_object["protected"].as_str().ok_or(Error::JwmHeaderParseError)?;
+        let protected_encoded = jwe_object["protected"]
+            .as_str()
+            .ok_or(Error::JwmHeaderParseError)?;
         let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
-        let protected_decoded_string = from_utf8(&protected_decoded_buffer)
-            .map_err(|_| Error::JwsParseError)?;
+        let protected_decoded_string =
+            from_utf8(&protected_decoded_buffer).map_err(|_| Error::JwsParseError)?;
         let protected_object: Value = serde_json::from_str(&protected_decoded_string)?;
 
         assert_eq!(
-            protected_object["typ"].as_str().ok_or(Error::JwmHeaderParseError)?,
+            protected_object["typ"]
+                .as_str()
+                .ok_or(Error::JwmHeaderParseError)?,
             "application/didcomm-encrypted+json",
         );
-        
+
         Ok(())
     }
 
@@ -1300,28 +1397,31 @@ mod serialization_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
 
-        let jwe_string = message
-            .routed_by(
-                &alice_private,
-                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
-                Some(&mediators_public),
-                Some(&bobs_public),
-            )?;
+        let jwe_string = message.routed_by(
+            &alice_private,
+            "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
+            Some(&mediators_public),
+            Some(&bobs_public),
+        )?;
 
         let jwe_object: Value = serde_json::from_str(&jwe_string)?;
 
         assert_eq!(jwe_object["protected"].as_str().is_some(), true);
-        let protected_encoded = jwe_object["protected"].as_str().ok_or(Error::JwmHeaderParseError)?;
+        let protected_encoded = jwe_object["protected"]
+            .as_str()
+            .ok_or(Error::JwmHeaderParseError)?;
         let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
-        let protected_decoded_string = from_utf8(&protected_decoded_buffer)
-            .map_err(|_| Error::JwsParseError)?;
+        let protected_decoded_string =
+            from_utf8(&protected_decoded_buffer).map_err(|_| Error::JwsParseError)?;
         let protected_object: Value = serde_json::from_str(&protected_decoded_string)?;
 
         assert_eq!(
-            protected_object["typ"].as_str().ok_or(Error::JwmHeaderParseError)?,
+            protected_object["typ"]
+                .as_str()
+                .ok_or(Error::JwmHeaderParseError)?,
             "https://didcomm.org/routing/2.0/forward",
         );
-        
+
         Ok(())
     }
 
@@ -1337,19 +1437,24 @@ mod serialization_tests {
 
         let jws_object: Value = serde_json::from_str(&jws_string)?;
         let jws_protected_encoded = jws_object
-            .get("signatures").ok_or(Error::JwsParseError)?
-            .as_array().ok_or(Error::JwsParseError)?[0]
-            .as_object().ok_or(Error::JwsParseError)?
-            .get("protected").ok_or(Error::JwsParseError)?
-            .as_str().ok_or(Error::JwsParseError)?
-        ;
+            .get("signatures")
+            .ok_or(Error::JwsParseError)?
+            .as_array()
+            .ok_or(Error::JwsParseError)?[0]
+            .as_object()
+            .ok_or(Error::JwsParseError)?
+            .get("protected")
+            .ok_or(Error::JwsParseError)?
+            .as_str()
+            .ok_or(Error::JwsParseError)?;
         let jws_protected_string_decoded = base64_url::decode(&jws_protected_encoded)?;
         let jws_jwm_header: JwmHeader = serde_json::from_slice(&jws_protected_string_decoded)?;
 
         let payload_string_encoded = jws_object
-            .get("payload").ok_or(Error::JwsParseError)?
-            .as_str().ok_or(Error::JwsParseError)?
-        ;
+            .get("payload")
+            .ok_or(Error::JwsParseError)?
+            .as_str()
+            .ok_or(Error::JwsParseError)?;
         let payload_string_decoded = base64_url::decode(&payload_string_encoded)?;
         let payload_jwm_header: JwmHeader = serde_json::from_slice(&payload_string_decoded)?;
         let received_message = Message::receive(&jws_string, None, None, None)?;
@@ -1357,7 +1462,7 @@ mod serialization_tests {
         assert_eq!(jws_jwm_header.typ, MessageType::DidcommJws);
         assert_eq!(payload_jwm_header.typ, MessageType::DidcommRaw);
         assert_eq!(received_message.jwm_header.typ, MessageType::DidcommRaw);
-        
+
         Ok(())
     }
 
@@ -1366,16 +1471,13 @@ mod serialization_tests {
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"]);
-        
+
         let jwm_string: String = serde_json::to_string(&message)?;
         let jwm_object: Value = serde_json::from_str(&jwm_string)?;
 
         assert_eq!(jwm_object["body"].as_object().is_some(), true);
-        assert_eq!(
-            serde_json::to_string(&jwm_object["body"])?,
-            "{}",
-        );
-        
+        assert_eq!(serde_json::to_string(&jwm_object["body"])?, "{}",);
+
         Ok(())
     }
 
@@ -1385,7 +1487,7 @@ mod serialization_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .set_body(r#"{"foo":"bar"}"#);
-        
+
         let jwm_string: String = serde_json::to_string(&message)?;
         let jwm_object: Value = serde_json::from_str(&jwm_string)?;
 
@@ -1394,7 +1496,7 @@ mod serialization_tests {
             serde_json::to_string(&jwm_object["body"])?,
             r#"{"foo":"bar"}"#,
         );
-        
+
         Ok(())
     }
 }
@@ -1407,11 +1509,15 @@ mod jwe_tests {
     use super::*;
 
     use k256::elliptic_curve::rand_core::OsRng;
-    use utilities::{KeyPairSet, get_keypair_set};
+    use utilities::{get_keypair_set, KeyPairSet};
 
     #[test]
     fn can_create_flat_jwe_json() -> Result<(), Error> {
-        let KeyPairSet { alice_private, bobs_public, ..  } = get_keypair_set();
+        let KeyPairSet {
+            alice_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1428,10 +1534,22 @@ mod jwe_tests {
 
         let jwe_object: Value = serde_json::from_str(&jwe_string)?;
 
-        assert_eq!(jwe_object["recipients"].as_array().is_none(), true, "recipients present in JWE");
-        assert_eq!(jwe_object["encrypted_key"].as_str().is_some(), true, "no recipients fields in JWE top level");
-        assert_eq!(jwe_object["header"].as_object().is_some(), true, "no recipients fields in JWE top level");
-        
+        assert_eq!(
+            jwe_object["recipients"].as_array().is_none(),
+            true,
+            "recipients present in JWE"
+        );
+        assert_eq!(
+            jwe_object["encrypted_key"].as_str().is_some(),
+            true,
+            "no recipients fields in JWE top level"
+        );
+        assert_eq!(
+            jwe_object["header"].as_object().is_some(),
+            true,
+            "no recipients fields in JWE top level"
+        );
+
         Ok(())
     }
 
@@ -1460,23 +1578,16 @@ mod jwe_tests {
             Some(&bobs_public),
         )?;
 
-        let received = Message::receive(
-            &jwe_string,
-            Some(&bobs_private),
-            Some(&alice_public),
-            None,
-        );
+        let received =
+            Message::receive(&jwe_string, Some(&bobs_private), Some(&alice_public), None);
 
         // Assert
         assert!(&received.is_ok());
         let received = received.unwrap();
         let sample_body: Value = serde_json::from_str(&body).unwrap();
         let received_body: Value = serde_json::from_str(&received.get_body().unwrap()).unwrap();
-        assert_eq!(
-            sample_body.to_string(),
-            received_body.to_string(),
-        );
-        
+        assert_eq!(sample_body.to_string(), received_body.to_string(),);
+
         Ok(())
     }
 }
@@ -1504,7 +1615,7 @@ mod jws_tests {
 
         assert_eq!(jws_object["signature"].as_str().is_some(), true);
         assert_eq!(jws_object["signatures"].as_array().is_some(), false);
-        
+
         Ok(())
     }
 
@@ -1522,7 +1633,7 @@ mod jws_tests {
 
         assert_eq!(jws_object["signature"].as_str().is_some(), false);
         assert_eq!(jws_object["signatures"].as_array().is_some(), true);
-        
+
         Ok(())
     }
 
@@ -1548,7 +1659,7 @@ mod jws_tests {
             None,
         );
         assert_eq!(received.is_ok(), true);
-        
+
         Ok(())
     }
 
@@ -1574,7 +1685,7 @@ mod jws_tests {
             None,
         );
         assert_eq!(received.is_ok(), true);
-        
+
         Ok(())
     }
 }

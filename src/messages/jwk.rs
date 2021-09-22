@@ -37,8 +37,7 @@ impl Jwk {
     }
     /// Creates `epk` jwk entry with required properties.
     /// Correctness is not verified by this constructor and totaly rely on caller.
-    pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: Option<String>)
-        -> Self {
+    pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: Option<String>) -> Self {
         self.epk = Some(Epk { kty, crv, x, y });
         self
     }

@@ -1,11 +1,6 @@
-use base64_url::{encode, decode};
-use rand::{Rng, prelude::SliceRandom};
-use crate::{
-    Jwk,
-    JwmHeader,
-    Recepient,
-    messages::serialization::base64_jwm_header,
-};
+use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recepient};
+use base64_url::{decode, encode};
+use rand::{prelude::SliceRandom, Rng};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {
@@ -31,7 +26,7 @@ macro_rules! create_getter {
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Jwe {
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with="base64_jwm_header")]
+    #[serde(with = "base64_jwm_header")]
     #[serde(default)]
     pub protected: Option<JwmHeader>,
 
@@ -146,14 +141,7 @@ fn default_jwe_with_random_iv() {
     // Arrange
     let not_expected: Vec<u8> = vec![0; 24];
     // Act
-    let jwe = Jwe::new(
-        None,
-        None,
-        vec![],
-        None,
-        Some(vec![]),
-        None,
-    );
+    let jwe = Jwe::new(None, None, vec![], None, Some(vec![]), None);
     // Assert
     assert_ne!(not_expected, decode(&jwe.iv).unwrap());
 }

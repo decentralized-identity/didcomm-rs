@@ -1,19 +1,10 @@
-use rand::{
-    Rng,
-};
-use std::{
-    time::SystemTime,
-    collections::HashMap,
-};
-use crate::{
-    Error,
-    Jwk,
-    crypto::{
-        CryptoAlgorithm,
-        SignatureAlgorithm
-    },
-};
 use super::{MessageType, PriorClaims};
+use crate::{
+    crypto::{CryptoAlgorithm, SignatureAlgorithm},
+    Error, Jwk,
+};
+use rand::Rng;
+use std::{collections::HashMap, time::SystemTime};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
@@ -38,7 +29,7 @@ impl DidcommHeader {
     pub fn new() -> Self {
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
-            to: vec!(String::default()),
+            to: vec![String::default()],
             from: Some(String::default()),
             created_time: None,
             expires_time: None,
@@ -59,12 +50,20 @@ impl DidcommHeader {
     }
     /// Creates set of DIDComm related headers with the static forward type
     ///
-    pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
+    pub fn forward(
+        to: Vec<String>,
+        from: Option<String>,
+        expires_time: Option<u64>,
+    ) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: DidcommHeader::gen_random_id(),
             to,
             from,
-            created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()),
+            created_time: Some(
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_secs(),
+            ),
             expires_time,
             ..DidcommHeader::new()
         })
@@ -127,13 +126,13 @@ impl JwmHeader {
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
-            },
+            }
             SignatureAlgorithm::Es256 => {
                 self.alg = Some(String::from("ES256"));
-            },
+            }
             SignatureAlgorithm::Es256k => {
                 self.alg = Some(String::from("ES256K"));
-            },
+            }
         }
     }
     /// Setter of JOSE header preperties to identify which crypto alg and key type used.
@@ -144,7 +143,7 @@ impl JwmHeader {
             CryptoAlgorithm::A256GCM => {
                 self.enc = Some("A256GCM".into());
                 self.alg = Some("ECDH-1PU+A256KW".into());
-            },
+            }
             CryptoAlgorithm::XC20P => {
                 self.enc = Some("XC20P".into());
                 self.alg = Some("ECDH-1PU+XC20PKW".into());
@@ -180,14 +179,14 @@ impl Default for JwmHeader {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Recepient {
     pub header: Jwk,
-    pub encrypted_key: String
+    pub encrypted_key: String,
 }
 
 impl Recepient {
     pub fn new(header: Jwk, encrypted_key: String) -> Self {
         Recepient {
             header,
-            encrypted_key
+            encrypted_key,
         }
     }
 }
