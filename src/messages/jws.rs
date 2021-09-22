@@ -23,12 +23,12 @@ macro_rules! create_getter {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SignatureValue {
     #[serde(skip_serializing_if = "Option::is_none")]
-	#[serde(with="base64_jwm_header")]
+    #[serde(with="base64_jwm_header")]
     #[serde(default)]
     pub protected: Option<JwmHeader>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<JwmHeader>,
-	#[serde(with="base64_buffer")]
+    #[serde(with="base64_buffer")]
     #[serde(default)]
     pub signature: Vec<u8>,
 }

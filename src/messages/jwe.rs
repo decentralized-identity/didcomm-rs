@@ -31,7 +31,7 @@ macro_rules! create_getter {
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Jwe {
     #[serde(skip_serializing_if = "Option::is_none")]
-	#[serde(with="base64_jwm_header")]
+    #[serde(with="base64_jwm_header")]
     #[serde(default)]
     pub protected: Option<JwmHeader>,
 

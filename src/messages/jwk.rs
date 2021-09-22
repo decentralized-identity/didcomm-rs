@@ -39,7 +39,7 @@ impl Jwk {
     /// Correctness is not verified by this constructor and totaly rely on caller.
     pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: Option<String>)
         -> Self {
-        self.epk = Some(Epk { kty, crv, x, y: y });
+        self.epk = Some(Epk { kty, crv, x, y });
         self
     }
     /// Insert new custom, non-defined by spec, header.
