@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use base64_url::{decode, encode};
 use serde_json::Value;
 
-use crate::{DidcommHeader, Error, Jwe, Jws, MessageType, crypto::{
+use crate::{DidcommHeader, Error, Jwe, Jws, crypto::{
         SignatureAlgorithm,
         SymmetricCypherMethod,
         SigningMethod,
@@ -52,15 +52,34 @@ impl Message {
                 aad,
             )?;
             let (cyphertext, tag) = cyphertext_and_tag.split_at(cyphertext_and_tag.len() - 16);
-            let jwe = Jwe::new(
-                None,
-                self.recepients.clone(),
-                cyphertext.to_vec(),
-                Some(header),
-                None,
-                Some(tag),
-                Some(iv),
-            );
+            let jwe;
+            if self.serialize_flat_jwe {
+                let recepients = self.recepients
+                    .ok_or_else(||
+                        Error::Generic("flat JWE JSON serialization needs a recipient".to_string()))?;
+                if recepients.len() != 1 {
+                    return Err(
+                        Error::Generic("flat JWE JSON serialization needs exactly one recipient".to_string()));
+                }
+
+                jwe = Jwe::new_flat(
+                    None,
+                    recepients[0].clone(),
+                    cyphertext.to_vec(),
+                    Some(header),
+                    Some(tag),
+                    Some(iv),
+                );
+            } else {
+                jwe = Jwe::new(
+                    None,
+                    self.recepients.clone(),
+                    cyphertext.to_vec(),
+                    Some(header),
+                    Some(tag),
+                    Some(iv),
+                );
+            }
             Ok(serde_json::to_string(&jwe)?)
     }
     /// Decrypts received cypher into instance of `Message`.

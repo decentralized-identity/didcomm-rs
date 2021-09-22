@@ -1,6 +1,5 @@
 use std::{convert::TryInto, time::SystemTime};
 use aes_gcm::{Aes256Gcm, aead::generic_array::GenericArray};
-use base64_url::{encode, decode};
 use k256::elliptic_curve::rand_core;
 use rand::{Rng, prelude::SliceRandom};
 use serde::{Serialize, Deserialize};
@@ -43,7 +42,7 @@ use crate::crypto::{
 };
 use std::convert::TryFrom;
 use sha2::{Digest, Sha256};
-use crate::{Error, Jwe, MessageType, RecipientValue, SignatureValue};
+use crate::{Error, Jwe, MessageType, SignatureValue};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -62,6 +61,10 @@ pub struct Message {
     ///     as base64url String of raw bytes of data.
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
     pub(crate) body: Value,
+    /// Flag that toggles JWE serialization to flat JSON.
+    /// Not part of the serialized JSON and ignored when deserializing.
+    #[serde(skip)]
+    pub serialize_flat_jwe: bool,
 }
 
 /// Helper type to check if received message is plain, signed or encrypted
@@ -82,6 +85,7 @@ impl Message {
             didcomm_header: DidcommHeader::new(),
             recepients: None,
             body: Value::Null,
+            serialize_flat_jwe: false,
         }
     }
     /// Setter of `from` header
@@ -224,6 +228,12 @@ impl Message {
         }
         self
     }
+    /// Sets message to be serialized as flat JSON.
+    /// If this message has multiple targets, `seal`ing it will result in an Error.
+    pub fn as_flat_jwe(mut self) -> Self {
+        self.serialize_flat_jwe = true;
+        self
+    }
     /// Serializez current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
     ///
@@ -255,6 +265,8 @@ impl Message {
 
         if self.didcomm_header.to.len() == 0 as usize {
             todo!(); // What should happen in this scenario?
+        } else if self.serialize_flat_jwe && self.didcomm_header.to.len() > 1 {
+            return Err(Error::Generic("flat JWE serialization only supports a single `to`".to_string()));
         }
 
         let mut recepients: Vec<Recepient> = vec!();
@@ -262,9 +274,8 @@ impl Message {
         for dest in &self.didcomm_header.to {
             let rv = self.encrypt_cek(&sk.as_ref(), dest, &cek, recipient_public_key)?;
             recepients.push(Recepient::new(
-                rv.header.ok_or_else(
-                    || Error::Generic("could not get recipient header value".to_string()))?,
-                encode(&rv.encrypted_key),
+                rv.header,
+                rv.encrypted_key,
             ));
         }
         self.recepients = Some(recepients);
@@ -401,7 +412,7 @@ impl Message {
         dest: &str,
         cek: &[u8; 32],
         recipient_public_key: Option<&[u8]>,
-    ) -> Result<RecipientValue, Error> {
+    ) -> Result<Recepient, Error> {
         trace!("creating per-recipient JWE value for {}", &dest);
         let alg = self.jwm_header.alg.as_ref()
             .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
@@ -464,14 +475,19 @@ impl Message {
         };
 
         let (sealed_cek, tag) = sealed_cek_and_tag.split_at(sealed_cek_and_tag.len() - 16);
-        jwk.add_other_header("iv".to_string(), encode(&iv));
-        jwk.add_other_header("tag".to_string(), encode(&tag));
+        jwk.add_other_header("iv".to_string(), base64_url::encode(&iv));
+        jwk.add_other_header("tag".to_string(), base64_url::encode(&tag));
 
         // finish jwk and build result
-        let jwk = jwk.ephemeral("OKP".to_string(), "X25519".to_string(), encode(epk_public.as_bytes()), None);
-        Ok(RecipientValue {
-            header: Some(jwk),
-            encrypted_key: sealed_cek.to_vec(),
+        let jwk = jwk.ephemeral(
+            "OKP".to_string(),
+            "X25519".to_string(),
+            base64_url::encode(epk_public.as_bytes()),
+            None,
+        );
+        Ok(Recepient {
+            header: jwk,
+            encrypted_key: base64_url::encode(sealed_cek),
         })
     }
 
@@ -503,7 +519,7 @@ impl Message {
         // zE (temporary secret)
         let epk = recipient.header.epk.as_ref()
             .ok_or_else(|| Error::Generic("JWM header is missing epk".to_string()))?;
-        let epk_public_array: [u8; 32] = decode(&epk.x)?
+        let epk_public_array: [u8; 32] = base64_url::decode(&epk.x)?
             .try_into()
             .map_err(|_err| Error::Generic("failed to decode epk public key".to_string()))?;
         let epk_public = PublicKey::from(epk_public_array);
@@ -518,13 +534,13 @@ impl Message {
 
         let iv = recipient.header.other.get("iv")
             .ok_or_else(|| Error::Generic("missing iv in header".to_string()))?;
-        let iv_bytes = decode(&iv)?;
+        let iv_bytes = base64_url::decode(&iv)?;
 
         let tag = recipient.header.other.get("tag")
             .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
         let mut cyphertext_and_tag: Vec<u8> = vec![];
-        cyphertext_and_tag.extend(decode(&recipient.encrypted_key)?);
-        cyphertext_and_tag.extend(&decode(&tag)?);
+        cyphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
+        cyphertext_and_tag.extend(&base64_url::decode(&tag)?);
 
         match alg.as_ref() {
             "ECDH-1PU+XC20PKW" => {
@@ -737,8 +753,15 @@ impl Message {
             .diffie_hellman(&PublicKey::from(array_ref!(signing_sender_public_key, 0, 32).to_owned()));
         let a: CryptoAlgorithm = alg.try_into()?;
         let m: Message;
+        let recipients_from_jwe: Option<Vec<Recepient>>; 
         if jwe.recepients.as_ref().is_some() {
-            let recepients = jwe.recepients.as_ref().ok_or(Error::JweParseError)?;
+            recipients_from_jwe = jwe.recepients.clone();
+        } else if let Some(recepient) = jwe.recepient.as_ref() {
+            recipients_from_jwe = Some(vec![recepient.clone()]);
+        } else {
+            recipients_from_jwe = None;
+        }
+        if let Some(recepients) = recipients_from_jwe {
             let mut key: Vec<u8> = vec![];
             for recepient in recepients {
                 let decrypted_key = Message::decrypt_cek(&jwe, &sk, &recepient, sender_public_key);
@@ -1083,7 +1106,7 @@ mod message_type_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jws(&SignatureAlgorithm::EdDsa)
             .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
-        
+
         let jws_object: Value = serde_json::from_str(&jws_string)?;
 
         assert_eq!(jws_object["protected"].as_str().is_some(), true);
@@ -1170,6 +1193,88 @@ mod message_type_tests {
         assert_eq!(
             protected_object["typ"].as_str().ok_or(Error::JwmHeaderParseError)?,
             "https://didcomm.org/routing/2.0/forward",
+        );
+        
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod jwe_flat_json_tests {
+    extern crate chacha20poly1305;
+    extern crate sodiumoxide;
+
+    use super::*;
+
+    use k256::elliptic_curve::rand_core::OsRng;
+    use utilities::{KeyPairSet, get_keypair_set};
+
+    #[test]
+    fn can_create_flat_jwe_json() -> Result<(), Error> {
+        let KeyPairSet { alice_private, bobs_public, ..  } = get_keypair_set();
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let message = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+            .as_flat_jwe()
+            .kid(&hex::encode(sign_keypair.public.to_bytes()));
+
+        let jwe_string = message.seal_signed(
+            &alice_private,
+            &sign_keypair.to_bytes(),
+            SignatureAlgorithm::EdDsa,
+            Some(&bobs_public),
+        )?;
+
+        let jwe_object: Value = serde_json::from_str(&jwe_string)?;
+
+        assert_eq!(jwe_object["recipients"].as_array().is_none(), true, "recipients present in JWE");
+        assert_eq!(jwe_object["encrypted_key"].as_str().is_some(), true, "no recipients fields in JWE top level");
+        assert_eq!(jwe_object["header"].as_object().is_some(), true, "no recipients fields in JWE top level");
+        
+        Ok(())
+    }
+
+    #[test]
+    fn can_receive_flat_jwe_json() -> Result<(), Error> {
+        let KeyPairSet {
+            alice_private,
+            alice_public,
+            bobs_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
+        let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
+        let body = r#"{"foo":"bar"}"#;
+        let message = Message::new()
+            .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
+            .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+            .set_body(&body) // packing in some payload
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+            .as_flat_jwe()
+            .kid(&hex::encode(sign_keypair.public.to_bytes()));
+
+        let jwe_string = message.seal_signed(
+            &alice_private,
+            &sign_keypair.to_bytes(),
+            SignatureAlgorithm::EdDsa,
+            Some(&bobs_public),
+        )?;
+
+        let received = Message::receive(
+            &jwe_string,
+            &bobs_private,
+            Some(&alice_public)); // and now we parse received
+
+        // Assert
+        assert!(&received.is_ok());
+        let received = received.unwrap();
+        let sample_body: Value = serde_json::from_str(&body).unwrap();
+        let received_body: Value = serde_json::from_str(&received.get_body().unwrap()).unwrap();
+        assert_eq!(
+            sample_body.to_string(),
+            received_body.to_string(),
         );
         
         Ok(())

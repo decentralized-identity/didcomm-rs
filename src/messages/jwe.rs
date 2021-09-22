@@ -4,7 +4,7 @@ use crate::{
     Jwk,
     JwmHeader,
     Recepient,
-    messages::serialization::{base64_buffer, base64_jwm_header},
+    messages::serialization::base64_jwm_header,
 };
 
 macro_rules! create_getter {
@@ -25,16 +25,6 @@ macro_rules! create_getter {
     };
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct RecipientValue {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub header: Option<Jwk>,
-
-    #[serde(with="base64_buffer")]
-    #[serde(default)]
-    pub encrypted_key: Vec<u8>,
-}
-
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
 ///
@@ -48,6 +38,14 @@ pub struct Jwe {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unprotected: Option<JwmHeader>,
 
+    /// Top-level recipient data for flat JWE JSON messages.
+    /// Will be ignored if `recepients` is not `None`
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recepient: Option<Recepient>,
+
+    /// Pre-recipient data for flat JWE JSON messages.
+    /// If not `None`, will be preferred over `recepient`.
     #[serde(rename = "recipients")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recepients: Option<Vec<Recepient>>,
@@ -58,10 +56,6 @@ pub struct Jwe {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
-
-    #[serde(flatten)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub recipient_value: Option<RecipientValue>,
 }
 
 impl Jwe {
@@ -71,31 +65,37 @@ impl Jwe {
         recepients: Option<Vec<Recepient>>,
         ciphertext: impl AsRef<[u8]>,
         protected: Option<JwmHeader>,
-        recipient_value: Option<RecipientValue>,
         tag: Option<impl AsRef<[u8]>>,
         iv_input: Option<String>,
     ) -> Self {
-        let mut rng = rand::thread_rng();
-        let mut a = rng.gen::<[u8; 24]>().to_vec();
-        a.shuffle(&mut rng);
-        let tag_value = match tag {
-            Some(tag_unencoded) => Some(encode(tag_unencoded.as_ref())),
-            None => None,
-        };
-        let iv = iv_input.unwrap_or_else(|| {
-            let mut rng = rand::thread_rng();
-            let mut a = rng.gen::<[u8; 24]>().to_vec();
-            a.shuffle(&mut rng);
-            encode(&a)
-        });
         Jwe {
             unprotected,
             recepients,
             ciphertext: encode(ciphertext.as_ref()),
             protected,
-            iv,
-            recipient_value,
-            tag: tag_value,
+            iv: Self::ensure_iv(iv_input),
+            tag: tag.map(|tag_unencoded| encode(tag_unencoded.as_ref())),
+            recepient: None,
+        }
+    }
+
+    /// Constructor for creating a flat JWE JSON
+    pub fn new_flat(
+        unprotected: Option<JwmHeader>,
+        recepient: Recepient,
+        ciphertext: impl AsRef<[u8]>,
+        protected: Option<JwmHeader>,
+        tag: Option<impl AsRef<[u8]>>,
+        iv_input: Option<String>,
+    ) -> Self {
+        Jwe {
+            unprotected,
+            recepients: None,
+            ciphertext: encode(ciphertext.as_ref()),
+            protected,
+            iv: Self::ensure_iv(iv_input),
+            tag: tag.map(|tag_unencoded| encode(tag_unencoded.as_ref())),
+            recepient: Some(recepient),
         }
     }
 
@@ -117,6 +117,20 @@ impl Jwe {
         decode(&self.iv).unwrap()
     }
 
+    /// Gets initial vector from option or creates a new one.
+    ///
+    /// # Parameters
+    ///
+    /// `iv_input` - an option that may contain an initial vector
+    fn ensure_iv(iv_input: Option<String>) -> String {
+        iv_input.unwrap_or_else(|| {
+            let mut rng = rand::thread_rng();
+            let mut a = rng.gen::<[u8; 24]>().to_vec();
+            a.shuffle(&mut rng);
+            encode(&a)
+        })
+    }
+
     create_getter!(enc, String);
     create_getter!(kid, String);
     create_getter!(skid, String);
@@ -136,7 +150,6 @@ fn default_jwe_with_random_iv() {
         None,
         None,
         vec![],
-        None,
         None,
         Some(vec![]),
         None,
