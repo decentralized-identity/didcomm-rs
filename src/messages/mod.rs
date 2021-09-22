@@ -16,14 +16,13 @@ pub use headers::*;
 pub use jwe::*;
 pub use jwk::*;
 pub use jws::*;
-pub use message::*;
-pub use prior_claims::*;
-pub use types::*;
 // pub use didurl::*;
 pub use mediated::*;
-
+pub use message::*;
+pub use prior_claims::*;
 #[cfg(feature = "raw-crypto")]
 pub use raw::*;
+pub use types::*;
 
 pub trait Shape: Sized {
     type Err;

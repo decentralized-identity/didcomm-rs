@@ -1,7 +1,9 @@
-use base64_url::{decode, encode};
-use serde_json::Value;
 use std::convert::TryInto;
 
+use base64_url::{decode, encode};
+use serde_json::Value;
+
+use super::Message;
 #[cfg(feature = "resolve")]
 use crate::Recepient;
 use crate::{
@@ -14,8 +16,6 @@ use crate::{
     MessageType,
     Signature,
 };
-
-use super::Message;
 
 #[derive(Serialize, Deserialize)]
 pub struct PayloadToVerify {
@@ -224,9 +224,6 @@ impl Message {
 
 #[cfg(test)]
 mod raw_tests {
-    use super::{Error, Message};
-
-    use crate::crypto::CryptoAlgorithm;
     use chacha20poly1305::{
         aead::{Aead, NewAead},
         Key,
@@ -235,6 +232,9 @@ mod raw_tests {
     };
     use sodiumoxide::crypto::secretbox;
     use x25519_dalek::{EphemeralSecret, PublicKey};
+
+    use super::{Error, Message};
+    use crate::crypto::CryptoAlgorithm;
 
     #[test]
     #[allow(non_snake_case)]

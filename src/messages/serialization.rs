@@ -15,8 +15,9 @@ pub(crate) mod base64_buffer {
 
 // see https://users.rust-lang.org/t/serialize-a-vec-u8-to-json-as-base64/57781/2
 pub(crate) mod base64_jwm_header {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::str::from_utf8;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use crate::JwmHeader;
 

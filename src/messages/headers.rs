@@ -1,11 +1,13 @@
+use std::{collections::HashMap, time::SystemTime};
+
+use rand::Rng;
+
 use super::{MessageType, PriorClaims};
 use crate::{
     crypto::{CryptoAlgorithm, SignatureAlgorithm},
     Error,
     Jwk,
 };
-use rand::Rng;
-use std::{collections::HashMap, time::SystemTime};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {

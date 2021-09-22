@@ -1,5 +1,6 @@
-use super::*;
 use std::convert::TryFrom;
+
+use super::*;
 
 /// Plugable closure generator enum, which creates instance of crypto function
 ///     based on selected algorythm types.

@@ -1,5 +1,6 @@
-use super::*;
 use std::convert::TryFrom;
+
+use super::*;
 
 /// Signature related batteries for DIDComm.
 /// Implementation of all algorithms required by (spec)[https://identity.foundation/didcomm-messaging/spec/#algorithms]

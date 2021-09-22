@@ -1,6 +1,7 @@
-use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recepient};
 use base64_url::{decode, encode};
 use rand::{prelude::SliceRandom, Rng};
+
+use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recepient};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {

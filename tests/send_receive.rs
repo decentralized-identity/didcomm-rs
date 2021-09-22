@@ -3,7 +3,6 @@ mod common;
 
 use didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message};
 use utilities::{get_keypair_set, KeyPairSet};
-
 #[cfg(not(feature = "resolve"))]
 use {
     common::*,

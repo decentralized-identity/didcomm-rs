@@ -1,11 +1,8 @@
-use super::{
-    headers::{DidcommHeader, JwmHeader},
-    mediated::Mediated,
-    prior_claims::PriorClaims,
+use std::{
+    convert::{TryFrom, TryInto},
+    time::SystemTime,
 };
-#[cfg(feature = "raw-crypto")]
-use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
-use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recepient, Signature};
+
 use aes_gcm::{aead::generic_array::GenericArray, Aes256Gcm};
 use arrayref::array_ref;
 use chacha20poly1305::{
@@ -21,11 +18,16 @@ use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, value::RawValue, Value};
 use sha2::{Digest, Sha256};
-use std::{
-    convert::{TryFrom, TryInto},
-    time::SystemTime,
-};
 use x25519_dalek::{PublicKey, StaticSecret};
+
+use super::{
+    headers::{DidcommHeader, JwmHeader},
+    mediated::Mediated,
+    prior_claims::PriorClaims,
+};
+#[cfg(feature = "raw-crypto")]
+use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
+use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recepient, Signature};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -985,13 +987,12 @@ mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
-    use super::*;
-
+    #[cfg(feature = "resolve")]
+    use base58::FromBase58;
     use k256::elliptic_curve::rand_core::OsRng;
     use utilities::{get_keypair_set, KeyPairSet};
 
-    #[cfg(feature = "resolve")]
-    use base58::FromBase58;
+    use super::*;
 
     #[test]
     #[cfg(feature = "resolve")]
@@ -1288,11 +1289,12 @@ mod crypto_tests {
 
 #[cfg(test)]
 mod serialization_tests {
-    use super::*;
+    use std::str::from_utf8;
 
     use k256::elliptic_curve::rand_core::OsRng;
-    use std::str::from_utf8;
     use utilities::{get_keypair_set, KeyPairSet};
+
+    use super::*;
 
     #[test]
     fn sets_message_type_correctly_for_plain_messages() -> Result<(), Error> {
@@ -1507,10 +1509,10 @@ mod jwe_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
-    use super::*;
-
     use k256::elliptic_curve::rand_core::OsRng;
     use utilities::{get_keypair_set, KeyPairSet};
+
+    use super::*;
 
     #[test]
     fn can_create_flat_jwe_json() -> Result<(), Error> {
@@ -1598,9 +1600,9 @@ mod jws_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
-    use super::*;
-
     use k256::elliptic_curve::rand_core::OsRng;
+
+    use super::*;
 
     #[test]
     fn can_create_flattened_jws_jsons() -> Result<(), Error> {
