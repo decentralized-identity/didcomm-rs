@@ -1,9 +1,9 @@
-use super::*;
 use std::convert::TryFrom;
+
+use super::*;
 
 /// Signature related batteries for DIDComm.
 /// Implementation of all algorithms required by (spec)[https://identity.foundation/didcomm-messaging/spec/#algorithms]
-///
 #[derive(Debug, Clone)]
 pub enum SignatureAlgorithm {
     /// `ed25519` signature
@@ -24,7 +24,6 @@ impl Signer for SignatureAlgorithm {
     /// let signer = SignatureAlgorithm::Es256k.signer();
     /// # }
     ///```
-    ///
     fn signer(&self) -> SigningMethod {
         match self {
             // an &[u8] representing the scalar for the secret key, and a compressed Edwards-Y coordinate of a point on curve25519, both as bytes.
@@ -54,6 +53,7 @@ impl Signer for SignatureAlgorithm {
             }
         }
     }
+
     /// Builds validator FnOnce, which performs signature validation.
     ///
     /// # Examples
@@ -63,7 +63,6 @@ impl Signer for SignatureAlgorithm {
     /// let validator = SignatureAlgorithm::Es256k.validator();
     /// # }
     /// ```
-    ///
     fn validator(&self) -> ValidationMethod {
         match self {
             SignatureAlgorithm::EdDsa => Box::new(

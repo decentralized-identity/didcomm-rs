@@ -1,11 +1,7 @@
-use base64_url::{encode, decode};
-use rand::{Rng, prelude::SliceRandom};
-use crate::{
-    Jwk,
-    JwmHeader,
-    Recepient,
-    messages::serialization::base64_jwm_header,
-};
+use base64_url::{decode, encode};
+use rand::{prelude::SliceRandom, Rng};
+
+use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recepient};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {
@@ -27,12 +23,11 @@ macro_rules! create_getter {
 
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
-///
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Jwe {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with="base64_jwm_header")]
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(with = "base64_jwm_header")]
     pub protected: Option<JwmHeader>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -107,7 +102,6 @@ impl Jwe {
     }
 
     /// Getter for ciphered payload of JWE.
-    ///
     pub fn payload(&self) -> Vec<u8> {
         decode(&self.ciphertext).unwrap()
     }
@@ -131,14 +125,21 @@ impl Jwe {
         })
     }
 
-    create_getter!(enc, String);
-    create_getter!(kid, String);
-    create_getter!(skid, String);
     create_getter!(alg, String);
-    create_getter!(jku, String);
-    create_getter!(jwk, Jwk);
-    create_getter!(epk, Jwk);
+
     create_getter!(cty, String);
+
+    create_getter!(enc, String);
+
+    create_getter!(epk, Jwk);
+
+    create_getter!(jku, String);
+
+    create_getter!(jwk, Jwk);
+
+    create_getter!(kid, String);
+
+    create_getter!(skid, String);
 }
 
 #[test]
@@ -146,14 +147,7 @@ fn default_jwe_with_random_iv() {
     // Arrange
     let not_expected: Vec<u8> = vec![0; 24];
     // Act
-    let jwe = Jwe::new(
-        None,
-        None,
-        vec![],
-        None,
-        Some(vec![]),
-        None,
-    );
+    let jwe = Jwe::new(None, None, vec![], None, Some(vec![]), None);
     // Assert
     assert_ne!(not_expected, decode(&jwe.iv).unwrap());
 }

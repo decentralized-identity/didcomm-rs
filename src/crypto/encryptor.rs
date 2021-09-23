@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+
 use super::*;
 
 /// Plugable closure generator enum, which creates instance of crypto function
@@ -10,7 +11,6 @@ use super::*;
 ///
 /// Allowed (and implemented) cryptographical algorithms (JWA).
 /// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
-///
 #[derive(Copy, Clone)]
 pub enum CryptoAlgorithm {
     XC20P,
@@ -20,92 +20,78 @@ pub enum CryptoAlgorithm {
 impl Cypher for CryptoAlgorithm {
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms encryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    ///
     fn encryptor(&self) -> SymmetricCypherMethod {
         match self {
-           CryptoAlgorithm::XC20P => {
-               Box::new(|nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
-                   check_nonce(nonce, 24)?;
-                   use chacha20poly1305::{
+            CryptoAlgorithm::XC20P => Box::new(
+                |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
+                    check_nonce(nonce, 24)?;
+                    use chacha20poly1305::{
+                        aead::{Aead, NewAead, Payload},
                         XChaCha20Poly1305,
                         XNonce,
-                        aead::{
-                            Aead,
-                            NewAead,
-                            Payload,
-                        },
                     };
                     let nonce = XNonce::from_slice(nonce);
                     let aead = XChaCha20Poly1305::new(key.into());
-                    aead.encrypt(nonce, Payload { msg: message, aad, }).map_err(|e| Error::Generic(e.to_string()))
-               })
-           },
-           CryptoAlgorithm::A256GCM => {
-               Box::new(|nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
-                   check_nonce(nonce, 12)?;
-                   use aes_gcm::{
-                       Aes256Gcm,
-                       aead::{
-                           Aead,
-                           NewAead,
-                           Payload,
-                           generic_array::GenericArray,
-                        },
-                   };
-                   let nonce = GenericArray::from_slice(&nonce[..12]);
-                   let aead = Aes256Gcm::new(GenericArray::from_slice(key));
-                   aead.encrypt(nonce, Payload { msg: message, aad, }).map_err(|e| Error::Generic(e.to_string()))
-               })
-           }
-       }
+                    aead.encrypt(nonce, Payload { msg: message, aad })
+                        .map_err(|e| Error::Generic(e.to_string()))
+                },
+            ),
+            CryptoAlgorithm::A256GCM => Box::new(
+                |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
+                    check_nonce(nonce, 12)?;
+                    use aes_gcm::{
+                        aead::{generic_array::GenericArray, Aead, NewAead, Payload},
+                        Aes256Gcm,
+                    };
+                    let nonce = GenericArray::from_slice(&nonce[..12]);
+                    let aead = Aes256Gcm::new(GenericArray::from_slice(key));
+                    aead.encrypt(nonce, Payload { msg: message, aad })
+                        .map_err(|e| Error::Generic(e.to_string()))
+                },
+            ),
+        }
     }
+
     /// Generates + invokes crypto of `SymmetricCypherMethod` which perfoms decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    ///
     fn decryptor(&self) -> SymmetricCypherMethod {
         match self {
-            CryptoAlgorithm::XC20P => {
-                Box::new(|nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
+            CryptoAlgorithm::XC20P => Box::new(
+                |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
                     check_nonce(nonce, 24)?;
                     use chacha20poly1305::{
-                            XChaCha20Poly1305,
-                            XNonce,
-                            aead::{
-                                Aead,
-                                NewAead,
-                                Payload,
-                            },
-                        };
+                        aead::{Aead, NewAead, Payload},
+                        XChaCha20Poly1305,
+                        XNonce,
+                    };
                     let aead = XChaCha20Poly1305::new(key.into());
                     let nonce = XNonce::from_slice(&nonce);
-                    aead.decrypt(nonce, Payload { msg: message, aad, }).map_err(|e| Error::Generic(e.to_string()))
-               })
-           },
-           CryptoAlgorithm::A256GCM => {
-               Box::new(|nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
-                   check_nonce(nonce, 12)?;
-                   use aes_gcm::{
-                       Aes256Gcm,
-                       aead::{
-                           Aead,
-                           NewAead,
-                           Payload,
-                           generic_array::GenericArray
-                        },
-                   };
-                   let nonce = GenericArray::from_slice(&nonce[..12]);
-                   let aead = Aes256Gcm::new(GenericArray::from_slice(key));
-                   aead.decrypt(nonce, Payload { msg: message, aad, }).map_err(|e| Error::Generic(e.to_string()))
-               })
-           }
-       }
+                    aead.decrypt(nonce, Payload { msg: message, aad })
+                        .map_err(|e| Error::Generic(e.to_string()))
+                },
+            ),
+            CryptoAlgorithm::A256GCM => Box::new(
+                |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
+                    check_nonce(nonce, 12)?;
+                    use aes_gcm::{
+                        aead::{generic_array::GenericArray, Aead, NewAead, Payload},
+                        Aes256Gcm,
+                    };
+                    let nonce = GenericArray::from_slice(&nonce[..12]);
+                    let aead = Aes256Gcm::new(GenericArray::from_slice(key));
+                    aead.decrypt(nonce, Payload { msg: message, aad })
+                        .map_err(|e| Error::Generic(e.to_string()))
+                },
+            ),
+        }
     }
+
     /// Not implemented - no usecase atm...
     fn assymetric_encryptor(&self) -> AssymetricCyptherMethod {
         match self {
             CryptoAlgorithm::XC20P => {
                 todo!()
-            },
+            }
             CryptoAlgorithm::A256GCM => {
                 todo!()
             }
@@ -123,6 +109,7 @@ impl TryFrom<&String> for CryptoAlgorithm {
         }
     }
 }
+
 // inner helper function
 fn check_nonce(nonce: &[u8], expected_len: usize) -> Result<(), Error> {
     if nonce.len() < expected_len {
@@ -146,10 +133,7 @@ mod batteries_tests {
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
-        let jwe_string_result = m.encrypt(
-            CryptoAlgorithm::XC20P.encryptor(),
-            key
-        );
+        let jwe_string_result = m.encrypt(CryptoAlgorithm::XC20P.encryptor(), key);
         assert!(&jwe_string_result.is_ok());
         let jwe_string = jwe_string_result?;
         let jwe: Jwe = serde_json::from_str(&jwe_string)?;
@@ -157,14 +141,15 @@ mod batteries_tests {
         let s = Message::decrypt(
             &jwe_string.as_bytes(),
             CryptoAlgorithm::XC20P.decryptor(),
-            key
-            )?;
+            key,
+        )?;
         let received_payload = &s.get_body()?;
         // Assert
         assert_eq!(s.jwm_header, original_header);
         assert_eq!(payload, received_payload);
         Ok(())
     }
+
     #[test]
     fn a256gcm_test() -> Result<(), Error> {
         // Arrange
@@ -175,16 +160,13 @@ mod batteries_tests {
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
-        let jwe = m.encrypt(
-            CryptoAlgorithm::A256GCM.encryptor(),
-            key
-        );
+        let jwe = m.encrypt(CryptoAlgorithm::A256GCM.encryptor(), key);
         assert!(&jwe.is_ok());
         let s = Message::decrypt(
             &jwe.unwrap().as_bytes(),
             CryptoAlgorithm::A256GCM.decryptor(),
-            key
-            )?;
+            key,
+        )?;
         let received_payload = &s.get_body()?;
         // Assert
         assert_eq!(s.jwm_header, original_header);

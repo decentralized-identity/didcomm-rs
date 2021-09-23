@@ -1,5 +1,4 @@
 /// Enum that represents DIDComm envelope type
-///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum MessageType {
     #[serde(rename = "application/didcomm-encrypted+json")]
@@ -13,7 +12,6 @@ pub enum MessageType {
 }
 
 /// Enum that represents DIDComm message payload type
-///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ContentType {
     #[serde(rename = "https://didcomm.org/routing/2.0/forward")]
