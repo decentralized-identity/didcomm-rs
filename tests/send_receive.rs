@@ -38,7 +38,7 @@ fn send_receive_raw() {
 }
 
 #[test]
-fn send_receive_mediated_encrypted_xc20p_json_test_new() {
+fn send_receive_mediated_encrypted_xc20p_json_test() {
     let KeyPairSet {
         alice_private,
         alice_public,
@@ -83,65 +83,6 @@ fn send_receive_mediated_encrypted_xc20p_json_test_new() {
     );
     assert!(bob_received.is_ok());
 }
-
-// #[test]
-// #[cfg(not(feature = "resolve"))]
-// fn send_receive_mediated_encrypted_xc20p_json_test() {
-//     // Arrange
-//     // keys
-//     let alice_secret = EphemeralSecret::new(OsRng);
-//     let alice_public = PublicKey::from(&alice_secret);
-//     let alice_secret_2 = EphemeralSecret::new(OsRng);
-//     let alice_public_2 = PublicKey::from(&alice_secret_2);
-//     let bob_mediator_secret = EphemeralSecret::new(OsRng);
-//     let bob_mediator_public = PublicKey::from(&bob_mediator_secret);
-//     let bob_secret = EphemeralSecret::new(OsRng);
-//     let bob_public = PublicKey::from(&bob_secret);
-//     // DIDComm related setup
-//     let ek_to_bob = alice_secret.diffie_hellman(&bob_public);
-//     let ek_to_mediator = alice_secret_2.diffie_hellman(&bob_mediator_public);
-
-//     // Message construction
-//     let sealed = Message::new() // creating message
-//         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp") // setting from
-//         .to(&["did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp", "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"]) // setting to
-//         .set_body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
-//         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bob_public.to_bytes())) // set JOSE header for XC20P algorithm
-//         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
-//         .add_header_field("another_key".into(), "another_value".into()) // another custom header
-//         .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#) // set kid header
-//         .routed_by(ek_to_bob.as_bytes(), "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf", Some(&bob_mediator_public.to_bytes())); // here we use destination key to bob and `to` header of mediator
-
-//     // Act + Assert as we go
-//     assert!(&sealed.is_ok());
-
-//     // Message envelope to mediator
-//     let message_object: Message = serde_json::from_str(&message.unwrap()).unwrap();
-//     let ready_to_send = message_object
-//         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bob_mediator_public.to_bytes())) // here this method call is crucial as mediator and end receiver may use different algorithms.
-//         .seal(ek_to_mediator.as_bytes(), Some(&bob_mediator_public.to_bytes())); // this would've failed without previous method call.
-
-//     assert!(&ready_to_send.is_ok());
-
-//     // Received by mediator
-//     let rk_mediator = bob_mediator_secret.diffie_hellman(&alice_public_2); // key to decrypt mediated message
-//     #[cfg(not(feature = "resolve"))]
-//     let received_mediated = Message::receive(&ready_to_send.unwrap(), rk_mediator.as_bytes(), Some(&bob_mediator_public.to_bytes()));
-//     #[cfg(feature = "resolve")]
-//     let received_mediated = Message::receive(&ready_to_send.unwrap(), &"ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap());
-
-//     assert!(&received_mediated.is_ok());
-
-//     // Received by Bob
-//     let rk_bob = bob_secret.diffie_hellman(&alice_public); // key to decrypt final message
-//     #[cfg(not(feature = "resolve"))]
-//     let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().get_body().unwrap().as_ref()), rk_bob.as_bytes(), None);
-//     #[cfg(feature = "resolve")]
-//     let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap());
-
-//     assert!(&received_bob.is_ok());
-//     assert_eq!(received_bob.unwrap().get_body().unwrap(), sample_dids::TEST_DID_SIGN_1);
-// }
 
 #[test]
 #[cfg(not(feature = "resolve"))]
