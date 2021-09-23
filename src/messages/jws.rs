@@ -1,5 +1,5 @@
 use crate::{
-    messages::serialization::{base64_buffer, base64_jwm_header},
+    messages::helpers::{serialization_base64_buffer, serialization_base64_jwm_header},
     Jwk,
     JwmHeader,
 };
@@ -26,14 +26,14 @@ macro_rules! create_getter {
 pub struct Signature {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with = "base64_jwm_header")]
+    #[serde(with = "serialization_base64_jwm_header")]
     pub protected: Option<JwmHeader>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<JwmHeader>,
 
     #[serde(default)]
-    #[serde(with = "base64_buffer")]
+    #[serde(with = "serialization_base64_buffer")]
     pub signature: Vec<u8>,
 }
 

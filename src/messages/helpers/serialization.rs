@@ -1,5 +1,5 @@
 // see https://users.rust-lang.org/t/serialize-a-vec-u8-to-json-as-base64/57781/2
-pub(crate) mod base64_buffer {
+pub(crate) mod serialization_base64_buffer {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S: Serializer>(v: &Vec<u8>, s: S) -> Result<S::Ok, S::Error> {
@@ -14,7 +14,7 @@ pub(crate) mod base64_buffer {
 }
 
 // see https://users.rust-lang.org/t/serialize-a-vec-u8-to-json-as-base64/57781/2
-pub(crate) mod base64_jwm_header {
+pub(crate) mod serialization_base64_jwm_header {
     use std::str::from_utf8;
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
