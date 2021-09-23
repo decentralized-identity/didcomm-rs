@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct DidcommHeader {
+pub struct DidCommHeader {
     pub id: String,
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -34,11 +34,11 @@ pub struct DidcommHeader {
     from_prior: Option<PriorClaims>,
 }
 
-impl DidcommHeader {
+impl DidCommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
-        DidcommHeader {
-            id: DidcommHeader::gen_random_id(),
+        DidCommHeader {
+            id: DidCommHeader::gen_random_id(),
             to: vec![String::default()],
             from: Some(String::default()),
             created_time: None,
@@ -55,7 +55,7 @@ impl DidcommHeader {
         format!("{}", id_number)
     }
 
-    /// Getter method for `from_prior` retreival
+    /// Getter method for `from_prior` retrieval
     pub fn from_prior(&self) -> &Option<PriorClaims> {
         &self.from_prior
     }
@@ -66,8 +66,8 @@ impl DidcommHeader {
         from: Option<String>,
         expires_time: Option<u64>,
     ) -> Result<Self, Error> {
-        Ok(DidcommHeader {
-            id: DidcommHeader::gen_random_id(),
+        Ok(DidCommHeader {
+            id: DidCommHeader::gen_random_id(),
             to,
             from,
             created_time: Some(
@@ -76,18 +76,18 @@ impl DidcommHeader {
                     .as_secs(),
             ),
             expires_time,
-            ..DidcommHeader::new()
+            ..DidCommHeader::new()
         })
     }
 }
 
-impl Default for DidcommHeader {
+impl Default for DidCommHeader {
     fn default() -> Self {
-        DidcommHeader::new()
+        DidCommHeader::new()
     }
 }
 
-/// JWM Header as specifiead in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
+/// JWM Header as specified in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
 ///
 /// Designed to work for both [JWE](https://tools.ietf.org/html/rfc7516) and [JWS](https://tools.ietf.org/html/rfc7515) message types.
@@ -153,7 +153,7 @@ impl JwmHeader {
         }
     }
 
-    /// Setter of JOSE header preperties to identify which crypto alg and key type used.
+    /// Setter of JOSE header properties to identify which crypto alg and key type used.
     /// Modifies `enc`, `typ` and `alg` headers.
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         match alg {
@@ -174,10 +174,10 @@ impl JwmHeader {
 }
 
 impl Default for JwmHeader {
-    // Need to make sure nonce is 192 bit long unigue for each message.
+    // Need to make sure nonce is 192 bit long unique for each message.
     fn default() -> Self {
         JwmHeader {
-            typ: MessageType::DidcommRaw,
+            typ: MessageType::DidCommRaw,
             enc: None,
             kid: None,
             skid: None,
@@ -190,20 +190,20 @@ impl Default for JwmHeader {
     }
 }
 
-/// This struct presents single recepient of JWE `recepients` collection.
-/// Each recepient should have same body cypher key ecrypted with shared secret.
+/// This struct presents single recipient of JWE `recipients` collection.
+/// Each recipient should have same body cypher key encrypted with shared secret.
 /// [Spec](https://tools.ietf.org/html/rfc7516#section-7.2.1)
 ///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Recepient {
+pub struct Recipient {
     pub header: Jwk,
 
     pub encrypted_key: String,
 }
 
-impl Recepient {
+impl Recipient {
     pub fn new(header: Jwk, encrypted_key: String) -> Self {
-        Recepient {
+        Recipient {
             header,
             encrypted_key,
         }

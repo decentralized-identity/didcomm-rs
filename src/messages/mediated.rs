@@ -13,7 +13,6 @@ impl Mediated {
     /// Constructor with empty payload
     /// # Parameters
     /// *next - `DidUrl` of delivery target.
-    ///
     pub fn new(next: String) -> Self {
         Mediated {
             next,
@@ -27,7 +26,7 @@ impl Mediated {
     /// ```rust
     /// use std::str::FromStr;
     /// use didcomm_rs::Mediated;
-    /// let warpper_payload = Mediated::new("did:key:abc".into())
+    /// let wrapper_payload = Mediated::new("did:key:abc".into())
     ///     .with_payload(b"hello, abc".to_vec());
     /// ```
     ///

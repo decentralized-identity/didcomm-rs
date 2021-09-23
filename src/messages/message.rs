@@ -21,13 +21,13 @@ use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 use super::{
-    headers::{DidcommHeader, JwmHeader},
+    headers::{DidCommHeader, JwmHeader},
     mediated::Mediated,
     prior_claims::PriorClaims,
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
-use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recepient, Signature};
+use crate::{Error, Jwe, Jwk, Jws, KeyAlgorithm, MessageType, Recipient, Signature};
 
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
@@ -40,10 +40,10 @@ pub struct Message {
 
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
-    pub didcomm_header: DidcommHeader,
+    pub didcomm_header: DidCommHeader,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) recepients: Option<Vec<Recepient>>,
+    pub(crate) recipients: Option<Vec<Recipient>>,
 
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as base64url String of raw bytes of data.
@@ -83,8 +83,8 @@ impl Message {
         }
         Message {
             jwm_header: JwmHeader::default(),
-            didcomm_header: DidcommHeader::new(),
-            recepients: None,
+            didcomm_header: DidCommHeader::new(),
+            recipients: None,
             body: json!({}),
             serialize_flat_jwe: false,
             serialize_flat_jws: false,
@@ -123,7 +123,7 @@ impl Message {
     }
 
     /// Getter of the `body` as ref of bytes slice.
-    /// Helpe method.
+    /// Helper method.
     pub fn get_body(&self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self.body)?)
     }
@@ -177,15 +177,15 @@ impl Message {
         }
     }
 
-    /// `&DidcommHeader` getter.
-    pub fn get_didcomm_header(&self) -> &DidcommHeader {
+    /// `&DidCommHeader` getter.
+    pub fn get_didcomm_header(&self) -> &DidCommHeader {
         &self.didcomm_header
     }
 
     /// Setter of `didcomm_header`.
     /// Replaces existing one with provided by consuming both values.
     /// Returns modified instance of `Self`.
-    pub fn set_didcomm_header(mut self, h: DidcommHeader) -> Self {
+    pub fn set_didcomm_header(mut self, h: DidCommHeader) -> Self {
         self.didcomm_header = h;
         self
     }
@@ -256,7 +256,7 @@ impl Message {
         self.as_jwe(alg, recipient_public_key)
     }
 
-    /// Serializez current state of the message into json.
+    /// Serializes current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
     pub fn as_raw_json(self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self)?)
@@ -268,10 +268,6 @@ impl Message {
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
     // TODO: Add examples
-    // pub fn seal(self, ek: impl AsRef<[u8]>) -> Result<String, Error> {
-    //     let alg = crypter_from_header(&self.jwm_header)?;
-    //     self.encrypt(alg.encryptor(), ek.as_ref())
-    // }
     pub fn seal(
         mut self,
         sk: impl AsRef<[u8]>,
@@ -294,13 +290,13 @@ impl Message {
             ));
         }
 
-        let mut recepients: Vec<Recepient> = vec![];
-        // create jwk from static secret per recepient
+        let mut recipients: Vec<Recipient> = vec![];
+        // create jwk from static secret per recipient
         for dest in &self.didcomm_header.to {
             let rv = self.encrypt_cek(&sk.as_ref(), dest, &cek, recipient_public_key)?;
-            recepients.push(Recepient::new(rv.header, rv.encrypted_key));
+            recipients.push(Recipient::new(rv.header, rv.encrypted_key));
         }
-        self.recepients = Some(recepients);
+        self.recipients = Some(recipients);
         // encrypt original message with static secret
         let alg = crypter_from_header(&self.jwm_header)?;
         self.encrypt(alg.encryptor(), cek.as_ref())
@@ -318,7 +314,7 @@ impl Message {
     /// `alg` - encryption algorithm used
     ///
     /// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
-    /// TODO: Adde examples
+    /// TODO: Add examples
     pub fn seal_signed(
         self,
         ek: &[u8],
@@ -332,13 +328,13 @@ impl Message {
             .sign(signing_algorithm.signer(), signing_sender_private_key)?;
         to.body = serde_json::from_str(&signed)?;
         return to
-            .m_type(MessageType::DidcommJws)
+            .m_type(MessageType::DidCommJws)
             .seal(ek, encryption_recipient_public_key);
     }
 
     /// Wrap self to be mediated by some mediator.
     /// Warning: Should be called on a `Message` instance which is ready to be sent!
-    /// If message is not properly set up for crypto - this method will propogate error from
+    /// If message is not properly set up for crypto - this method will propagate error from
     ///     called `.seal()` method.
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
@@ -347,7 +343,7 @@ impl Message {
     ///
     /// `ek` - encryption key for inner message payload JWE encryption
     ///
-    /// `to` - list of destination recepients. can be empty (Optional) `String::default()`
+    /// `to` - list of destination recipients. can be empty (Optional) `String::default()`
     ///
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
@@ -369,7 +365,7 @@ impl Message {
             .to(&[mediator_did])
             .from(&from)
             .as_jwe(&alg, mediator_public_key)
-            .m_type(MessageType::DidcommForward)
+            .m_type(MessageType::DidCommForward)
             .set_body(&serde_json::to_string(&body)?)
             .seal(ek, mediator_public_key)
     }
@@ -395,7 +391,7 @@ impl Message {
         recipient_public_key: Option<&[u8]>,
     ) -> Result<Vec<u8>, Error> {
         // zS (shared for recipient)
-        let shared = gen_shared_for_recepient(sk.as_ref(), did, recipient_public_key)?;
+        let shared = gen_shared_for_recipient(sk.as_ref(), did, recipient_public_key)?;
         trace!(
             "sk: {:?} shared: {:?} dest: {:?}",
             sk,
@@ -431,7 +427,7 @@ impl Message {
         dest: &str,
         cek: &[u8; 32],
         recipient_public_key: Option<&[u8]>,
-    ) -> Result<Recepient, Error> {
+    ) -> Result<Recipient, Error> {
         trace!("creating per-recipient JWE value for {}", &dest);
         let alg = self
             .jwm_header
@@ -443,7 +439,7 @@ impl Message {
         // zE (temporary secret)
         let epk = StaticSecret::new(rand_core::OsRng);
         let epk_public = PublicKey::from(&epk);
-        let ze = gen_shared_for_recepient(epk.to_bytes(), dest, recipient_public_key)?;
+        let ze = gen_shared_for_recipient(epk.to_bytes(), dest, recipient_public_key)?;
         trace!(
             "ze: {:?} epk_public: {:?}, dest: {:?}",
             &ze.as_ref(),
@@ -517,7 +513,7 @@ impl Message {
             base64_url::encode(epk_public.as_bytes()),
             None,
         );
-        Ok(Recepient {
+        Ok(Recipient {
             header: jwk,
             encrypted_key: base64_url::encode(sealed_cek),
         })
@@ -537,7 +533,7 @@ impl Message {
     fn decrypt_cek(
         jwe: &Jwe,
         sk: &[u8],
-        recipient: &Recepient,
+        recipient: &Recipient,
         recipient_public_key: Option<&[u8]>,
     ) -> Result<Vec<u8>, Error> {
         trace!("decrypting per-recipient JWE value");
@@ -580,9 +576,9 @@ impl Message {
             .other
             .get("tag")
             .ok_or_else(|| Error::Generic("missing tag in header".to_string()))?;
-        let mut cyphertext_and_tag: Vec<u8> = vec![];
-        cyphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
-        cyphertext_and_tag.extend(&base64_url::decode(&tag)?);
+        let mut ciphertext_and_tag: Vec<u8> = vec![];
+        ciphertext_and_tag.extend(base64_url::decode(&recipient.encrypted_key)?);
+        ciphertext_and_tag.extend(&base64_url::decode(&tag)?);
 
         match alg.as_ref() {
             "ECDH-1PU+XC20PKW" => {
@@ -591,7 +587,7 @@ impl Message {
                 let crypter = XChaCha20Poly1305::new(kek_key);
 
                 let cek = crypter
-                    .decrypt(nonce, cyphertext_and_tag.as_ref())
+                    .decrypt(nonce, ciphertext_and_tag.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?;
 
                 Ok(cek)
@@ -602,7 +598,7 @@ impl Message {
                 let crypter = Aes256Gcm::new(kek_key);
 
                 let cek = crypter
-                    .decrypt(nonce, cyphertext_and_tag.as_ref())
+                    .decrypt(nonce, ciphertext_and_tag.as_ref())
                     .map_err(|e| Error::Generic(e.to_string()))?;
 
                 Ok(cek)
@@ -719,7 +715,7 @@ impl Message {
     ) -> Result<Self, Error> {
         let mut current_message: String = incoming.to_string();
 
-        if Self::get_message_type(&current_message)? == MessageType::DidcommJwe {
+        if Self::get_message_type(&current_message)? == MessageType::DidCommJwe {
             current_message = Self::receive_jwe(
                 &current_message,
                 encryption_receiver_private_key,
@@ -727,7 +723,7 @@ impl Message {
             )?;
         }
 
-        if Self::get_message_type(&current_message)? == MessageType::DidcommJws {
+        if Self::get_message_type(&current_message)? == MessageType::DidCommJws {
             current_message = Self::receive_jws(&current_message, signing_sender_public_key)?;
         }
 
@@ -738,10 +734,10 @@ impl Message {
         // try to skip parsing by using known fields from jwe/jws
         let to_check: UnknownReceivedMessage = serde_json::from_str(message)?;
         if to_check.iv.is_some() {
-            return Ok(MessageType::DidcommJwe);
+            return Ok(MessageType::DidCommJwe);
         }
         if to_check.signatures.is_some() || to_check.signature.is_some() {
-            return Ok(MessageType::DidcommJws);
+            return Ok(MessageType::DidCommJws);
         }
         let message: Message = serde_json::from_str(message)?;
         Ok(message.jwm_header.typ)
@@ -785,21 +781,21 @@ impl Message {
             ));
         let a: CryptoAlgorithm = alg.try_into()?;
         let m: Message;
-        let recipients_from_jwe: Option<Vec<Recepient>>;
-        if jwe.recepients.as_ref().is_some() {
-            recipients_from_jwe = jwe.recepients.clone();
-        } else if let Some(recepient) = jwe.recepient.as_ref() {
-            recipients_from_jwe = Some(vec![recepient.clone()]);
+        let recipients_from_jwe: Option<Vec<Recipient>>;
+        if jwe.recipients.as_ref().is_some() {
+            recipients_from_jwe = jwe.recipients.clone();
+        } else if let Some(recipient) = jwe.recipient.as_ref() {
+            recipients_from_jwe = Some(vec![recipient.clone()]);
         } else {
             recipients_from_jwe = None;
         }
-        if let Some(recepients) = recipients_from_jwe {
+        if let Some(recipients) = recipients_from_jwe {
             let mut key: Vec<u8> = vec![];
-            for recepient in recepients {
+            for recipient in recipients {
                 let decrypted_key = Message::decrypt_cek(
                     &jwe,
                     &receiver_private_key,
-                    &recepient,
+                    &recipient,
                     encryption_sender_public_key,
                 );
                 if decrypted_key.is_ok() {
@@ -894,7 +890,7 @@ impl Message {
 }
 
 #[allow(unused_variables)]
-fn gen_shared_for_recepient(
+fn gen_shared_for_recipient(
     sk: impl AsRef<[u8]>,
     did: &str,
     recipient_public_key: Option<&[u8]>,
@@ -944,7 +940,7 @@ mod parse_tests {
     fn iv_from_json_test() {
         // Arrange
         // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
-        // Extendet twice to be 192bit (24byte) nonce.
+        // Extended twice to be 192bit (24byte) nonce.
         let raw_json = r#"{
             "protected": "eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiLU5oN1NoUkJfeGFDQlpSZElpVkN1bDNTb1IwWXc0VEdFUXFxR2lqMXZKcyIsInkiOiI5dEx4ODFQTWZRa3JPdzh5dUkyWXdJMG83TXROemFDR2ZDQmJaQlc1WXJNIn19",
             "recipients": [
@@ -1462,9 +1458,9 @@ mod serialization_tests {
         let payload_jwm_header: JwmHeader = serde_json::from_slice(&payload_string_decoded)?;
         let received_message = Message::receive(&jws_string, None, None, None)?;
 
-        assert_eq!(jws_jwm_header.typ, MessageType::DidcommJws);
-        assert_eq!(payload_jwm_header.typ, MessageType::DidcommRaw);
-        assert_eq!(received_message.jwm_header.typ, MessageType::DidcommRaw);
+        assert_eq!(jws_jwm_header.typ, MessageType::DidCommJws);
+        assert_eq!(payload_jwm_header.typ, MessageType::DidCommRaw);
+        assert_eq!(received_message.jwm_header.typ, MessageType::DidCommRaw);
 
         Ok(())
     }
@@ -1605,7 +1601,7 @@ mod jws_tests {
     use super::*;
 
     #[test]
-    fn can_create_flattened_jws_jsons() -> Result<(), Error> {
+    fn can_create_flattened_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1623,7 +1619,7 @@ mod jws_tests {
     }
 
     #[test]
-    fn can_create_general_jws_jsons() -> Result<(), Error> {
+    fn can_create_general_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1641,7 +1637,7 @@ mod jws_tests {
     }
 
     #[test]
-    fn can_receive_flattened_jws_jsons() -> Result<(), Error> {
+    fn can_receive_flattened_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
@@ -1667,7 +1663,7 @@ mod jws_tests {
     }
 
     #[test]
-    fn can_receive_general_jws_jsons() -> Result<(), Error> {
+    fn can_receive_general_jws_json() -> Result<(), Error> {
         let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
         let jws_string = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")

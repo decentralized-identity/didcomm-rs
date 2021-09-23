@@ -2,13 +2,13 @@
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum MessageType {
     #[serde(rename = "application/didcomm-encrypted+json")]
-    DidcommJwe,
+    DidCommJwe,
     #[serde(rename = "application/didcomm-signed+json")]
-    DidcommJws,
+    DidCommJws,
     #[serde(rename = "application/didcomm-plain+json")]
-    DidcommRaw,
+    DidCommRaw,
     #[serde(rename = "https://didcomm.org/routing/2.0/forward")]
-    DidcommForward,
+    DidCommForward,
 }
 
 /// Enum that represents DIDComm message payload type

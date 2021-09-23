@@ -108,7 +108,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test_new() {
 //         .set_body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
 //         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bob_public.to_bytes())) // set JOSE header for XC20P algorithm
 //         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
-//         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
+//         .add_header_field("another_key".into(), "another_value".into()) // another custom header
 //         .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#) // set kid header
 //         .routed_by(ek_to_bob.as_bytes(), "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf", Some(&bob_mediator_public.to_bytes())); // here we use destination key to bob and `to` header of mediator
 
@@ -199,7 +199,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
         .set_body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
-        .add_header_field("another_key".into(), "another_value".into()) // another coustom header
+        .add_header_field("another_key".into(), "another_value".into()) // another custom header
         .kid(&hex::encode(sign_keypair.public.to_bytes())); // set kid header
 
     // Act
