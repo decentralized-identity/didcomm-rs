@@ -1,14 +1,11 @@
-use super::{
-    Shape,
-    Message,
-};
+use super::{Message, Shape};
 use crate::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mediated {
     pub next: String,
     #[serde(rename = "payloads~attach")]
-    pub payload: Vec<u8>
+    pub payload: Vec<u8>,
 }
 
 impl Mediated {
@@ -17,9 +14,9 @@ impl Mediated {
     /// *next - `DidUrl` of delivery target.
     ///
     pub fn new(next: String) -> Self {
-        Mediated{
+        Mediated {
             next,
-            payload: vec!()
+            payload: vec![],
         }
     }
     /// Payload setter to be chained in forwarding calls.
@@ -33,18 +30,13 @@ impl Mediated {
     /// ```
     ///
     pub fn with_payload(self, payload: Vec<u8>) -> Self {
-        Mediated {
-            payload,
-            ..self
-        }
+        Mediated { payload, ..self }
     }
 }
 
 impl Shape for Mediated {
-   type Err = Error;
-   fn shape(m: &Message) -> Result<Self, Self::Err> {
-       serde_json::from_slice(m.get_body()?.as_ref())
-           .map_err(|e| Error::SerdeError(e))
-   }
+    type Err = Error;
+    fn shape(m: &Message) -> Result<Self, Self::Err> {
+        serde_json::from_slice(m.get_body()?.as_ref()).map_err(|e| Error::SerdeError(e))
+    }
 }
-
