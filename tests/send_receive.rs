@@ -38,6 +38,49 @@ fn send_receive_raw() {
 }
 
 #[test]
+#[cfg(not(feature = "resolve"))]
+fn send_receive_encrypted_xc20p_json_test() {
+    // Arrange
+    // keys
+    let KeyPairSet {
+        alice_private,
+        alice_public,
+        bobs_private,
+        bobs_public,
+        ..
+    } = get_keypair_set();
+
+    // Message construction
+    let message = Message::new() // creating message
+        .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp") // setting from
+        .to(&[
+            "did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp",
+            "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
+        ]) // setting to
+        .set_body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
+        .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
+        .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
+        .add_header_field("another_key".into(), "another_value".into()) // another coustom header
+        .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#); // set kid header
+
+    // Act
+    let ready_to_send = message.seal(&alice_private, Some(&bobs_public)).unwrap();
+    let received = Message::receive(
+        &ready_to_send,
+        Some(&bobs_private),
+        Some(&alice_public),
+        None,
+    ); // and now we parse received
+
+    // Assert
+    assert!(&received.is_ok());
+    let sample_body: Value = serde_json::from_str(sample_dids::TEST_DID_SIGN_1).unwrap();
+    let received_body: Value =
+        serde_json::from_str(&received.unwrap().get_body().unwrap()).unwrap();
+    assert_eq!(sample_body.to_string(), received_body.to_string());
+}
+
+#[test]
 fn send_receive_mediated_encrypted_xc20p_json_test() {
     let KeyPairSet {
         alice_private,
