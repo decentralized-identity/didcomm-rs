@@ -161,49 +161,74 @@
 //!
 //! #### GoTo: [full test][send_receive_mediated_encrypted_xc20p_json_test]
 //!
-//! ```ignore
-//!  // Message construction
-//! let message = Message::new()
+//! ```rust
+//! # use didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message};
+//! # use utilities::{get_keypair_set, KeyPairSet};
+//! # let KeyPairSet {
+//! #     alice_private,
+//! #     alice_public,
+//! #     bobs_private,
+//! #     bobs_public,
+//! #     mediators_private,
+//! #     mediators_public,
+//! # } = get_keypair_set();
+//! let mediated = Message::new()
 //!     // setting from
-//!     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
+//!     .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
 //!     // setting to
-//!     .to(&["did:xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
+//!     .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
 //!     // packing in some payload
-//!     .set_body(some_payload.as_bytes())
+//!     .set_body(r#"{"foo":"bar"}"#)
 //!     // set JOSE header for XC20P algorithm
-//!     .as_jwe(CryptoAlgorithm::XC20P)
+//!     .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
 //!     // custom header
 //!     .add_header_field("my_custom_key".into(), "my_custom_value".into())
 //!     // another custom header
 //!     .add_header_field("another_key".into(), "another_value".into())
 //!     // set kid header
-//!     .kid(String::from(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#))
+//!     .kid(&"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ")
 //!     // here we use destination key to bob and `to` header of mediator -
 //!     //**THIS MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
-//!     // `ek_to_bob` - destination targeted encryption key
-//!     .routed_by(ek_to_bob.as_bytes(), vec!("did:mediator:suetcpl23pt23rp2teu995t98u"));
-//!
-//! // Message envelope to mediator
-//! let ready_to_send = message
-//!     .unwrap() // **ERROR HANDLE** here is recommended
-//!     .as_jwe(CryptoAlgorithm::XC20P) // here this method call is crucial as mediator and end receiver may use different algorithms.
-//!     // `ek_to_mediator` - mediator targeted encryption key
-//!     .seal(ek_to_mediator.as_bytes()); // this would've failed without previous method call.
+//!     .routed_by(
+//!         &alice_private,
+//!         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
+//!         Some(&mediators_public),
+//!         Some(&bobs_public),
+//!     );
+//! assert!(mediated.is_ok());
 //!
 //! //... transport to mediator is happening here ...
 //!
 //! // Received by mediator
-//! // `rk_mediator` - key to decrypt mediated message
-//! let received_mediated = Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()));
+//! let mediator_received = Message::receive(
+//!     &mediated.unwrap(),
+//!     Some(&mediators_private),
+//!     Some(&alice_public),
+//!     None,
+//! );
+//! assert!(mediator_received.is_ok());
+//!
+//! // Get inner JWE as string from message
+//! let mediator_received_unwrapped = mediator_received.unwrap().get_body().unwrap();
+//! let pl_string = String::from_utf8_lossy(mediator_received_unwrapped.as_ref());
+//! let message_to_forward: Mediated = serde_json::from_str(&pl_string).unwrap();
+//! let attached_jwe = serde_json::from_slice::<Jwe>(&message_to_forward.payload);
+//! assert!(attached_jwe.is_ok());
+//! let str_jwe = serde_json::to_string(&attached_jwe.unwrap());
+//! assert!(str_jwe.is_ok());
 //!
 //! //... transport to destination is happening here ...
 //!
 //! // Received by Bob
-//! // `rk_bob` - key to decrypt final message
-//! let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().get_body()?.as_ref()), Some(rk_bob.as_bytes()));
+//! let bob_received = Message::receive(
+//!     &String::from_utf8_lossy(&message_to_forward.payload),
+//!     Some(&bobs_private),
+//!     Some(&alice_public),
+//!     None,
+//! );
+//! assert!(bob_received.is_ok());
 //! ```
 //!
-
 //! ### 5. Prepare JWS envelope wrapped into JWE -> sign -> pack -> receive
 //!
 //! * JWS header is set automatically based on signing algorithm type.
