@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use super::*;
 
 /// Signature related batteries for DIDComm.
-/// Implementation of all algorithms required by (spec)[https://identity.foundation/didcomm-messaging/spec/#algorithms]
+/// Implementation of all algorithms required by [spec](https://identity.foundation/didcomm-messaging/spec/#algorithms)
 #[derive(Debug, Clone)]
 pub enum SignatureAlgorithm {
     /// `ed25519` signature

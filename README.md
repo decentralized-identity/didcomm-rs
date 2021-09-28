@@ -239,7 +239,7 @@ assert!(received_second.is_ok());
 
 ## Pluggable cryptography
 
-In order to use your own implementation[s] of message crypto and/or signature algorithms implement these trait[s]:
+In order to use your own implementation(s) of message crypto and/or signature algorithms implement these trait(s):
 
 [`didcomm_rs::crypto::Cypher`][crypter]
 
@@ -302,4 +302,4 @@ This is a sample implementation of the DIDComm V2 spec. The DIDComm V2 spec is s
 [send_receive_direct_signed_and_encrypted_xc20p_test]: https://github.com/evannetwork/didcomm-rs/blob/master/tests/send_receive.rs#L164
 [send_receive_didkey_test]: https://github.com/evannetwork/didcomm-rs/blob/master/src/messages/message.rs#L482
 [shape_desired_test]: https://github.com/evannetwork/didcomm-rs/blob/main/tests/shape.rs#L21
-[signer]: https://github.com/decentralized-identity/didcomm-rs/blob/master/src/crypto/mod.rs#L39
+[signer]: https://github.com/evannetwork/didcomm-rs/blob/master/src/crypto/mod.rs#L39

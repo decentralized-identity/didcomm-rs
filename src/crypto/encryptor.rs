@@ -10,7 +10,7 @@ use super::*;
 /// Underlying algorithms are implemented by Rust-crypto crate family.
 ///
 /// Allowed (and implemented) cryptographical algorithms (JWA).
-/// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
+/// According to [spec](https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption)
 #[derive(Copy, Clone)]
 pub enum CryptoAlgorithm {
     XC20P,
