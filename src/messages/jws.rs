@@ -41,13 +41,13 @@ impl Signature {
     /// Creates a new `Signature` that can be used in JWS `signatures` property or
     /// as top-level (flattened) property in flattened JWS JSON serialization.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `protected` - JWM header protected by signing
+    /// * `protected` - JWM header protected by signing
     ///
-    /// `header` - JWM header not protected by signing
+    /// * `header` - JWM header not protected by signing
     ///
-    /// `signature` - signature over JWS payload and protected header
+    /// * `signature` - signature over JWS payload and protected header
     pub fn new(
         protected: Option<JwmHeader>,
         header: Option<JwmHeader>,
@@ -97,11 +97,11 @@ impl Jws {
     /// Creates a new [general JWS](https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.1)
     /// object with signature values per recipient.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `payload` - payload with encoded data
+    /// * `payload` - payload with encoded data
     ///
-    /// `signatures` - signature values per recipient
+    /// * `signatures` - signature values per recipient
     pub fn new(payload: String, signatures: Vec<Signature>) -> Self {
         Jws {
             payload,
@@ -113,11 +113,11 @@ impl Jws {
     /// Creates a new [flattened JWS](https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.2)
     /// object with signature information on JWS' top level.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `payload` - payload with encoded data
+    /// * `payload` - payload with encoded data
     ///
-    /// `signatures` - signature value that is used on JWS top-level
+    /// * `signatures_value` - signature value that is used on JWS top-level
     pub fn new_flat(payload: String, signature_value: Signature) -> Self {
         Jws {
             payload,

@@ -112,9 +112,9 @@ impl Jwe {
 
     /// Gets initial vector from option or creates a new one.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `iv_input` - an option that may contain an initial vector
+    /// * `iv_input` - an option that may contain an initial vector
     fn ensure_iv(iv_input: Option<String>) -> String {
         iv_input.unwrap_or_else(|| {
             let mut rng = rand::thread_rng();

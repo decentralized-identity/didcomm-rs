@@ -11,8 +11,10 @@ pub struct Mediated {
 
 impl Mediated {
     /// Constructor with empty payload
-    /// # Parameters
-    /// *next - `DidUrl` of delivery target.
+    ///
+    /// # Arguments
+    ///
+    /// * `next` - `DidUrl` of delivery target.
     pub fn new(next: String) -> Self {
         Mediated {
             next,

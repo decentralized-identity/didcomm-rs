@@ -20,15 +20,15 @@ use crate::{Error, Jwe, Jwk, JwmHeader, KeyAlgorithm, Message, Recipient};
 
 /// Decrypts the content encryption key with a key encryption key.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `jwe` - jwe to decrypt content encryption key for
+/// * `jwe` - jwe to decrypt content encryption key for
 ///
-/// `sk` - receivers private key
+/// * `sk` - receivers private key
 ///
-/// `recipient` - recipient data from JWE
+/// * `recipient` - recipient data from JWE
 ///
-/// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
+/// * `recipient_public_key` - can be provided if key should not be resolved via recipients DID
 pub(crate) fn decrypt_cek(
     jwe: &Jwe,
     sk: &[u8],
@@ -111,15 +111,17 @@ pub(crate) fn decrypt_cek(
 
 /// Encrypts the content encryption key with a key encryption key.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `sk` - senders private key
+/// * `message` - message the content encryption key should be encrypted for
 ///
-/// `dest` - receiver to encrypt cek for
+/// * `sk` - senders private key
 ///
-/// `cek` - key used to encrypt content with, will be encrypted per recipient
+/// * `dest` - receiver to encrypt cek for
 ///
-/// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
+/// * `cek` - key used to encrypt content with, will be encrypted per recipient
+///
+/// * `recipient_public_key` - can be provided if key should not be resolved via recipients DID
 pub(crate) fn encrypt_cek(
     message: &Message,
     sk: &[u8],
@@ -228,11 +230,11 @@ pub(crate) fn get_crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgori
 /// Use given key from `signing_sender_public_key` or if `None`, use key from "kid".
 /// `kid` is currently "resolved" by hex-decoding it and using it as the public key.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `signing_sender_public_key` - optional senders public to verify signature
+/// * `signing_sender_public_key` - optional senders public to verify signature
 ///
-/// `kid` - key reference to senders public key to verify signature
+/// * `kid` - key reference to senders public key to verify signature
 pub(crate) fn get_signing_sender_public_key(
     signing_sender_public_key: Option<&[u8]>,
     kid: Option<&String>,
@@ -282,17 +284,17 @@ fn concat_kdf(
 
 /// Creates a key used to encrypt/decrypt keys (key encryption key).
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `did` - receiver of a message (during encryption) or sender of a message (during decryption)
+/// * `did` - receiver of a message (during encryption) or sender of a message (during decryption)
 ///
-/// `sk` - senders private key (encryption) or receivers private key (decryption)
+/// * `sk` - senders private key (encryption) or receivers private key (decryption)
 ///
-/// `ze` - temporary secret zE
+/// * `ze` - temporary secret zE
 ///
-/// `alg` - encryption algorithm used
+/// * `alg` - encryption algorithm used
 ///
-/// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
+/// * `recipient_public_key` - can be provided if key should not be resolved via recipients DID
 fn generate_kek(
     did: &str,
     sk: &[u8],

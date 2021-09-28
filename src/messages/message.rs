@@ -128,9 +128,11 @@ impl Message {
     }
 
     /// Sets times of creation as now and, optional, expires time.
-    /// # Parameters
+    ///
+    /// # Arguments
+    ///
     /// * `expires` - time in seconds since Unix Epoch when message is
-    /// considered to be invalid.
+    ///               considered to be invalid.
     pub fn timed(mut self, expires: Option<u64>) -> Self {
         self.didcomm_header.expires_time = expires;
         self.didcomm_header.created_time =
@@ -242,15 +244,15 @@ impl Message {
     /// Construct a message from received data.
     /// Raw, JWS or JWE payload is accepted.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `incoming` - serialized message as `Message`/`Jws`/`Jws`
+    /// * `incoming` - serialized message as `Message`/`Jws`/`Jws`
     ///
-    /// `encryption_receiver_private_key` - receivers private key, used to decrypt `kek` in JWE
+    /// * `encryption_receiver_private_key` - receivers private key, used to decrypt `kek` in JWE
     ///
-    /// `encryption_sender_public_key` - senders public key, used to decrypt `kek` in JWE
+    /// * `encryption_sender_public_key` - senders public key, used to decrypt `kek` in JWE
     ///
-    /// `signing_sender_public_key` - senders public key, the JWS envelope was signed with
+    /// * `signing_sender_public_key` - senders public key, the JWS envelope was signed with
     pub fn receive(
         incoming: &str,
         encryption_receiver_private_key: Option<&[u8]>,
@@ -287,17 +289,17 @@ impl Message {
     /// Takes one mediator at a time to make sure that mediated chain preserves unchanged.
     /// This method can be chained any number of times to match all the mediators in the chain.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `ek` - encryption key for inner message payload JWE encryption
+    /// * `ek` - encryption key for inner message payload JWE encryption
     ///
-    /// `to` - list of destination recipients. can be empty (Optional) `String::default()`
+    /// * `mediator_did` - DID of message mediator, will be `to` of mediated envelope
     ///
-    /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
+    /// * `mediator_public_key` - key used to encrypt content encryption key for mediator;
+    ///                           can be provided if key should not be resolved via mediators DID
     ///
-    /// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
-    ///
-    /// TODO: Add examples
+    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
+    ///                            can be provided if key should not be resolved via recipients DID
     pub fn routed_by(
         self,
         ek: &[u8],
@@ -320,10 +322,12 @@ impl Message {
 
     /// Seals self and returns ready to send JWE
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `ek` - encryption key for inner message payload JWE encryption
-    // TODO: Add examples
+    /// * `sk` - encryption key for inner message payload JWE encryption
+    ///
+    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
+    ///                            can be provided if key should not be resolved via recipients DID
     pub fn seal(
         mut self,
         sk: impl AsRef<[u8]>,
@@ -361,16 +365,17 @@ impl Message {
     /// Signs raw message and then packs it to encrypted envelope
     /// [Spec](https://identity.foundation/didcomm-messaging/spec/#message-signing)
     ///
-    /// # Parameters
+    /// # Arguments
     ///
-    /// `ek` - encryption key for inner message payload JWE encryption
+    /// * `ek` - encryption key for inner message payload JWE encryption
     ///
-    /// `signing_sender_private_key` - signing key for enveloped message JWS encryption
+    /// * `signing_sender_private_key` - signing key for enveloped message JWS encryption
     ///
-    /// `alg` - encryption algorithm used
+    /// * `signing_algorithm` - encryption algorithm used
     ///
-    /// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
-    /// TODO: Add examples
+    /// * `encryption_recipient_public_key` - key used to encrypt content encryption key for
+    ///                                       recipient with; can be provided if key should not be
+    ///                                       resolved via recipients DID
     pub fn seal_signed(
         self,
         ek: &[u8],
