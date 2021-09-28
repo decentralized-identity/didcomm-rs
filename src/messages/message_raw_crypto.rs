@@ -117,7 +117,7 @@ impl Message {
             .ok_or_else(|| "JWE is missing tag")
             .map_err(|e| Error::Generic(e.to_string()))?;
         let mut ciphertext_and_tag: Vec<u8> = vec![];
-        ciphertext_and_tag.extend(&jwe.payload());
+        ciphertext_and_tag.extend(&jwe.get_payload());
         ciphertext_and_tag.extend(&decode(&tag)?);
 
         return match decrypter(jwe.get_iv().as_ref(), key, &ciphertext_and_tag, &aad) {

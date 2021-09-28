@@ -87,28 +87,14 @@ impl Jwe {
         encode(&a)
     }
 
-    /// Getter for ciphered payload of JWE.
-    pub fn payload(&self) -> Vec<u8> {
-        decode(&self.ciphertext).unwrap()
-    }
-
     /// `iv` getter
     pub fn get_iv(&self) -> impl AsRef<[u8]> {
         decode(&self.iv).unwrap()
     }
 
-    /// Gets initial vector from option or creates a new one.
-    ///
-    /// # Arguments
-    ///
-    /// * `iv_input` - an option that may contain an initial vector
-    fn ensure_iv(iv_input: Option<String>) -> String {
-        iv_input.unwrap_or_else(|| {
-            let mut rng = rand::thread_rng();
-            let mut a = rng.gen::<[u8; 24]>().to_vec();
-            a.shuffle(&mut rng);
-            encode(&a)
-        })
+    /// Getter for ciphered payload of JWE.
+    pub fn get_payload(&self) -> Vec<u8> {
+        decode(&self.ciphertext).unwrap()
     }
 
     create_fallback_getter!(protected, unprotected, alg, String);
@@ -126,6 +112,20 @@ impl Jwe {
     create_fallback_getter!(protected, unprotected, kid, String);
 
     create_fallback_getter!(protected, unprotected, skid, String);
+
+    /// Gets initial vector from option or creates a new one.
+    ///
+    /// # Arguments
+    ///
+    /// * `iv_input` - an option that may contain an initial vector
+    fn ensure_iv(iv_input: Option<String>) -> String {
+        iv_input.unwrap_or_else(|| {
+            let mut rng = rand::thread_rng();
+            let mut a = rng.gen::<[u8; 24]>().to_vec();
+            a.shuffle(&mut rng);
+            encode(&a)
+        })
+    }
 }
 
 #[test]
