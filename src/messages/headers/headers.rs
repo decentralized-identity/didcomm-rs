@@ -2,11 +2,12 @@ use std::{collections::HashMap, time::SystemTime};
 
 use rand::Rng;
 
-use super::{MessageType, PriorClaims};
 use crate::{
     crypto::{CryptoAlgorithm, SignatureAlgorithm},
     Error,
     Jwk,
+    MessageType,
+    PriorClaims,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

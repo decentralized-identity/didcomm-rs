@@ -1,7 +1,7 @@
 use base64_url::{decode, encode};
 use rand::{prelude::SliceRandom, Rng};
 
-use crate::{messages::serialization::base64_jwm_header, Jwk, JwmHeader, Recipient};
+use crate::{messages::helpers::serialization_base64_jwm_header, Jwk, JwmHeader, Recipient};
 
 macro_rules! create_getter {
     ($field_name:ident, $field_type:ident) => {
@@ -27,7 +27,7 @@ macro_rules! create_getter {
 pub struct Jwe {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with = "base64_jwm_header")]
+    #[serde(with = "serialization_base64_jwm_header")]
     pub protected: Option<JwmHeader>,
 
     #[serde(skip_serializing_if = "Option::is_none")]

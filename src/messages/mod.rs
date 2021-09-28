@@ -1,26 +1,20 @@
 mod headers;
+pub(crate) mod helpers;
 mod jwe;
-mod jwk;
 mod jws;
 mod mediated;
 mod message;
-mod prior_claims;
-mod serialization;
-mod types;
 
 #[cfg(feature = "raw-crypto")]
-mod raw;
+mod message_raw_crypto;
 
 pub use headers::*;
 pub use jwe::*;
-pub use jwk::*;
 pub use jws::*;
 pub use mediated::*;
 pub use message::*;
-pub use prior_claims::*;
 #[cfg(feature = "raw-crypto")]
-pub use raw::*;
-pub use types::*;
+pub use message_raw_crypto::*;
 
 pub trait Shape: Sized {
     type Err;
