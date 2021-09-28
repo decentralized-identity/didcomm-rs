@@ -427,6 +427,7 @@ assert!(received_second.is_ok());
 //! [send_receive_didkey_test]: https://github.com/evannetwork/didcomm-rs/blob/master/src/messages/message.rs#L482
 //! [shape_desired_test]: https://github.com/evannetwork/didcomm-rs/blob/main/tests/shape.rs#L21
 //! [signer]: https://github.com/evannetwork/didcomm-rs/blob/master/src/crypto/mod.rs#L39
+#![feature(extended_key_value_attributes)] // allows us to use concat! for doc in getter macro
 extern crate env_logger;
 #[macro_use]
 extern crate log;
