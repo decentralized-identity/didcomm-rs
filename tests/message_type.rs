@@ -182,7 +182,10 @@ fn keeps_inner_message_type_as_plain_for_signed_messages() -> Result<(), Error> 
 
     assert_eq!(jws_jwm_header.typ, MessageType::DidCommJws);
     assert_eq!(payload_jwm_header.typ, MessageType::DidCommRaw);
-    assert_eq!(received_message.jwm_header.typ, MessageType::DidCommRaw);
+    assert_eq!(
+        received_message.get_jwm_header().typ,
+        MessageType::DidCommRaw
+    );
 
     Ok(())
 }

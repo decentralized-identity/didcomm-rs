@@ -22,17 +22,19 @@ use crate::{
 };
 
 /// DIDComm message structure.
-/// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 ///
+/// `Message`s are used to construct new DIDComm messages, for usage see examples [here][`crate`].
+///
+/// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Message {
     /// JOSE header, which is sent as public part with JWE.
     #[serde(flatten)]
-    pub jwm_header: JwmHeader,
+    pub(crate) jwm_header: JwmHeader,
 
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
-    pub didcomm_header: DidCommHeader,
+    pub(crate) didcomm_header: DidCommHeader,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recipients: Option<Vec<Recipient>>,
@@ -45,12 +47,12 @@ pub struct Message {
     /// Flag that toggles JWE serialization to flat JSON.
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
-    pub serialize_flat_jwe: bool,
+    pub(crate) serialize_flat_jwe: bool,
 
     /// Flag that toggles JWS serialization to flat JSON.
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
-    pub serialize_flat_jws: bool,
+    pub(crate) serialize_flat_jws: bool,
 }
 
 // field getters/setters, default format handling
@@ -169,6 +171,19 @@ impl Message {
     /// Returns modified instance of `Self`.
     pub fn set_didcomm_header(mut self, h: DidCommHeader) -> Self {
         self.didcomm_header = h;
+        self
+    }
+
+    /// `&JwmCommHeader` getter.
+    pub fn get_jwm_header(&self) -> &JwmHeader {
+        &self.jwm_header
+    }
+
+    /// Setter of `jwm_header`.
+    /// Replaces existing one with provided by consuming both values.
+    /// Returns modified instance of `Self`.
+    pub fn set_jwm_header(mut self, h: JwmHeader) -> Self {
+        self.jwm_header = h;
         self
     }
 
