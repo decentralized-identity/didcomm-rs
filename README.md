@@ -25,7 +25,7 @@ let m = Message::new()
         "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
     ])
     // populating body with some data - `Vec<bytes>`
-    .set_body(TEST_DID);
+    .body(TEST_DID);
 
 // Serialize message into JWM json (SENDER action)
 let ready_to_send = m.clone().as_raw_json().unwrap();
@@ -54,7 +54,7 @@ let message = Message::new()
         "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
     ])
     // packing in some payload (can be anything really)
-    .set_body(TEST_DID)
+    .body(TEST_DID)
     // decide which [Algorithm](crypto::encryptor::CryptoAlgorithm) is used (based on key)
     .as_jwe(
         &CryptoAlgorithm::XC20P,
@@ -83,7 +83,7 @@ let ready_to_send = message.seal(&ek, Some(&bobs_public)).unwrap();
 let message = Message::new() // creating message
     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
     .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
-    .set_body(TEST_DID) // packing in some payload
+    .body(TEST_DID) // packing in some payload
     .as_jws(&SignatureAlgorithm::EdDsa)
     .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes()).unwrap();
 
@@ -109,7 +109,7 @@ let mediated = Message::new()
     // setting to
     .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
     // packing in some payload
-    .set_body(r#"{"foo":"bar"}"#)
+    .body(r#"{"foo":"bar"}"#)
     // set JOSE header for XC20P algorithm
     .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
     // custom header
@@ -180,7 +180,7 @@ let KeyPairSet {
 let message = Message::new() // creating message
     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
     .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
-    .set_body(TEST_DID) // packing in some payload
+    .body(TEST_DID) // packing in some payload
     .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
     .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
     .add_header_field("another_key".into(), "another_value".into()) // another custom header
@@ -286,7 +286,7 @@ let body = r#"{"num_field":123,"string_field":"foobar"}"#.to_string();
 let message = Message::new() // creating message
     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
     .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
-    .set_body(&body); // packing in some payload
+    .body(&body); // packing in some payload
 let received_typed_body = DesiredShape::shape(&message).unwrap(); // Where m = Message
 ```
 

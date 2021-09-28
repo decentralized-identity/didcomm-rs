@@ -23,7 +23,18 @@ use crate::{
 
 /// DIDComm message structure.
 ///
-/// `Message`s are used to construct new DIDComm messages, for usage see examples [here][`crate`].
+/// `Message`s are used to construct new DIDComm messages.
+///
+/// A common flow is
+/// - [creating a message][Message::new()]
+/// - setting different properties with [chained setters](#impl-1)
+/// - serializing the message to one of the following formats:
+///   - a [plain][Message::as_raw_json()] DIDComm message
+///   - a [signed][Message::sign()] JWS envelope
+///   - an [encrypted][Message::seal()] JWE envelope
+///   - a [sealed and encrypted][Message::seal_signed()] JWE envelope
+///
+/// For examples have a look [here][`crate`].
 ///
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -72,121 +83,10 @@ impl Message {
             serialize_flat_jws: false,
         }
     }
+}
 
-    /// Setter of `from` header
-    /// Helper method.
-    pub fn from(mut self, from: &str) -> Self {
-        self.didcomm_header.from = Some(String::from(from));
-        self
-    }
-
-    /// Setter of `to` header
-    /// Helper method.
-    pub fn to(mut self, to: &[&str]) -> Self {
-        for s in to {
-            self.didcomm_header.to.push(s.to_string());
-        }
-        while let Some(a) = self
-            .didcomm_header
-            .to
-            .iter()
-            .position(|e| e == &String::default())
-        {
-            self.didcomm_header.to.remove(a);
-        }
-        self
-    }
-
-    /// Setter of `m_type` @type header
-    /// Helper method.
-    pub fn m_type(mut self, m_type: MessageType) -> Self {
-        self.jwm_header.typ = m_type;
-        self
-    }
-
-    /// Getter of the `body` as ref of bytes slice.
-    /// Helper method.
-    pub fn get_body(&self) -> Result<String, Error> {
-        Ok(serde_json::to_string(&self.body)?)
-    }
-
-    /// Setter of the `body`
-    /// Helper method.
-    pub fn set_body(mut self, body: &str) -> Self {
-        self.body = serde_json::from_str(body).unwrap();
-        self
-    }
-
-    // Setter of the `kid` header
-    // Helper method.
-    pub fn kid(mut self, kid: &str) -> Self {
-        match &mut self.jwm_header.kid {
-            Some(h) => *h = kid.into(),
-            None => {
-                self.jwm_header.kid = Some(kid.into());
-            }
-        }
-        self
-    }
-
-    /// Sets times of creation as now and, optional, expires time.
-    ///
-    /// # Arguments
-    ///
-    /// * `expires` - time in seconds since Unix Epoch when message is
-    ///               considered to be invalid.
-    pub fn timed(mut self, expires: Option<u64>) -> Self {
-        self.didcomm_header.expires_time = expires;
-        self.didcomm_header.created_time =
-            match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-                Ok(t) => Some(t.as_secs()),
-                Err(_) => None,
-            };
-        self
-    }
-
-    /// Checks if message is rotation one.
-    /// Exposed for explicit checks on calling code level.
-    pub fn is_rotation(&self) -> bool {
-        self.didcomm_header.from_prior().is_some()
-    }
-
-    /// If message `is_rotation()` true - returns from_prion claims.
-    /// Errors otherwise with `Error::NoRotationData`
-    pub fn get_prior(&self) -> Result<PriorClaims, Error> {
-        if self.is_rotation() {
-            Ok(self.didcomm_header.from_prior().clone().unwrap())
-        } else {
-            Err(Error::NoRotationData)
-        }
-    }
-
-    /// `&DidCommHeader` getter.
-    pub fn get_didcomm_header(&self) -> &DidCommHeader {
-        &self.didcomm_header
-    }
-
-    /// Setter of `didcomm_header`.
-    /// Replaces existing one with provided by consuming both values.
-    /// Returns modified instance of `Self`.
-    pub fn set_didcomm_header(mut self, h: DidCommHeader) -> Self {
-        self.didcomm_header = h;
-        self
-    }
-
-    /// `&JwmCommHeader` getter.
-    pub fn get_jwm_header(&self) -> &JwmHeader {
-        &self.jwm_header
-    }
-
-    /// Setter of `jwm_header`.
-    /// Replaces existing one with provided by consuming both values.
-    /// Returns modified instance of `Self`.
-    pub fn set_jwm_header(mut self, h: JwmHeader) -> Self {
-        self.jwm_header = h;
-        self
-    }
-
+// getters/setters for fields, function to update fields on `Message`
+impl Message {
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     pub fn add_header_field(mut self, key: String, value: String) -> Self {
@@ -197,13 +97,15 @@ impl Message {
         self
     }
 
-    /// Creates set of Jwm related headers for the JWE
-    /// Modifies JWM related header portion to match
-    ///     encryption implementation and leaves other
-    ///     parts unchanged.  TODO + FIXME: complete implementation
-    pub fn as_jws(mut self, alg: &SignatureAlgorithm) -> Self {
-        self.jwm_header.as_signed(alg);
-        self
+    /// Sets message to be serialized as flat JWE JSON.
+    /// If this message has multiple targets, `seal`ing it will result in an Error.
+    pub fn as_flat_jwe(
+        mut self,
+        alg: &CryptoAlgorithm,
+        recipient_public_key: Option<&[u8]>,
+    ) -> Self {
+        self.serialize_flat_jwe = true;
+        self.as_jwe(alg, recipient_public_key)
     }
 
     /// Sets message to be serialized as flat JWS JSON and then calls `as_jws`.
@@ -242,20 +144,138 @@ impl Message {
         self
     }
 
-    /// Sets message to be serialized as flat JWE JSON.
-    /// If this message has multiple targets, `seal`ing it will result in an Error.
-    pub fn as_flat_jwe(
-        mut self,
-        alg: &CryptoAlgorithm,
-        recipient_public_key: Option<&[u8]>,
-    ) -> Self {
-        self.serialize_flat_jwe = true;
-        self.as_jwe(alg, recipient_public_key)
+    /// Creates set of Jwm related headers for the JWE
+    /// Modifies JWM related header portion to match
+    ///     encryption implementation and leaves other
+    ///     parts unchanged.  TODO + FIXME: complete implementation
+    pub fn as_jws(mut self, alg: &SignatureAlgorithm) -> Self {
+        self.jwm_header.as_signed(alg);
+        self
+    }
+
+    /// Setter of the `body`
+    /// Helper method.
+    pub fn body(mut self, body: &str) -> Self {
+        self.body = serde_json::from_str(body).unwrap();
+        self
+    }
+
+    /// Setter of `didcomm_header`.
+    /// Replaces existing one with provided by consuming both values.
+    /// Returns modified instance of `Self`.
+    pub fn didcomm_header(mut self, h: DidCommHeader) -> Self {
+        self.didcomm_header = h;
+        self
+    }
+
+    /// Setter of `from` header
+    /// Helper method.
+    pub fn from(mut self, from: &str) -> Self {
+        self.didcomm_header.from = Some(String::from(from));
+        self
+    }
+
+    /// Getter of the `body` as ref of bytes slice.
+    /// Helper method.
+    pub fn get_body(&self) -> Result<String, Error> {
+        Ok(serde_json::to_string(&self.body)?)
+    }
+
+    /// `&DidCommHeader` getter.
+    pub fn get_didcomm_header(&self) -> &DidCommHeader {
+        &self.didcomm_header
+    }
+
+    /// `&JwmCommHeader` getter.
+    pub fn get_jwm_header(&self) -> &JwmHeader {
+        &self.jwm_header
+    }
+
+    /// If message `is_rotation()` true - returns from_prion claims.
+    /// Errors otherwise with `Error::NoRotationData`
+    pub fn get_prior(&self) -> Result<PriorClaims, Error> {
+        if self.is_rotation() {
+            Ok(self.didcomm_header.from_prior().clone().unwrap())
+        } else {
+            Err(Error::NoRotationData)
+        }
+    }
+
+    /// Checks if message is rotation one.
+    /// Exposed for explicit checks on calling code level.
+    pub fn is_rotation(&self) -> bool {
+        self.didcomm_header.from_prior().is_some()
+    }
+
+    /// Setter of `jwm_header`.
+    /// Replaces existing one with provided by consuming both values.
+    /// Returns modified instance of `Self`.
+    pub fn jwm_header(mut self, h: JwmHeader) -> Self {
+        self.jwm_header = h;
+        self
+    }
+
+    // Setter of the `kid` header
+    // Helper method.
+    pub fn kid(mut self, kid: &str) -> Self {
+        match &mut self.jwm_header.kid {
+            Some(h) => *h = kid.into(),
+            None => {
+                self.jwm_header.kid = Some(kid.into());
+            }
+        }
+        self
+    }
+
+    /// Setter of `m_type` @type header
+    /// Helper method.
+    pub fn m_type(mut self, m_type: MessageType) -> Self {
+        self.jwm_header.typ = m_type;
+        self
+    }
+
+    /// Sets times of creation as now and, optional, expires time.
+    ///
+    /// # Arguments
+    ///
+    /// * `expires` - time in seconds since Unix Epoch when message is
+    ///               considered to be invalid.
+    pub fn timed(mut self, expires: Option<u64>) -> Self {
+        self.didcomm_header.expires_time = expires;
+        self.didcomm_header.created_time =
+            match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(t) => Some(t.as_secs()),
+                Err(_) => None,
+            };
+        self
+    }
+
+    /// Setter of `to` header
+    /// Helper method.
+    pub fn to(mut self, to: &[&str]) -> Self {
+        for s in to {
+            self.didcomm_header.to.push(s.to_string());
+        }
+        while let Some(a) = self
+            .didcomm_header
+            .to
+            .iter()
+            .position(|e| e == &String::default())
+        {
+            self.didcomm_header.to.remove(a);
+        }
+        self
     }
 }
 
 // Interactions with messages (sending, receiving, etc.)
 impl Message {
+    /// Serializes current state of the message into json.
+    /// Consumes original message - use as raw sealing of envelope.
+    pub fn as_raw_json(self) -> Result<String, Error> {
+        Ok(serde_json::to_string(&self)?)
+    }
+
     /// Construct a message from received data.
     /// Raw, JWS or JWE payload is accepted.
     ///
@@ -289,12 +309,6 @@ impl Message {
         }
 
         Ok(serde_json::from_str(&current_message)?)
-    }
-
-    /// Serializes current state of the message into json.
-    /// Consumes original message - use as raw sealing of envelope.
-    pub fn as_raw_json(self) -> Result<String, Error> {
-        Ok(serde_json::to_string(&self)?)
     }
 
     /// Wrap self to be mediated by some mediator.
@@ -331,7 +345,7 @@ impl Message {
             .from(&from)
             .as_jwe(&alg, mediator_public_key)
             .m_type(MessageType::DidCommForward)
-            .set_body(&serde_json::to_string(&body)?)
+            .body(&serde_json::to_string(&body)?)
             .seal(ek, mediator_public_key)
     }
 
@@ -676,7 +690,7 @@ mod crypto_tests {
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .set_body(&body) // packing in some payload
+            .body(&body) // packing in some payload
             .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
             .kid(&hex::encode(vec![1; 32])); // invalid key, passing no key will not succeed
 

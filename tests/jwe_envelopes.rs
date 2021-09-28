@@ -66,7 +66,7 @@ fn can_receive_flat_jwe_json() -> Result<(), Error> {
     let message = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .set_body(&body) // packing in some payload
+        .body(&body) // packing in some payload
         .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 

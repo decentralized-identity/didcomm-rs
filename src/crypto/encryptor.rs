@@ -129,7 +129,7 @@ mod batteries_tests {
         let payload = r#"{"test":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P, None) // Set jwe header manually - should be preceded by key properties
-            .set_body(&payload);
+            .body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -156,7 +156,7 @@ mod batteries_tests {
         let payload = r#"{"example":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM, None) // Set jwe header manually - should be preceded by key properties
-            .set_body(&payload);
+            .body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act

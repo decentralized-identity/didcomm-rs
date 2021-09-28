@@ -210,7 +210,7 @@ fn serializes_existing_body_as_object() -> Result<(), Error> {
     let message = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .set_body(r#"{"foo":"bar"}"#);
+        .body(r#"{"foo":"bar"}"#);
 
     let jwm_string: String = serde_json::to_string(&message)?;
     let jwm_object: Value = serde_json::from_str(&jwm_string)?;
