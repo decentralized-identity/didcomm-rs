@@ -1,25 +1,12 @@
 use base64_url::{decode, encode};
 use rand::{prelude::SliceRandom, Rng};
 
-use crate::{messages::helpers::serialization_base64_jwm_header, Jwk, JwmHeader, Recipient};
-
-macro_rules! create_getter {
-    ($field_name:ident, $field_type:ident) => {
-        pub fn $field_name(&self) -> Option<$field_type> {
-            if let Some(protected) = &self.protected {
-                if let Some(value) = &protected.$field_name {
-                    return Some(value.clone());
-                }
-            }
-            if let Some(unprotected) = &self.unprotected {
-                if let Some(value) = &unprotected.$field_name {
-                    return Some(value.clone());
-                }
-            }
-            None
-        }
-    };
-}
+use crate::{
+    messages::helpers::{create_fallback_getter, serialization_base64_jwm_header},
+    Jwk,
+    JwmHeader,
+    Recipient,
+};
 
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
@@ -124,21 +111,21 @@ impl Jwe {
         })
     }
 
-    create_getter!(alg, String);
+    create_fallback_getter!(protected, unprotected, alg, String);
 
-    create_getter!(cty, String);
+    create_fallback_getter!(protected, unprotected, cty, String);
 
-    create_getter!(enc, String);
+    create_fallback_getter!(protected, unprotected, enc, String);
 
-    create_getter!(epk, Jwk);
+    create_fallback_getter!(protected, unprotected, epk, Jwk);
 
-    create_getter!(jku, String);
+    create_fallback_getter!(protected, unprotected, jku, String);
 
-    create_getter!(jwk, Jwk);
+    create_fallback_getter!(protected, unprotected, jwk, Jwk);
 
-    create_getter!(kid, String);
+    create_fallback_getter!(protected, unprotected, kid, String);
 
-    create_getter!(skid, String);
+    create_fallback_getter!(protected, unprotected, skid, String);
 }
 
 #[test]

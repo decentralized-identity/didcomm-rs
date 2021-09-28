@@ -37,12 +37,12 @@ pub(crate) fn decrypt_cek(
 ) -> Result<Vec<u8>, Error> {
     trace!("decrypting per-recipient JWE value");
     let alg = jwe
-        .alg()
+        .get_alg()
         .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
     trace!("using algorithm {}", &alg);
 
     let skid = jwe
-        .skid()
+        .get_skid()
         .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
 
     // zE (temporary secret)

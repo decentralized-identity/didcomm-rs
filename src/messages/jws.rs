@@ -1,26 +1,9 @@
 use crate::{
+    helpers::create_fallback_getter,
     messages::helpers::{serialization_base64_buffer, serialization_base64_jwm_header},
     Jwk,
     JwmHeader,
 };
-
-macro_rules! create_getter {
-    ($field_name:ident, $field_type:ident) => {
-        pub fn $field_name(&self) -> Option<$field_type> {
-            if let Some(header) = &self.header {
-                if let Some(value) = &header.$field_name {
-                    return Some(value.clone());
-                }
-            }
-            if let Some(protected) = &self.protected {
-                if let Some(value) = &protected.$field_name {
-                    return Some(value.clone());
-                }
-            }
-            None
-        }
-    };
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Signature {
@@ -60,21 +43,21 @@ impl Signature {
         }
     }
 
-    create_getter!(alg, String);
+    create_fallback_getter!(header, protected, alg, String);
 
-    create_getter!(cty, String);
+    create_fallback_getter!(header, protected, cty, String);
 
-    create_getter!(enc, String);
+    create_fallback_getter!(header, protected, enc, String);
 
-    create_getter!(epk, Jwk);
+    create_fallback_getter!(header, protected, epk, Jwk);
 
-    create_getter!(jku, String);
+    create_fallback_getter!(header, protected, jku, String);
 
-    create_getter!(jwk, Jwk);
+    create_fallback_getter!(header, protected, jwk, Jwk);
 
-    create_getter!(kid, String);
+    create_fallback_getter!(header, protected, kid, String);
 
-    create_getter!(skid, String);
+    create_fallback_getter!(header, protected, skid, String);
 }
 
 #[derive(Serialize, Deserialize, Debug)]

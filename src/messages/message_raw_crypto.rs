@@ -187,7 +187,7 @@ impl Message {
 
         let mut verified = false;
         for signature_value in signatures_values_to_verify.clone() {
-            let alg = &signature_value.alg().ok_or(Error::JweParseError)?;
+            let alg = &signature_value.get_alg().ok_or(Error::JweParseError)?;
             let signature = &signature_value.signature[..];
             let verifier: SignatureAlgorithm = alg.try_into()?;
             let protected_header = signature_value
