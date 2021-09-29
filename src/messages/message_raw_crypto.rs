@@ -23,11 +23,13 @@ impl Message {
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
-    pub fn encrypt(
-        self,
-        crypter: SymmetricCypherMethod,
-        encryption_key: &[u8],
-    ) -> Result<String, Error> {
+    ///
+    /// # Arguments
+    ///
+    /// * `crypter` - encryptor that should be used
+    ///
+    /// * `cek` - content encryption key to encrypt message with
+    pub fn encrypt(self, crypter: SymmetricCypherMethod, cek: &[u8]) -> Result<String, Error> {
         let mut jwe_header = self.jwm_header.clone();
         if jwe_header.typ != MessageType::DidCommForward {
             jwe_header.typ = MessageType::DidCommJwe;
@@ -44,7 +46,7 @@ impl Message {
         let aad = aad_string.as_bytes();
         let ciphertext_and_tag = crypter(
             &decode(&iv)?,
-            encryption_key,
+            cek,
             serde_json::to_string(&self)?.as_bytes(),
             aad,
         )?;
@@ -84,11 +86,19 @@ impl Message {
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
     /// Returns `Ok(Message)` if decryption / deserialization
-    ///     succeeded. `Error` otherwise.
+    /// succeeded. `Error` otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `received_message` - received message as byte array
+    ///
+    /// * `decryptor` - decryptor that should be used
+    ///
+    /// * `cek` - content encryption key to decrypt message with
     pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
-        key: &[u8],
+        cek: &[u8],
     ) -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
         let protected = jwe
@@ -106,7 +116,7 @@ impl Message {
         ciphertext_and_tag.extend(&jwe.get_payload());
         ciphertext_and_tag.extend(&decode(&tag)?);
 
-        return match decrypter(jwe.get_iv().as_ref(), key, &ciphertext_and_tag, &aad) {
+        return match decrypter(jwe.get_iv().as_ref(), cek, &ciphertext_and_tag, &aad) {
             Ok(raw_message_bytes) => Ok(serde_json::from_slice(&raw_message_bytes)?),
             Err(e) => {
                 error!("decryption failed; {}", &e);
@@ -204,9 +214,9 @@ impl Message {
     /// Verifies signature and returns payload message on verification success.
     /// `Err` return if signature invalid or data is malformed.
     /// Expects Jws's payload to be a valid serialized `Message` and base64_url encoded.
-    pub fn verify_value(jws: &Value, key: &[u8]) -> Result<Message, Error> {
+    pub fn verify_value(jws: &Value, signing_sender_public_key: &[u8]) -> Result<Message, Error> {
         let jws_string = serde_json::to_string(jws)?;
-        Message::verify(&jws_string.into_bytes(), key)
+        Message::verify(&jws_string.into_bytes(), signing_sender_public_key)
     }
 }
 

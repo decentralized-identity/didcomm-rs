@@ -316,7 +316,7 @@ impl Message {
     ///
     /// # Arguments
     ///
-    /// * `ek` - encryption key for inner message payload JWE encryption
+    /// * `sender_private_key` - encryption key for inner message payload JWE encryption
     ///
     /// * `mediator_did` - DID of message mediator, will be `to` of mediated envelope
     ///
@@ -327,38 +327,41 @@ impl Message {
     ///                            can be provided if key should not be resolved via recipients DID
     pub fn routed_by(
         self,
-        ek: &[u8],
+        sender_private_key: &[u8],
         mediator_did: &str,
         mediator_public_key: Option<&[u8]>,
         recipient_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
-        let body = Mediated::new(self.didcomm_header.to[0].clone().into())
-            .with_payload(self.seal(ek, recipient_public_key)?.as_bytes().to_vec());
+        let body = Mediated::new(self.didcomm_header.to[0].clone().into()).with_payload(
+            self.seal(sender_private_key, recipient_public_key)?
+                .as_bytes()
+                .to_vec(),
+        );
         Message::new()
             .to(&[mediator_did])
             .from(&from)
             .as_jwe(&alg, mediator_public_key)
             .m_type(MessageType::DidCommForward)
             .body(&serde_json::to_string(&body)?)
-            .seal(ek, mediator_public_key)
+            .seal(sender_private_key, mediator_public_key)
     }
 
-    /// Seals self and returns ready to send JWE
+    /// Seals (encrypts) self and returns ready to send JWE
     ///
     /// # Arguments
     ///
-    /// * `sk` - encryption key for inner message payload JWE encryption
+    /// * `sender_private_key` - encryption key for inner message payload JWE encryption
     ///
     /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
     ///                            can be provided if key should not be resolved via recipients DID
     pub fn seal(
         mut self,
-        sk: impl AsRef<[u8]>,
+        sender_private_key: impl AsRef<[u8]>,
         recipient_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
-        if sk.as_ref().len() != 32 {
+        if sender_private_key.as_ref().len() != 32 {
             return Err(Error::InvalidKeySize("!32".into()));
         }
         // generate content encryption key
@@ -378,7 +381,13 @@ impl Message {
         let mut recipients: Vec<Recipient> = vec![];
         // create jwk from static secret per recipient
         for dest in &self.didcomm_header.to {
-            let rv = encrypt_cek(&self, &sk.as_ref(), dest, &cek, recipient_public_key)?;
+            let rv = encrypt_cek(
+                &self,
+                &sender_private_key.as_ref(),
+                dest,
+                &cek,
+                recipient_public_key,
+            )?;
             recipients.push(Recipient::new(rv.header, rv.encrypted_key));
         }
         self.recipients = Some(recipients);
@@ -392,7 +401,7 @@ impl Message {
     ///
     /// # Arguments
     ///
-    /// * `ek` - encryption key for inner message payload JWE encryption
+    /// * `encryption_sender_private_key` - encryption key for inner message payload JWE encryption
     ///
     /// * `signing_sender_private_key` - signing key for enveloped message JWS encryption
     ///
@@ -403,7 +412,7 @@ impl Message {
     ///                                       resolved via recipients DID
     pub fn seal_signed(
         self,
-        ek: &[u8],
+        encryption_sender_private_key: &[u8],
         signing_sender_private_key: &[u8],
         signing_algorithm: SignatureAlgorithm,
         encryption_recipient_public_key: Option<&[u8]>,
@@ -413,9 +422,10 @@ impl Message {
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), signing_sender_private_key)?;
         to.body = serde_json::from_str(&signed)?;
-        return to
-            .m_type(MessageType::DidCommJws)
-            .seal(ek, encryption_recipient_public_key);
+        return to.m_type(MessageType::DidCommJws).seal(
+            encryption_sender_private_key,
+            encryption_recipient_public_key,
+        );
     }
 }
 
