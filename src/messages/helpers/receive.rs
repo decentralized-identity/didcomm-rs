@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use arrayref::array_ref;
 #[cfg(feature = "resolve")]
-pub use ddoresolver_rs::*;
+use ddoresolver_rs::*;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use x25519_dalek::{PublicKey, StaticSecret};

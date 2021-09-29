@@ -5,7 +5,7 @@ pub mod signer;
 #[cfg(feature = "raw-crypto")]
 pub use {encryptor::CryptoAlgorithm, signer::SignatureAlgorithm};
 
-pub use crate::Error;
+use crate::Error;
 
 /// Return `FnOnce` signature definition for symmetric cryptography method.
 /// Arguments sequence: Nonce, Key, Message.

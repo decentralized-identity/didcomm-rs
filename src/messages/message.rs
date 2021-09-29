@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 #[cfg(feature = "resolve")]
-pub use ddoresolver_rs::*;
+use ddoresolver_rs::*;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
