@@ -22,7 +22,7 @@ impl Message {
     ///     the encryption. Agnostic of actual algorithm used.
     /// Consuming is to make sure no changes are
     ///     possible post packaging / sending.
-    /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
+    /// Returns `(JwmHeader, Vec<u8>)` to be sent to recipient.
     ///
     /// # Arguments
     ///
@@ -311,10 +311,10 @@ mod raw_tests {
         // Arrange
         let sender_sk = EphemeralSecret::new(rand_core::OsRng);
         let sender_pk = PublicKey::from(&sender_sk);
-        let receiver_sk = EphemeralSecret::new(rand_core::OsRng);
-        let receiver_pk = PublicKey::from(&receiver_sk);
-        let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
-        let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
+        let recipient_sk = EphemeralSecret::new(rand_core::OsRng);
+        let recipient_pk = PublicKey::from(&recipient_sk);
+        let sender_shared = sender_sk.diffie_hellman(&recipient_pk);
+        let recipient_shared = recipient_sk.diffie_hellman(&sender_pk);
         let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, None);
         let id = m.get_didcomm_header().id.to_owned();
         // Pluggable encryptor function to encrypt data
@@ -342,7 +342,7 @@ mod raw_tests {
         let raw_m = Message::decrypt(
             &encrypted.unwrap().as_bytes(),
             my_decrypter,
-            receiver_shared.as_bytes(),
+            recipient_shared.as_bytes(),
         );
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistency check

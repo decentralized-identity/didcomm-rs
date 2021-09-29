@@ -24,7 +24,7 @@ use crate::{Error, Jwe, Jwk, JwmHeader, KeyAlgorithm, Message, Recipient};
 ///
 /// * `jwe` - jwe to decrypt content encryption key for
 ///
-/// * `sk` - receivers private key
+/// * `sk` - recipients private key
 ///
 /// * `recipient` - recipient data from JWE
 ///
@@ -117,7 +117,7 @@ pub(crate) fn decrypt_cek(
 ///
 /// * `sk` - senders private key
 ///
-/// * `dest` - receiver to encrypt cek for
+/// * `dest` - recipient to encrypt cek for
 ///
 /// * `cek` - key used to encrypt content with, will be encrypted per recipient
 ///
@@ -288,9 +288,9 @@ fn concat_kdf(
 ///
 /// # Arguments
 ///
-/// * `did` - receiver of a message (during encryption) or sender of a message (during decryption)
+/// * `did` - recipient of a message (during encryption) or sender of a message (during decryption)
 ///
-/// * `sk` - senders private key (encryption) or receivers private key (decryption)
+/// * `sk` - senders private key (encryption) or recipient private key (decryption)
 ///
 /// * `ze` - temporary secret zE
 ///

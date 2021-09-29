@@ -279,14 +279,14 @@ impl Message {
     ///
     /// * `incoming` - serialized message as `Message`/`Jws`/`Jws`
     ///
-    /// * `encryption_receiver_private_key` - receivers private key, used to decrypt `kek` in JWE
+    /// * `encryption_recipient_private_key` - recipients private key, used to decrypt `kek` in JWE
     ///
     /// * `encryption_sender_public_key` - senders public key, used to decrypt `kek` in JWE
     ///
     /// * `signing_sender_public_key` - senders public key, the JWS envelope was signed with
     pub fn receive(
         incoming: &str,
-        encryption_receiver_private_key: Option<&[u8]>,
+        encryption_recipient_private_key: Option<&[u8]>,
         encryption_sender_public_key: Option<&[u8]>,
         signing_sender_public_key: Option<&[u8]>,
     ) -> Result<Self, Error> {
@@ -295,7 +295,7 @@ impl Message {
         if get_message_type(&current_message)? == MessageType::DidCommJwe {
             current_message = receive_jwe(
                 &current_message,
-                encryption_receiver_private_key,
+                encryption_recipient_private_key,
                 encryption_sender_public_key,
             )?;
         }
@@ -612,7 +612,7 @@ mod crypto_tests {
 
     #[test]
     #[cfg(feature = "resolve")]
-    fn send_receive_didkey_multiple_receivers_test() {
+    fn send_receive_didkey_multiple_recipients_test() {
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&[

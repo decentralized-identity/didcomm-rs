@@ -67,7 +67,7 @@ let message = Message::new()
     // set `kid` property
     .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#);
 
-// receiver public key is automatically resolved
+// recipient public key is automatically resolved
 let ready_to_send = message.seal(&ek, Some(&bobs_public)).unwrap();
 
 //... transport is happening here ...
@@ -205,7 +205,7 @@ let received = Message::receive(
 ); // and now we parse received
 ```
 
-### 6. Multiple receivers static key wrap per recipient with shared secret
+### 6. Multiple recipients static key wrap per recipient with shared secret
 
 * ! Works with `resolve` feature only - requires resolution of public keys for each recipient for shared secret generation.
 * Static key generated randomly in the background (`to` field has >1 recipient).
@@ -228,7 +228,7 @@ assert!(jwe.is_ok());
 
 let jwe = jwe.unwrap();
 
-// Each of the recipients receive it in same way as before (direct with single receiver)
+// Each of the recipients receive it in same way as before (direct with single recipient)
 let received_first = Message::receive(&jwe, Some(&bobs_private), None, None);
 let received_second = Message::receive(&jwe, Some(&clarice_private), None, None);
 
