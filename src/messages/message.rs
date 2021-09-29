@@ -318,19 +318,19 @@ impl Message {
     ///
     /// * `sender_private_key` - encryption key for inner message payload JWE encryption
     ///
+    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
+    ///                            can be provided if key should not be resolved via recipients DID
+    ///
     /// * `mediator_did` - DID of message mediator, will be `to` of mediated envelope
     ///
     /// * `mediator_public_key` - key used to encrypt content encryption key for mediator;
     ///                           can be provided if key should not be resolved via mediators DID
-    ///
-    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
-    ///                            can be provided if key should not be resolved via recipients DID
     pub fn routed_by(
         self,
         sender_private_key: &[u8],
+        recipient_public_key: Option<&[u8]>,
         mediator_did: &str,
         mediator_public_key: Option<&[u8]>,
-        recipient_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
@@ -655,8 +655,8 @@ mod crypto_tests {
             .as_jwe(&CryptoAlgorithm::XC20P, None)
             .routed_by(
                 &alice_private,
-                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
                 None,
+                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
                 None,
             );
         assert!(sealed.is_ok());

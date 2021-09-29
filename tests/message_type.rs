@@ -120,9 +120,9 @@ fn sets_message_type_correctly_for_forwarded_messages() -> Result<(), Error> {
 
     let jwe_string = message.routed_by(
         &alice_private,
+        Some(&bobs_public),
         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
         Some(&mediators_public),
-        Some(&bobs_public),
     )?;
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
