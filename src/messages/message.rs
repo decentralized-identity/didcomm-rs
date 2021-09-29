@@ -47,6 +47,7 @@ pub struct Message {
     #[serde(flatten)]
     pub(crate) didcomm_header: DidCommHeader,
 
+    /// single recipient of JWE `recipients` collection as used in JWE
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recipients: Option<Vec<Recipient>>,
 
@@ -153,8 +154,8 @@ impl Message {
         self
     }
 
-    /// Setter of the `body`
-    /// Helper method.
+    /// Setter of the `body`.
+    /// Note, that given text has to be a valid JSON string to be a valid body value.
     pub fn body(mut self, body: &str) -> Self {
         self.body = serde_json::from_str(body).unwrap();
         self
@@ -168,15 +169,13 @@ impl Message {
         self
     }
 
-    /// Setter of `from` header
-    /// Helper method.
+    /// Setter of `from` header.
     pub fn from(mut self, from: &str) -> Self {
         self.didcomm_header.from = Some(String::from(from));
         self
     }
 
-    /// Getter of the `body` as ref of bytes slice.
-    /// Helper method.
+    /// Getter of the `body` as String.
     pub fn get_body(&self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self.body)?)
     }
@@ -216,7 +215,6 @@ impl Message {
     }
 
     // Setter of the `kid` header
-    // Helper method.
     pub fn kid(mut self, kid: &str) -> Self {
         match &mut self.jwm_header.kid {
             Some(h) => *h = kid.into(),
@@ -228,7 +226,6 @@ impl Message {
     }
 
     /// Setter of `m_type` @type header
-    /// Helper method.
     pub fn m_type(mut self, m_type: MessageType) -> Self {
         self.jwm_header.typ = m_type;
         self
@@ -251,7 +248,6 @@ impl Message {
     }
 
     /// Setter of `to` header
-    /// Helper method.
     pub fn to(mut self, to: &[&str]) -> Self {
         for s in to {
             self.didcomm_header.to.push(s.to_string());

@@ -1,3 +1,4 @@
+/// `Error` type used througout crate
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("plugged cryptography failure")]

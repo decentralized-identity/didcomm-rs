@@ -5,16 +5,24 @@ use crate::{
     JwmHeader,
 };
 
+/// Signature data for [JWS](https://datatracker.ietf.org/doc/html/rfc7515) envelopes.
+/// They can be used per recipient in [General JWS JSON](https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.1),
+/// triggered by using [`.as_jws`][crate::Message::as_jws()] or as a single signature for the entire JWS in
+/// [Flattened JWS JSON](https://datatracker.ietf.org/doc/html/rfc7515#section-7.2.2), triggered by
+/// [`.as_flat_jws`][crate::Message::as_flat_jws()].
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Signature {
+    /// integrity protected header elements
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "serialization_base64_jwm_header")]
     pub protected: Option<JwmHeader>,
 
+    /// header elements that are not integrity protected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<JwmHeader>,
 
+    /// signature computed over protected header elements
     #[serde(default)]
     #[serde(with = "serialization_base64_buffer")]
     pub signature: Vec<u8>,
@@ -60,8 +68,11 @@ impl Signature {
     create_fallback_getter!(header, protected, skid, String);
 }
 
+/// A struct to generate and serialize [JWS](https://datatracker.ietf.org/doc/html/rfc7515)
+/// envelopes for DIDComm messages.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Jws {
+    /// base64 encoded payload of the JWS
     pub payload: String,
 
     /// Top-level signature for flat JWS JSON messages.

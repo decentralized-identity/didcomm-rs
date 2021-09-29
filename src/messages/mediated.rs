@@ -1,10 +1,13 @@
 use super::{Message, Shape};
 use crate::Error;
 
+/// Mediated Message value
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mediated {
+    /// `DidUrl` of delivery target
     pub next: String,
 
+    /// "inner" message, that should be routed to target
     #[serde(rename = "payloads~attach")]
     pub payload: Vec<u8>,
 }

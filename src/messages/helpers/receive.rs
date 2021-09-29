@@ -33,6 +33,7 @@ struct UnknownReceivedMessage<'a> {
     pub iv: Option<&'a RawValue>,
 }
 
+/// Tries to parse message and checks for well known fields to derive message type.
 pub(crate) fn get_message_type(message: &str) -> Result<MessageType, Error> {
     // try to skip parsing by using known fields from jwe/jws
     let to_check: UnknownReceivedMessage = serde_json::from_str(message)?;
@@ -46,6 +47,16 @@ pub(crate) fn get_message_type(message: &str) -> Result<MessageType, Error> {
     Ok(message.jwm_header.typ)
 }
 
+/// Receive a serialized message. This function handles receival of [`crate::Jwe`] envelopes.
+///
+/// # Arguments
+///
+/// * `incoming` - incoming message
+///
+/// * `encryption_receiver_private_key` - private key of receiver of a message, required
+///
+/// * `encryption_sender_public_key` - public key of message sender, can be omitted if public key
+///                                    should be automatically resolved (requires `resolve` feature)
 pub(crate) fn receive_jwe(
     incoming: &str,
     encryption_receiver_private_key: Option<&[u8]>,
@@ -53,6 +64,8 @@ pub(crate) fn receive_jwe(
 ) -> Result<String, Error> {
     let jwe: Jwe = serde_json::from_str(incoming)?;
     let alg = &jwe.get_alg().ok_or(Error::JweParseError)?;
+    let receiver_private_key = encryption_receiver_private_key
+        .ok_or_else(|| Error::Generic("missing encryption receiver private key".to_string()))?;
 
     // get public key from input or from senders DID document
     let sender_public_key = match encryption_sender_public_key {
@@ -74,8 +87,6 @@ pub(crate) fn receive_jwe(
             }
         }
     };
-    let receiver_private_key = encryption_receiver_private_key
-        .ok_or_else(|| Error::Generic("missing encryption receiver private key".to_string()))?;
 
     let shared = StaticSecret::from(array_ref!(receiver_private_key, 0, 32).to_owned())
         .diffie_hellman(&PublicKey::from(
@@ -117,6 +128,14 @@ pub(crate) fn receive_jwe(
     Ok(serde_json::to_string(&m)?)
 }
 
+/// Receive a serialized message. This function handles receival of [`crate::Jws`] envelopes.
+///
+/// # Arguments
+///
+/// * `incoming` - incoming message
+///
+/// * `signing_sender_public_key` - senders public key, can be omitted if public key
+///                                 should be automatically resolved (requires `resolve` feature)
 pub(crate) fn receive_jws(
     incoming: &str,
     signing_sender_public_key: Option<&[u8]>,

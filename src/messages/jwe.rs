@@ -12,11 +12,13 @@ use crate::{
 /// Can be serialized to JSON or Compact representations and from same.
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Jwe {
+    /// integrity protected header elements
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(with = "serialization_base64_jwm_header")]
     pub protected: Option<JwmHeader>,
 
+    /// header elements that are not integrity protected
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unprotected: Option<JwmHeader>,
 
@@ -31,10 +33,13 @@ pub struct Jwe {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recipients: Option<Vec<Recipient>>,
 
+    /// Encrypted data of JWE as base64 encoded String
     ciphertext: String,
 
+    /// Initial vector for encryption as base64 encoded String
     iv: String,
 
+    /// base64 encoded JWE authentication tag
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
 }
@@ -80,6 +85,7 @@ impl Jwe {
         }
     }
 
+    /// Generate new random IV as String
     pub fn generate_iv() -> String {
         let mut rng = rand::thread_rng();
         let mut a = rng.gen::<[u8; 24]>().to_vec();
@@ -87,7 +93,7 @@ impl Jwe {
         encode(&a)
     }
 
-    /// `iv` getter
+    /// Gets `iv` as byte array.
     pub fn get_iv(&self) -> impl AsRef<[u8]> {
         decode(&self.iv).unwrap()
     }

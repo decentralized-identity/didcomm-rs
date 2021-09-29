@@ -253,7 +253,7 @@ When implemented - use them instead of `CryptoAlgorithm` and `SignatureAlgorithm
 
 ### GoTo: [full test][shape_desired_test]
 
-In most cases application implementation would prefer to have strongly typed body of the message instead of raw `Vec<u8>`.
+In most cases application implementation would prefer to have strongly typed body of the message instead of raw `String`.
 For this scenario `Shape` trait should be implemented for target type.
 
 * First, let's define our target type. JSON in this example.

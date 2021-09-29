@@ -29,6 +29,7 @@ pub struct PayloadToVerify {
     body: Value,
 }
 
+// struct docu is placed in `message.rs`
 #[cfg(feature = "raw-crypto")]
 impl Message {
     /// Encrypts current message by consuming it.

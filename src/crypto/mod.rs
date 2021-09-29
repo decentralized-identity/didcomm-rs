@@ -1,3 +1,4 @@
+//! Collection of utilities for cryptography related components.
 pub mod encryptor;
 pub mod signer;
 

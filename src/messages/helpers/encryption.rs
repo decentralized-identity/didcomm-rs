@@ -220,6 +220,7 @@ pub(crate) fn encrypt_cek(
     })
 }
 
+/// Create a `CryptoAlgorithm` by using headers `alg` value.
 pub(crate) fn get_crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgorithm, Error> {
     match &header.alg {
         None => Err(Error::JweParseError),
@@ -249,6 +250,7 @@ pub(crate) fn get_signing_sender_public_key(
     Err(Error::JwsParseError)
 }
 
+/// Concatenates key derivation function
 fn concat_kdf(
     secret: &Vec<u8>,
     alg: &str,
@@ -322,10 +324,29 @@ fn generate_kek(
     Ok(kek)
 }
 
+/// Generates shared secret for a message recipient with a senders public key and a recipients
+/// private key. Key is taken from `recipient_public_key`, if it contains a value.
+///
+/// If `recipient_public_key` is set to `None`, the public key is automatically resolved by using
+/// `recipient_did`, which is only possible if `resolve` feature is enabled.
+///
+/// If recipient_public_key` is set to `None`, and `resolve` feature is disabled, function
+/// invocation will return an `Error`.
+///
+/// # Arguments
+///
+/// * `sender_private_key` - senders private key, used to generate a shared secret for recipient
+///
+/// * `recipient_did` - if `recipient_public_key` is `None`, used to resolved recipient public key
+///                     if `resolve` feature is enabled
+///
+/// * `recipient_public_key` - public key, allows to skip public key resolving via
+///                            via `recipient_did`
+///
 #[allow(unused_variables)]
 fn generate_shared_for_recipient(
-    sk: impl AsRef<[u8]>,
-    did: &str,
+    sender_private_key: impl AsRef<[u8]>,
+    recipient_did: &str,
     recipient_public_key: Option<&[u8]>,
 ) -> Result<impl AsRef<[u8]>, Error> {
     let recipient_public = match recipient_public_key {
@@ -333,7 +354,7 @@ fn generate_shared_for_recipient(
         None => {
             #[cfg(feature = "resolve")]
             {
-                let document = resolve_any(did).ok_or(Error::DidResolveFailed)?;
+                let document = resolve_any(recipient_did).ok_or(Error::DidResolveFailed)?;
                 document
                     .find_public_key_for_curve("X25519")
                     .ok_or(Error::DidResolveFailed)?
@@ -344,13 +365,15 @@ fn generate_shared_for_recipient(
             }
         }
     };
-    let ss = StaticSecret::from(array_ref!(sk.as_ref(), 0, 32).to_owned()).diffie_hellman(
-        &PublicKey::from(array_ref!(recipient_public, 0, 32).to_owned()),
-    );
+    let ss = StaticSecret::from(array_ref!(sender_private_key.as_ref(), 0, 32).to_owned())
+        .diffie_hellman(&PublicKey::from(
+            array_ref!(recipient_public, 0, 32).to_owned(),
+        ));
 
     Ok(*ss.as_bytes())
 }
 
+/// Combines length of array and its its length into a vector.
 fn get_length_and_input(vector: &[u8]) -> Result<Vec<u8>, Error> {
     let mut collected: Vec<u8> = u32::try_from(vector.len())
         .map_err(|err| Error::Generic(err.to_string()))?
@@ -360,6 +383,7 @@ fn get_length_and_input(vector: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(collected)
 }
 
+/// Extracts key id part from a did url (basically the part after the method).
 fn get_key_id_from_didurl(url: &str) -> String {
     let re = regex::Regex::new(
         r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$",
