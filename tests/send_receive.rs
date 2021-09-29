@@ -190,10 +190,10 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     // Send
     let ready_to_send = message
         .seal_signed(
-            SignatureAlgorithm::EdDsa,
-            &sign_keypair.to_bytes(),
             &alice_private,
             Some(&bobs_public),
+            SignatureAlgorithm::EdDsa,
+            &sign_keypair.to_bytes(),
         )
         .unwrap();
 

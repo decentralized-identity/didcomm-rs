@@ -279,10 +279,10 @@
 //!
 //! // Send as signed and encrypted JWS wrapped into JWE
 //! let ready_to_send = message.seal_signed(
-//!     SignatureAlgorithm::EdDsa,
-//!     &sign_keypair.to_bytes(),
 //!     &alice_private,
 //!     Some(&bobs_public),
+//!     SignatureAlgorithm::EdDsa,
+//!     &sign_keypair.to_bytes(),
 //! ).unwrap();
 //!
 //! //... transport to destination is happening here ...

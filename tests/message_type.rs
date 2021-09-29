@@ -78,10 +78,10 @@ fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(),
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
-        SignatureAlgorithm::EdDsa,
-        &sign_keypair.to_bytes(),
         &alice_private,
         Some(&bobs_public),
+        SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
     )?;
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
