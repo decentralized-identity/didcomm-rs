@@ -78,9 +78,9 @@ fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(),
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
-        &alice_private,
-        &sign_keypair.to_bytes(),
         SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
+        &alice_private,
         Some(&bobs_public),
     )?;
 

@@ -25,9 +25,9 @@ fn can_create_flat_jwe_json() -> Result<(), Error> {
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
-        &alice_private,
-        &sign_keypair.to_bytes(),
         SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
+        &alice_private,
         Some(&bobs_public),
     )?;
 
@@ -71,9 +71,9 @@ fn can_receive_flat_jwe_json() -> Result<(), Error> {
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
-        &alice_private,
-        &sign_keypair.to_bytes(),
         SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
+        &alice_private,
         Some(&bobs_public),
     )?;
 

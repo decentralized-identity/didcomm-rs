@@ -188,9 +188,9 @@ let message = Message::new() // creating message
 
 // Send as signed and encrypted JWS wrapped into JWE
 let ready_to_send = message.seal_signed(
-    &alice_private,
-    &sign_keypair.to_bytes(),
     SignatureAlgorithm::EdDsa,
+    &sign_keypair.to_bytes(),
+    &alice_private,
     Some(&bobs_public),
 ).unwrap();
 

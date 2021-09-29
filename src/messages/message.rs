@@ -401,20 +401,20 @@ impl Message {
     ///
     /// # Arguments
     ///
-    /// * `encryption_sender_private_key` - encryption key for inner message payload JWE encryption
+    /// * `signing_algorithm` - encryption algorithm used
     ///
     /// * `signing_sender_private_key` - signing key for enveloped message JWS encryption
     ///
-    /// * `signing_algorithm` - encryption algorithm used
+    /// * `encryption_sender_private_key` - encryption key for inner message payload JWE encryption
     ///
     /// * `encryption_recipient_public_key` - key used to encrypt content encryption key for
     ///                                       recipient with; can be provided if key should not be
     ///                                       resolved via recipients DID
     pub fn seal_signed(
         self,
-        encryption_sender_private_key: &[u8],
-        signing_sender_private_key: &[u8],
         signing_algorithm: SignatureAlgorithm,
+        signing_sender_private_key: &[u8],
+        encryption_sender_private_key: &[u8],
         encryption_recipient_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
         let mut to = self.clone();
@@ -701,9 +701,9 @@ mod crypto_tests {
             .kid(&hex::encode(vec![1; 32])); // invalid key, passing no key will not succeed
 
         let jwe_string = message.seal_signed(
-            &alice_private,
-            &sign_keypair.to_bytes(),
             SignatureAlgorithm::EdDsa,
+            &sign_keypair.to_bytes(),
+            &alice_private,
             Some(&bobs_public),
         )?;
 
