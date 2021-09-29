@@ -293,9 +293,12 @@ impl Message {
         let mut current_message: String = incoming.to_string();
 
         if get_message_type(&current_message)? == MessageType::DidCommJwe {
+            let recipient_private_key = encryption_recipient_private_key.ok_or_else(|| {
+                Error::Generic("missing encryption recipient private key".to_string())
+            })?;
             current_message = receive_jwe(
                 &current_message,
-                encryption_recipient_private_key,
+                recipient_private_key,
                 encryption_sender_public_key,
             )?;
         }

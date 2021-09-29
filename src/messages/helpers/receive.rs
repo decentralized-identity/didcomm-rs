@@ -59,13 +59,11 @@ pub(crate) fn get_message_type(message: &str) -> Result<MessageType, Error> {
 ///                                    should be automatically resolved (requires `resolve` feature)
 pub(crate) fn receive_jwe(
     incoming: &str,
-    encryption_recipient_private_key: Option<&[u8]>,
+    encryption_recipient_private_key: &[u8],
     encryption_sender_public_key: Option<&[u8]>,
 ) -> Result<String, Error> {
     let jwe: Jwe = serde_json::from_str(incoming)?;
     let alg = &jwe.get_alg().ok_or(Error::JweParseError)?;
-    let recipient_private_key = encryption_recipient_private_key
-        .ok_or_else(|| Error::Generic("missing encryption recipient private key".to_string()))?;
 
     // get public key from input or from senders DID document
     let sender_public_key = match encryption_sender_public_key {
@@ -88,7 +86,7 @@ pub(crate) fn receive_jwe(
         }
     };
 
-    let shared = StaticSecret::from(array_ref!(recipient_private_key, 0, 32).to_owned())
+    let shared = StaticSecret::from(array_ref!(encryption_recipient_private_key, 0, 32).to_owned())
         .diffie_hellman(&PublicKey::from(
             array_ref!(sender_public_key, 0, 32).to_owned(),
         ));
@@ -107,7 +105,7 @@ pub(crate) fn receive_jwe(
         for recipient in recipients {
             let decrypted_key = decrypt_cek(
                 &jwe,
-                &recipient_private_key,
+                &encryption_recipient_private_key,
                 &recipient,
                 encryption_sender_public_key,
             );
