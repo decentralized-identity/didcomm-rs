@@ -4,11 +4,8 @@ use base64_url::{decode, encode};
 use serde_json::Value;
 
 use super::Message;
-#[cfg(feature = "resolve")]
-use crate::Recipient;
 use crate::{
     crypto::{SignatureAlgorithm, Signer, SigningMethod, SymmetricCypherMethod},
-    DidCommHeader,
     Error,
     Jwe,
     JwmHeader,
@@ -16,18 +13,6 @@ use crate::{
     MessageType,
     Signature,
 };
-
-#[derive(Serialize, Deserialize)]
-pub struct PayloadToVerify {
-    #[serde(flatten)]
-    didcomm_header: DidCommHeader,
-
-    #[cfg(feature = "resolve")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) recipients: Option<Vec<Recipient>>,
-
-    body: Value,
-}
 
 // struct docu is placed in `message.rs`
 #[cfg(feature = "raw-crypto")]
