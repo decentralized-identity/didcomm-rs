@@ -58,13 +58,13 @@ fn can_receive_flattened_jws_json() -> Result<(), Error> {
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
 
     // 'verify' style receive
-    let received = Message::verify(&jws_string.as_bytes(), &sign_keypair.public.to_bytes());
+    let received = Message::verify(jws_string.as_bytes(), &sign_keypair.public.to_bytes());
     assert_eq!(received.is_ok(), true);
 
     // generic 'receive' style
     let received = Message::receive(
         &jws_string,
-        Some(&vec![]),
+        Some(&[]),
         Some(&sign_keypair.public.to_bytes()),
         None,
     );
@@ -84,13 +84,13 @@ fn can_receive_general_jws_json() -> Result<(), Error> {
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
 
     // 'verify' style receive
-    let received = Message::verify(&jws_string.as_bytes(), &sign_keypair.public.to_bytes());
+    let received = Message::verify(jws_string.as_bytes(), &sign_keypair.public.to_bytes());
     assert_eq!(received.is_ok(), true);
 
     // generic 'receive' style
     let received = Message::receive(
         &jws_string,
-        Some(&vec![]),
+        Some(&[]),
         Some(&sign_keypair.public.to_bytes()),
         None,
     );

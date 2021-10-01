@@ -109,14 +109,13 @@ impl Message {
         let aad = aad_string.as_bytes();
         let tag = jwe
             .tag
-            .as_ref()
-            .ok_or_else(|| "JWE is missing tag")
+            .as_ref().ok_or("JWE is missing tag")
             .map_err(|e| Error::Generic(e.to_string()))?;
         let mut ciphertext_and_tag: Vec<u8> = vec![];
         ciphertext_and_tag.extend(&jwe.get_payload());
         ciphertext_and_tag.extend(&decode(&tag)?);
 
-        return match decrypter(jwe.get_iv().as_ref(), cek, &ciphertext_and_tag, &aad) {
+        return match decrypter(jwe.get_iv().as_ref(), cek, &ciphertext_and_tag, aad) {
             Ok(raw_message_bytes) => Ok(serde_json::from_slice(&raw_message_bytes)?),
             Err(e) => {
                 error!("decryption failed; {}", &e);
@@ -146,8 +145,8 @@ impl Message {
         let payload_json_string = serde_json::to_string(&self)?;
         let payload_string_base64 = base64_url::encode(&payload_json_string);
         let payload_to_sign = format!("{}.{}", &jws_header_string_base64, &payload_string_base64);
-        let signature = signer(signing_sender_private_key, &payload_to_sign.as_bytes())?;
-        let signature_value = Signature::new(Some(jws_header.clone()), None, signature);
+        let signature = signer(signing_sender_private_key, payload_to_sign.as_bytes())?;
+        let signature_value = Signature::new(Some(jws_header), None, signature);
 
         let jws: Jws;
         if self.serialize_flat_jws {
@@ -194,7 +193,7 @@ impl Message {
             let payload_to_verify = format!("{}.{}", &encoded_header, &payload);
             if verifier.validator()(
                 signing_sender_public_key,
-                &payload_to_verify.as_bytes(),
+                payload_to_verify.as_bytes(),
                 signature,
             )? {
                 verified = true;
@@ -263,7 +262,7 @@ mod raw_tests {
         // Act and Assert
         let encrypted = m.encrypt(my_crypter, key);
         assert!(&encrypted.is_ok()); // Encryption check
-        let raw_m = Message::decrypt(&encrypted.unwrap().as_bytes(), my_decrypter, key);
+        let raw_m = Message::decrypt(encrypted.unwrap().as_bytes(), my_decrypter, key);
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistency check
     }
@@ -295,11 +294,11 @@ mod raw_tests {
         let key = secretbox::gen_key();
 
         // Act and Assert
-        let encrypted = m.encrypt(my_crypter, &key.as_ref());
+        let encrypted = m.encrypt(my_crypter, key.as_ref());
         assert!(&encrypted.is_ok()); // Encryption check
         let encrypted = encrypted.unwrap();
         println!("{}", &encrypted);
-        let raw_m = Message::decrypt(&encrypted.as_bytes(), my_decrypter, &key.as_ref());
+        let raw_m = Message::decrypt(encrypted.as_bytes(), my_decrypter, key.as_ref());
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistency check
     }
@@ -340,7 +339,7 @@ mod raw_tests {
         let encrypted = m.encrypt(my_crypter, sender_shared.as_bytes());
         assert!(&encrypted.is_ok()); // Encryption check
         let raw_m = Message::decrypt(
-            &encrypted.unwrap().as_bytes(),
+            encrypted.unwrap().as_bytes(),
             my_decrypter,
             recipient_shared.as_bytes(),
         );

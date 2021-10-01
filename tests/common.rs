@@ -110,7 +110,7 @@ pub mod sample_dids {
         "id": "did:elem:ropsten:EiAS3mqC4OLMKOwcz3ItIL7XfWduPT7q3Fa4vHgiCfSG2A"
     }"#;
 
-    pub const TEST_DID_ENCRYPT_1: &'static str = r###"{
+    pub const TEST_DID_ENCRYPT_1: &str = r###"{
         "@context": "https://www.w3.org/ns/did/v1",
         "id": "did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw",
         "verificationMethod": [
@@ -129,7 +129,7 @@ pub mod sample_dids {
         ]
     }"###;
 
-    pub const TEST_DID_ENCRYPT_2: &'static str = r###"{
+    pub const TEST_DID_ENCRYPT_2: &str = r###"{
         "@context": "https://www.w3.org/ns/did/v1",
         "id": "did:jun:ELB1nzFeCRQjH5aWZRDmBDcDO1VepN1GPe6798tGOZCQ",
         "verificationMethod": [

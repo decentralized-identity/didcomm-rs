@@ -91,7 +91,7 @@ impl Message {
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     pub fn add_header_field(mut self, key: String, value: String) -> Self {
-        if key.len() == 0 {
+        if key.is_empty() {
             return self;
         }
         self.didcomm_header.other.insert(key, value);
@@ -337,14 +337,14 @@ impl Message {
     ) -> Result<String, Error> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
-        let body = Mediated::new(self.didcomm_header.to[0].clone().into()).with_payload(
+        let body = Mediated::new(self.didcomm_header.to[0].clone()).with_payload(
             self.seal(sender_private_key, recipient_public_keys)?
                 .as_bytes()
                 .to_vec(),
         );
         Message::new()
             .to(&[mediator_did])
-            .from(&from)
+            .from(from)
             .as_jwe(&alg, mediator_public_key)
             .m_type(MessageType::DidCommForward)
             .body(&serde_json::to_string(&body)?)
@@ -386,7 +386,7 @@ impl Message {
         rng.fill_bytes(&mut cek);
         trace!("sealing message with shared_key: {:?}", &cek.as_ref());
 
-        if to_len == 0 as usize {
+        if to_len == 0_usize {
             todo!(); // What should happen in this scenario?
         } else if self.serialize_flat_jwe && self.didcomm_header.to.len() > 1 {
             return Err(Error::Generic(
@@ -399,7 +399,7 @@ impl Message {
         for i in 0..to_len {
             let rv = encrypt_cek(
                 &self,
-                &sender_private_key.as_ref(),
+                sender_private_key.as_ref(),
                 &self.didcomm_header.to[i],
                 &cek,
                 public_keys[i],
@@ -438,10 +438,10 @@ impl Message {
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), signing_sender_private_key)?;
         to.body = serde_json::from_str(&signed)?;
-        return to.m_type(MessageType::DidCommJws).seal(
+        to.m_type(MessageType::DidCommJws).seal(
             encryption_sender_private_key,
             encryption_recipient_public_keys,
-        );
+        )
     }
 }
 
@@ -714,7 +714,7 @@ mod crypto_tests {
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .body(&body) // packing in some payload
+            .body(body) // packing in some payload
             .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
             .kid(&hex::encode(vec![1; 32])); // invalid key, passing no key will not succeed
 
@@ -731,7 +731,7 @@ mod crypto_tests {
             &jwe_string,
             Some(&bobs_private),
             Some(&alice_public),
-            Some(&vec![0; 32]),
+            Some(&[0; 32]),
         );
         let received_success = Message::receive(
             &jwe_string,
@@ -745,7 +745,7 @@ mod crypto_tests {
         assert!(&received_failure_wrong_key.is_err());
         assert!(&received_success.is_ok());
         let received = received_success.unwrap();
-        let sample_body: Value = serde_json::from_str(&body).unwrap();
+        let sample_body: Value = serde_json::from_str(body).unwrap();
         let received_body: Value = serde_json::from_str(&received.get_body().unwrap()).unwrap();
         assert_eq!(sample_body.to_string(), received_body.to_string(),);
 

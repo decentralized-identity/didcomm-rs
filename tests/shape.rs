@@ -13,7 +13,7 @@ struct DesiredShape {
 impl Shape for DesiredShape {
     type Err = Error;
     fn shape(m: &Message) -> Result<DesiredShape, Error> {
-        serde_json::from_slice(m.get_body()?.as_ref()).map_err(|e| Error::SerdeError(e))
+        serde_json::from_slice(m.get_body()?.as_ref()).map_err(Error::SerdeError)
     }
 }
 
