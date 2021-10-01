@@ -26,7 +26,7 @@ fn can_create_flat_jwe_json() -> Result<(), Error> {
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        Some(&bobs_public),
+        Some(vec![Some(&bobs_public)]),
         SignatureAlgorithm::EdDsa,
         &sign_keypair.to_bytes(),
     )?;
@@ -72,7 +72,7 @@ fn can_receive_flat_jwe_json() -> Result<(), Error> {
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        Some(&bobs_public),
+        Some(vec![Some(&bobs_public)]),
         SignatureAlgorithm::EdDsa,
         &sign_keypair.to_bytes(),
     )?;

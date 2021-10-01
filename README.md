@@ -68,7 +68,10 @@ let message = Message::new()
     .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#);
 
 // recipient public key is automatically resolved
-let ready_to_send = message.seal(&ek, Some(&bobs_public)).unwrap();
+let ready_to_send = message.seal(
+    &ek,
+    Some(vec![Some(&bobs_public), Some(&clarice_public)]),
+).unwrap();
 
 //... transport is happening here ...
 ```
@@ -122,7 +125,7 @@ let mediated = Message::new()
     //**THIS MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
     .routed_by(
         &alice_private,
-        Some(&bobs_public),
+        Some(vec![Some(&bobs_public)]),
         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
         Some(&mediators_public),
     );
@@ -189,7 +192,7 @@ let message = Message::new() // creating message
 // Send as signed and encrypted JWS wrapped into JWE
 let ready_to_send = message.seal_signed(
     &alice_private,
-    Some(&bobs_public),
+    Some(vec![Some(&bobs_public)]),
     SignatureAlgorithm::EdDsa,
     &sign_keypair.to_bytes(),
 ).unwrap();
@@ -253,7 +256,7 @@ When implemented - use them instead of `CryptoAlgorithm` and `SignatureAlgorithm
 
 ### GoTo: [full test][shape_desired_test]
 
-In most cases application implementation would prefer to have strongly typed body of the message instead of raw `String`.
+In most cases application implementation would prefer to have strongly typed body of the message instead of raw `Vec<u8>`.
 For this scenario `Shape` trait should be implemented for target type.
 
 * First, let's define our target type. JSON in this example.
