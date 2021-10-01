@@ -54,7 +54,7 @@ impl Cypher for CryptoAlgorithm {
 
     /// Generates + invokes crypto of `SymmetricCypherMethod` which performs decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    fn decryptor(&self) -> SymmetricCypherMethod {
+    fn decrypter(&self) -> SymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => Box::new(
                 |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {

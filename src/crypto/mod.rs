@@ -27,7 +27,7 @@ pub type ValidationMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<bool, Erro
 /// Implemented by `CryptoAlgorithm` with `raw-crypto` feature.
 pub trait Cypher {
     fn encryptor(&self) -> SymmetricCypherMethod;
-    fn decryptor(&self) -> SymmetricCypherMethod;
+    fn decrypter(&self) -> SymmetricCypherMethod;
     fn asymmetric_encryptor(&self) -> AsymmetricCypherMethod;
 }
 

@@ -70,7 +70,7 @@ let message = Message::new()
 // recipient public key is automatically resolved
 let ready_to_send = message.seal(
     &ek,
-    Some(vec![Some(&bobs_public), Some(&clarice_public)]),
+    Some(vec![Some(&bobs_public), Some(&carol_public)]),
 ).unwrap();
 
 //... transport is happening here ...
@@ -199,7 +199,7 @@ let ready_to_send = message.seal_signed(
 
 //... transport to destination is happening here ...
 
-//Receive - same method to receive for JWE or JWS wrapped into JWE but with pub verifying key
+// Receive - same method to receive for JWE or JWS wrapped into JWE but with pub verifying key
 let received = Message::receive(
     &ready_to_send,
     Some(&bobs_private),
@@ -233,7 +233,7 @@ let jwe = jwe.unwrap();
 
 // Each of the recipients receive it in same way as before (direct with single recipient)
 let received_first = Message::receive(&jwe, Some(&bobs_private), None, None);
-let received_second = Message::receive(&jwe, Some(&clarice_private), None, None);
+let received_second = Message::receive(&jwe, Some(&carol_private), None, None);
 
 // All good without any extra inputs
 assert!(received_first.is_ok());
