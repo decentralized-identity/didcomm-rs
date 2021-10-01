@@ -214,6 +214,12 @@ impl Message {
     /// Verifies signature and returns payload message on verification success.
     /// `Err` return if signature invalid or data is malformed.
     /// Expects Jws's payload to be a valid serialized `Message` and base64_url encoded.
+    ///
+    /// # Arguments
+    ///
+    /// * `jws` - to be verified jws message as json `Value` object
+    ///
+    /// * `signing_sender_public_key` - optional public key used for verification, if `None` it will try to resolve the did in the `kid` field
     pub fn verify_value(jws: &Value, signing_sender_public_key: &[u8]) -> Result<Message, Error> {
         let jws_string = serde_json::to_string(jws)?;
         Message::verify(&jws_string.into_bytes(), signing_sender_public_key)
