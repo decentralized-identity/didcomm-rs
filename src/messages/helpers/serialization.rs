@@ -3,14 +3,14 @@
 pub(crate) mod serialization_base64_buffer {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    pub fn serialize<S: Serializer>(v: &Vec<u8>, s: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(v: &[u8], s: S) -> Result<S::Ok, S::Error> {
         let base64 = base64_url::encode(v);
         String::serialize(&base64, s)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
         let base64 = String::deserialize(d)?;
-        base64_url::decode(base64.as_bytes()).map_err(|e| serde::de::Error::custom(e))
+        base64_url::decode(base64.as_bytes()).map_err(serde::de::Error::custom)
     }
 }
 
@@ -26,8 +26,7 @@ pub(crate) mod serialization_base64_jwm_header {
     pub fn serialize<S: Serializer>(v: &Option<JwmHeader>, s: S) -> Result<S::Ok, S::Error> {
         let base64 = match v {
             Some(v) => {
-                let header_string =
-                    serde_json::to_string(&v).map_err(|e| serde::ser::Error::custom(e))?;
+                let header_string = serde_json::to_string(&v).map_err(serde::ser::Error::custom)?;
                 let header_buffer = header_string.into_bytes();
                 Some(base64_url::encode(&header_buffer))
             }
@@ -41,10 +40,9 @@ pub(crate) mod serialization_base64_jwm_header {
         match base64 {
             Some(v) => {
                 let header_buffer =
-                    base64_url::decode(v.as_bytes()).map_err(|e| serde::de::Error::custom(e))?;
-                let header_string =
-                    from_utf8(&header_buffer).map_err(|e| serde::de::Error::custom(e))?;
-                serde_json::from_str(&header_string).map_err(|e| serde::de::Error::custom(e))
+                    base64_url::decode(v.as_bytes()).map_err(serde::de::Error::custom)?;
+                let header_string = from_utf8(&header_buffer).map_err(serde::de::Error::custom)?;
+                serde_json::from_str(header_string).map_err(serde::de::Error::custom)
             }
             None => Ok(None),
         }

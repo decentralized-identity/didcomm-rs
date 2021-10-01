@@ -158,7 +158,7 @@ pub(crate) fn encrypt_cek(
 
     // start building jwk
     let mut jwk = Jwk::new();
-    jwk.kid = Some(get_key_id_from_didurl(&dest));
+    jwk.kid = Some(get_key_id_from_didurl(dest));
 
     let sealed_cek_and_tag: Vec<u8> = match alg.as_ref() {
         "ECDH-1PU+A256KW" => {
@@ -252,7 +252,7 @@ pub(crate) fn get_signing_sender_public_key(
 
 /// Concatenates key derivation function
 fn concat_kdf(
-    secret: &Vec<u8>,
+    secret: &[u8],
     alg: &str,
     producer_info: Option<&Vec<u8>>,
     consumer_info: Option<&Vec<u8>>,
@@ -305,7 +305,7 @@ fn generate_kek(
     recipient_public_key: Option<&[u8]>,
 ) -> Result<Vec<u8>, Error> {
     // zS (shared for recipient)
-    let shared = generate_shared_for_recipient(sk.as_ref(), did, recipient_public_key)?;
+    let shared = generate_shared_for_recipient(sk, did, recipient_public_key)?;
     trace!(
         "sk: {:?} shared: {:?} dest: {:?}",
         sk,

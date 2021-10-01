@@ -8,6 +8,9 @@ cargo check --workspace
 # check formatting
 cargo fmt --all -- --check
 
+# run clippy
+cargo clippy --all
+
 # test once with default feature setup and once without resolve
 cargo test --workspace
 cargo test --no-default-features --features=raw-crypto

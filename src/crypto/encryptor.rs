@@ -65,7 +65,7 @@ impl Cypher for CryptoAlgorithm {
                         XNonce,
                     };
                     let aead = XChaCha20Poly1305::new(key.into());
-                    let nonce = XNonce::from_slice(&nonce);
+                    let nonce = XNonce::from_slice(nonce);
                     aead.decrypt(nonce, Payload { msg: message, aad })
                         .map_err(|e| Error::Generic(e.to_string()))
                 },
@@ -105,7 +105,7 @@ impl TryFrom<&String> for CryptoAlgorithm {
         match &incoming[..] {
             "ECDH-1PU+A256KW" => Ok(Self::A256GCM),
             "ECDH-1PU+XC20PKW" => Ok(Self::XC20P),
-            _ => return Err(Error::JweParseError),
+            _ => Err(Error::JweParseError),
         }
     }
 }
@@ -129,7 +129,7 @@ mod batteries_tests {
         let payload = r#"{"test":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P, None) // Set jwe header manually - should be preceded by key properties
-            .body(&payload);
+            .body(payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -139,8 +139,8 @@ mod batteries_tests {
         let jwe: Jwe = serde_json::from_str(&jwe_string)?;
         assert!(&jwe.tag.is_some());
         let s = Message::decrypt(
-            &jwe_string.as_bytes(),
-            CryptoAlgorithm::XC20P.decrypter(),
+            jwe_string.as_bytes(),
+            CryptoAlgorithm::XC20P.decryptor(),
             key,
         )?;
         let received_payload = &s.get_body()?;
@@ -156,15 +156,15 @@ mod batteries_tests {
         let payload = r#"{"example":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM, None) // Set jwe header manually - should be preceded by key properties
-            .body(&payload);
+            .body(payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
         let jwe = m.encrypt(CryptoAlgorithm::A256GCM.encryptor(), key);
         assert!(&jwe.is_ok());
         let s = Message::decrypt(
-            &jwe.unwrap().as_bytes(),
-            CryptoAlgorithm::A256GCM.decrypter(),
+            jwe.unwrap().as_bytes(),
+            CryptoAlgorithm::A256GCM.decryptor(),
             key,
         )?;
         let received_payload = &s.get_body()?;

@@ -51,7 +51,7 @@ fn sets_message_type_correctly_for_signed_messages() -> Result<(), Error> {
     let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
     let protected_decoded_string =
         from_utf8(&protected_decoded_buffer).map_err(|_| Error::JwsParseError)?;
-    let protected_object: Value = serde_json::from_str(&protected_decoded_string)?;
+    let protected_object: Value = serde_json::from_str(protected_decoded_string)?;
 
     assert_eq!(
         protected_object["typ"]
@@ -93,7 +93,7 @@ fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(),
     let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
     let protected_decoded_string =
         from_utf8(&protected_decoded_buffer).map_err(|_| Error::JwsParseError)?;
-    let protected_object: Value = serde_json::from_str(&protected_decoded_string)?;
+    let protected_object: Value = serde_json::from_str(protected_decoded_string)?;
 
     assert_eq!(
         protected_object["typ"]
@@ -134,7 +134,7 @@ fn sets_message_type_correctly_for_forwarded_messages() -> Result<(), Error> {
     let protected_decoded_buffer = base64_url::decode(&protected_encoded.as_bytes())?;
     let protected_decoded_string =
         from_utf8(&protected_decoded_buffer).map_err(|_| Error::JwsParseError)?;
-    let protected_object: Value = serde_json::from_str(&protected_decoded_string)?;
+    let protected_object: Value = serde_json::from_str(protected_decoded_string)?;
 
     assert_eq!(
         protected_object["typ"]

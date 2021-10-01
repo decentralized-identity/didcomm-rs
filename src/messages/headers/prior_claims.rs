@@ -14,6 +14,6 @@ impl PriorClaims {
     }
 
     pub fn from_bytes(jwt: &[u8]) -> Result<Self, Error> {
-        Ok(Self::from_string(String::from_utf8(jwt.to_vec())?)?)
+        Self::from_string(String::from_utf8(jwt.to_vec())?)
     }
 }

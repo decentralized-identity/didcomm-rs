@@ -105,7 +105,7 @@ pub(crate) fn receive_jwe(
         for recipient in recipients {
             let decrypted_key = decrypt_cek(
                 &jwe,
-                &encryption_recipient_private_key,
+                encryption_recipient_private_key,
                 &recipient,
                 encryption_sender_public_key,
             );
@@ -140,7 +140,7 @@ pub(crate) fn receive_jws(
 ) -> Result<String, Error> {
     // incoming data may be a jws string or a serialized message with jws data
     let mut message_verified = None::<Message>;
-    if let Ok(message) = serde_json::from_str::<Message>(&incoming) {
+    if let Ok(message) = serde_json::from_str::<Message>(incoming) {
         if message.jwm_header.alg.is_none() {
             return Err(Error::JweParseError);
         }
@@ -151,12 +151,12 @@ pub(crate) fn receive_jws(
             message.jwm_header.kid.as_ref(),
         )?;
         message_verified = Some(Message::verify(to_verify, &key)?);
-    } else if let Ok(jws) = serde_json::from_str::<Jws>(&incoming) {
+    } else if let Ok(jws) = serde_json::from_str::<Jws>(incoming) {
         let signatures_values_to_verify: Vec<Signature>;
         if let Some(signatures) = &jws.signatures {
             signatures_values_to_verify = signatures.clone();
         } else if let Some(signature_value) = jws.signature {
-            signatures_values_to_verify = vec![signature_value.clone()];
+            signatures_values_to_verify = vec![signature_value];
         } else {
             return Err(Error::JwsParseError);
         }
@@ -171,7 +171,7 @@ pub(crate) fn receive_jws(
                 signing_sender_public_key,
                 signature_value.get_kid().as_ref(),
             )?;
-            if let Ok(message_result) = Message::verify(&to_verify, &key) {
+            if let Ok(message_result) = Message::verify(to_verify, &key) {
                 message_verified = Some(message_result);
                 break;
             }

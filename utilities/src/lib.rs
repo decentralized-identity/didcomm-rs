@@ -33,12 +33,12 @@ pub fn get_keypair_set() -> KeyPairSet {
     let bob_public: PublicKey = (&bob_secret_key).into();
     let mediator_public: PublicKey = (&mediator_secret_key).into();
 
-    return KeyPairSet {
+    KeyPairSet {
         alice_public: alice_public.to_bytes(),
         alice_private: alice_secret_key.to_bytes(),
         bobs_public: bob_public.to_bytes(),
         bobs_private: bob_secret_key.to_bytes(),
         mediators_public: mediator_public.to_bytes(),
         mediators_private: mediator_secret_key.to_bytes(),
-    };
+    }
 }

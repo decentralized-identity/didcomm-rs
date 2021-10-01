@@ -5,8 +5,27 @@ use crate::{
     messages::helpers::{create_fallback_getter, serialization_base64_jwm_header},
     Jwk,
     JwmHeader,
-    Recipient,
 };
+
+/// This struct presents single recipient of JWE `recipients` collection.
+/// Each recipient should have same body cypher key encrypted with shared secret.
+/// [Spec](https://tools.ietf.org/html/rfc7516#section-7.2.1)
+///
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct Recipient {
+    pub header: Jwk,
+
+    pub encrypted_key: String,
+}
+
+impl Recipient {
+    pub fn new(header: Jwk, encrypted_key: String) -> Self {
+        Recipient {
+            header,
+            encrypted_key,
+        }
+    }
+}
 
 /// JWE representation of `Message` with public header.
 /// Can be serialized to JSON or Compact representations and from same.
