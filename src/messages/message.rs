@@ -145,7 +145,7 @@ impl Message {
         self
     }
 
-    /// Creates set of Jwm related headers for the JWE
+    /// Creates set of JWM related headers for the JWE
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
