@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use arrayref::array_ref;
 #[cfg(feature = "resolve")]
-pub use ddoresolver_rs::*;
+use ddoresolver_rs::*;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use x25519_dalek::{PublicKey, StaticSecret};
@@ -33,6 +33,7 @@ struct UnknownReceivedMessage<'a> {
     pub iv: Option<&'a RawValue>,
 }
 
+/// Tries to parse message and checks for well known fields to derive message type.
 pub(crate) fn get_message_type(message: &str) -> Result<MessageType, Error> {
     // try to skip parsing by using known fields from jwe/jws
     let to_check: UnknownReceivedMessage = serde_json::from_str(message)?;
@@ -46,13 +47,25 @@ pub(crate) fn get_message_type(message: &str) -> Result<MessageType, Error> {
     Ok(message.jwm_header.typ)
 }
 
+/// Receive a serialized message. This function handles receival of [`crate::Jwe`] envelopes.
+///
+/// # Arguments
+///
+/// * `incoming` - incoming message
+///
+/// * `encryption_recipient_private_key` - private key of recipient of a message, required
+///
+/// * `encryption_sender_public_key` - public key of message sender, can be omitted if public key
+///                                    should be automatically resolved (requires `resolve` feature)
 pub(crate) fn receive_jwe(
     incoming: &str,
-    encryption_receiver_private_key: Option<&[u8]>,
+    encryption_recipient_private_key: Option<&[u8]>,
     encryption_sender_public_key: Option<&[u8]>,
 ) -> Result<String, Error> {
     let jwe: Jwe = serde_json::from_str(incoming)?;
-    let alg = &jwe.alg().ok_or(Error::JweParseError)?;
+    let alg = &jwe.get_alg().ok_or(Error::JweParseError)?;
+    let recipient_private_key = encryption_recipient_private_key
+        .ok_or_else(|| Error::Generic("missing encryption recipient private key".to_string()))?;
 
     // get public key from input or from senders DID document
     let sender_public_key = match encryption_sender_public_key {
@@ -61,7 +74,7 @@ pub(crate) fn receive_jwe(
             #[cfg(feature = "resolve")]
             {
                 let skid = &jwe
-                    .skid()
+                    .get_skid()
                     .ok_or_else(|| Error::Generic("skid missing".to_string()))?;
                 let document = ddoresolver_rs::resolve_any(skid).ok_or(Error::DidResolveFailed)?;
                 document
@@ -74,10 +87,8 @@ pub(crate) fn receive_jwe(
             }
         }
     };
-    let receiver_private_key = encryption_receiver_private_key
-        .ok_or_else(|| Error::Generic("missing encryption receiver private key".to_string()))?;
 
-    let shared = StaticSecret::from(array_ref!(receiver_private_key, 0, 32).to_owned())
+    let shared = StaticSecret::from(array_ref!(recipient_private_key, 0, 32).to_owned())
         .diffie_hellman(&PublicKey::from(
             array_ref!(sender_public_key, 0, 32).to_owned(),
         ));
@@ -96,7 +107,7 @@ pub(crate) fn receive_jwe(
         for recipient in recipients {
             let decrypted_key = decrypt_cek(
                 &jwe,
-                &receiver_private_key,
+                &recipient_private_key,
                 &recipient,
                 encryption_sender_public_key,
             );
@@ -106,17 +117,25 @@ pub(crate) fn receive_jwe(
             }
         }
         if !key.is_empty() {
-            m = Message::decrypt(incoming.as_bytes(), a.decryptor(), &key)?;
+            m = Message::decrypt(incoming.as_bytes(), a.decrypter(), &key)?;
         } else {
             return Err(Error::JweParseError);
         }
     } else {
-        m = Message::decrypt(incoming.as_bytes(), a.decryptor(), shared.as_bytes())?;
+        m = Message::decrypt(incoming.as_bytes(), a.decrypter(), shared.as_bytes())?;
     }
 
     Ok(serde_json::to_string(&m)?)
 }
 
+/// Receive a serialized message. This function handles receival of [`crate::Jws`] envelopes.
+///
+/// # Arguments
+///
+/// * `incoming` - incoming message
+///
+/// * `signing_sender_public_key` - senders public key, can be omitted if public key
+///                                 should be automatically resolved (requires `resolve` feature)
 pub(crate) fn receive_jws(
     incoming: &str,
     signing_sender_public_key: Option<&[u8]>,
@@ -147,12 +166,12 @@ pub(crate) fn receive_jws(
         let incoming_string = incoming.to_string();
         let to_verify = incoming_string.as_bytes();
         for signature_value in signatures_values_to_verify {
-            if signature_value.alg().is_none() {
+            if signature_value.get_alg().is_none() {
                 continue;
             }
             let key = get_signing_sender_public_key(
                 signing_sender_public_key,
-                signature_value.kid().as_ref(),
+                signature_value.get_kid().as_ref(),
             )?;
             if let Ok(message_result) = Message::verify(&to_verify, &key) {
                 message_verified = Some(message_result);

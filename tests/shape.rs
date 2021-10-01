@@ -24,7 +24,7 @@ fn shape_desired_test() {
         num_field: 42,
         string_field: "important data".into(),
     };
-    let m = Message::new().set_body(&serde_json::to_string(&initial_shape).unwrap());
+    let m = Message::new().body(&serde_json::to_string(&initial_shape).unwrap());
 
     // -- pack, send, receive happens here
 

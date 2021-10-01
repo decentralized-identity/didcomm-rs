@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+/// Encryption public key
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Epk {
     pub kty: String,

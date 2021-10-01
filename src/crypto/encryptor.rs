@@ -10,7 +10,7 @@ use super::*;
 /// Underlying algorithms are implemented by Rust-crypto crate family.
 ///
 /// Allowed (and implemented) cryptographical algorithms (JWA).
-/// According to (spec)[https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption]
+/// According to [spec](https://identity.foundation/didcomm-messaging/spec/#sender-authenticated-encryption)
 #[derive(Copy, Clone)]
 pub enum CryptoAlgorithm {
     XC20P,
@@ -54,7 +54,7 @@ impl Cypher for CryptoAlgorithm {
 
     /// Generates + invokes crypto of `SymmetricCypherMethod` which performs decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    fn decryptor(&self) -> SymmetricCypherMethod {
+    fn decrypter(&self) -> SymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => Box::new(
                 |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
@@ -129,7 +129,7 @@ mod batteries_tests {
         let payload = r#"{"test":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P, None) // Set jwe header manually - should be preceded by key properties
-            .set_body(&payload);
+            .body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -140,7 +140,7 @@ mod batteries_tests {
         assert!(&jwe.tag.is_some());
         let s = Message::decrypt(
             &jwe_string.as_bytes(),
-            CryptoAlgorithm::XC20P.decryptor(),
+            CryptoAlgorithm::XC20P.decrypter(),
             key,
         )?;
         let received_payload = &s.get_body()?;
@@ -156,7 +156,7 @@ mod batteries_tests {
         let payload = r#"{"example":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM, None) // Set jwe header manually - should be preceded by key properties
-            .set_body(&payload);
+            .body(&payload);
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -164,7 +164,7 @@ mod batteries_tests {
         assert!(&jwe.is_ok());
         let s = Message::decrypt(
             &jwe.unwrap().as_bytes(),
-            CryptoAlgorithm::A256GCM.decryptor(),
+            CryptoAlgorithm::A256GCM.decrypter(),
             key,
         )?;
         let received_payload = &s.get_body()?;

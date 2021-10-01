@@ -8,7 +8,7 @@ use chacha20poly1305::{
     XNonce,
 };
 #[cfg(feature = "resolve")]
-pub use ddoresolver_rs::*;
+use ddoresolver_rs::*;
 use k256::elliptic_curve::rand_core;
 use rand::{prelude::SliceRandom, Rng};
 use sha2::{Digest, Sha256};
@@ -20,15 +20,15 @@ use crate::{Error, Jwe, Jwk, JwmHeader, KeyAlgorithm, Message, Recipient};
 
 /// Decrypts the content encryption key with a key encryption key.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `jwe` - jwe to decrypt content encryption key for
+/// * `jwe` - jwe to decrypt content encryption key for
 ///
-/// `sk` - receivers private key
+/// * `sk` - recipients private key
 ///
-/// `recipient` - recipient data from JWE
+/// * `recipient` - recipient data from JWE
 ///
-/// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
+/// * `recipient_public_key` - can be provided if key should not be resolved via recipients DID
 pub(crate) fn decrypt_cek(
     jwe: &Jwe,
     sk: &[u8],
@@ -37,12 +37,12 @@ pub(crate) fn decrypt_cek(
 ) -> Result<Vec<u8>, Error> {
     trace!("decrypting per-recipient JWE value");
     let alg = jwe
-        .alg()
+        .get_alg()
         .ok_or_else(|| Error::Generic("missing encryption 'alg' in header".to_string()))?;
     trace!("using algorithm {}", &alg);
 
     let skid = jwe
-        .skid()
+        .get_skid()
         .ok_or_else(|| Error::Generic("missing 'skid' in header".to_string()))?;
 
     // zE (temporary secret)
@@ -111,15 +111,17 @@ pub(crate) fn decrypt_cek(
 
 /// Encrypts the content encryption key with a key encryption key.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `sk` - senders private key
+/// * `message` - message the content encryption key should be encrypted for
 ///
-/// `dest` - receiver to encrypt cek for
+/// * `sk` - senders private key
 ///
-/// `cek` - key used to encrypt content with, will be encrypted per recipient
+/// * `dest` - recipient to encrypt cek for
 ///
-/// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
+/// * `cek` - key used to encrypt content with, will be encrypted per recipient
+///
+/// * `recipient_public_key` - can be provided if key should not be resolved via recipients DID
 pub(crate) fn encrypt_cek(
     message: &Message,
     sk: &[u8],
@@ -218,6 +220,7 @@ pub(crate) fn encrypt_cek(
     })
 }
 
+/// Create a `CryptoAlgorithm` by using headers `alg` value.
 pub(crate) fn get_crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgorithm, Error> {
     match &header.alg {
         None => Err(Error::JweParseError),
@@ -228,11 +231,11 @@ pub(crate) fn get_crypter_from_header(header: &JwmHeader) -> Result<CryptoAlgori
 /// Use given key from `signing_sender_public_key` or if `None`, use key from "kid".
 /// `kid` is currently "resolved" by hex-decoding it and using it as the public key.
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `signing_sender_public_key` - optional senders public to verify signature
+/// * `signing_sender_public_key` - optional senders public to verify signature
 ///
-/// `kid` - key reference to senders public key to verify signature
+/// * `kid` - key reference to senders public key to verify signature
 pub(crate) fn get_signing_sender_public_key(
     signing_sender_public_key: Option<&[u8]>,
     kid: Option<&String>,
@@ -247,6 +250,7 @@ pub(crate) fn get_signing_sender_public_key(
     Err(Error::JwsParseError)
 }
 
+/// Concatenates key derivation function
 fn concat_kdf(
     secret: &Vec<u8>,
     alg: &str,
@@ -282,17 +286,17 @@ fn concat_kdf(
 
 /// Creates a key used to encrypt/decrypt keys (key encryption key).
 ///
-/// # Parameters
+/// # Arguments
 ///
-/// `did` - receiver of a message (during encryption) or sender of a message (during decryption)
+/// * `did` - recipient of a message (during encryption) or sender of a message (during decryption)
 ///
-/// `sk` - senders private key (encryption) or receivers private key (decryption)
+/// * `sk` - senders private key (encryption) or recipient private key (decryption)
 ///
-/// `ze` - temporary secret zE
+/// * `ze` - temporary secret zE
 ///
-/// `alg` - encryption algorithm used
+/// * `alg` - encryption algorithm used
 ///
-/// `recipient_public_key` - can be provided if key should not be resolved via recipients DID
+/// * `recipient_public_key` - can be provided if key should not be resolved via recipients DID
 fn generate_kek(
     did: &str,
     sk: &[u8],
@@ -320,10 +324,29 @@ fn generate_kek(
     Ok(kek)
 }
 
+/// Generates shared secret for a message recipient with a senders public key and a recipients
+/// private key. Key is taken from `recipient_public_key`, if it contains a value.
+///
+/// If `recipient_public_key` is set to `None`, the public key is automatically resolved by using
+/// `recipient_did`, which is only possible if `resolve` feature is enabled.
+///
+/// If recipient_public_key` is set to `None`, and `resolve` feature is disabled, function
+/// invocation will return an `Error`.
+///
+/// # Arguments
+///
+/// * `sender_private_key` - senders private key, used to generate a shared secret for recipient
+///
+/// * `recipient_did` - if `recipient_public_key` is `None`, used to resolved recipient public key
+///                     if `resolve` feature is enabled
+///
+/// * `recipient_public_key` - public key, allows to skip public key resolving via
+///                            via `recipient_did`
+///
 #[allow(unused_variables)]
 fn generate_shared_for_recipient(
-    sk: impl AsRef<[u8]>,
-    did: &str,
+    sender_private_key: impl AsRef<[u8]>,
+    recipient_did: &str,
     recipient_public_key: Option<&[u8]>,
 ) -> Result<impl AsRef<[u8]>, Error> {
     let recipient_public = match recipient_public_key {
@@ -331,7 +354,7 @@ fn generate_shared_for_recipient(
         None => {
             #[cfg(feature = "resolve")]
             {
-                let document = resolve_any(did).ok_or(Error::DidResolveFailed)?;
+                let document = resolve_any(recipient_did).ok_or(Error::DidResolveFailed)?;
                 document
                     .find_public_key_for_curve("X25519")
                     .ok_or(Error::DidResolveFailed)?
@@ -342,13 +365,15 @@ fn generate_shared_for_recipient(
             }
         }
     };
-    let ss = StaticSecret::from(array_ref!(sk.as_ref(), 0, 32).to_owned()).diffie_hellman(
-        &PublicKey::from(array_ref!(recipient_public, 0, 32).to_owned()),
-    );
+    let ss = StaticSecret::from(array_ref!(sender_private_key.as_ref(), 0, 32).to_owned())
+        .diffie_hellman(&PublicKey::from(
+            array_ref!(recipient_public, 0, 32).to_owned(),
+        ));
 
     Ok(*ss.as_bytes())
 }
 
+/// Combines length of array and its its length into a vector.
 fn get_length_and_input(vector: &[u8]) -> Result<Vec<u8>, Error> {
     let mut collected: Vec<u8> = u32::try_from(vector.len())
         .map_err(|err| Error::Generic(err.to_string()))?
@@ -358,6 +383,7 @@ fn get_length_and_input(vector: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(collected)
 }
 
+/// Extracts key id part from a did url (basically the part after the method).
 fn get_key_id_from_didurl(url: &str) -> String {
     let re = regex::Regex::new(
         r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$",

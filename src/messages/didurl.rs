@@ -2,6 +2,7 @@ use std::{str::FromStr, string::ToString};
 
 use crate::Error;
 
+/// DID URL string
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DidUrl(pub String);
 

@@ -182,7 +182,10 @@ fn keeps_inner_message_type_as_plain_for_signed_messages() -> Result<(), Error> 
 
     assert_eq!(jws_jwm_header.typ, MessageType::DidCommJws);
     assert_eq!(payload_jwm_header.typ, MessageType::DidCommRaw);
-    assert_eq!(received_message.jwm_header.typ, MessageType::DidCommRaw);
+    assert_eq!(
+        received_message.get_jwm_header().typ,
+        MessageType::DidCommRaw
+    );
 
     Ok(())
 }
@@ -207,7 +210,7 @@ fn serializes_existing_body_as_object() -> Result<(), Error> {
     let message = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .set_body(r#"{"foo":"bar"}"#);
+        .body(r#"{"foo":"bar"}"#);
 
     let jwm_string: String = serde_json::to_string(&message)?;
     let jwm_object: Value = serde_json::from_str(&jwm_string)?;

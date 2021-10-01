@@ -10,6 +10,8 @@ use crate::{
     PriorClaims,
 };
 
+/// Collection of DIDComm message specific headers, will be flattened into DIDComm plain message
+/// according to [spec](https://datatracker.ietf.org/doc/html/draft-looker-jwm-01#section-4).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidCommHeader {
     pub id: String,

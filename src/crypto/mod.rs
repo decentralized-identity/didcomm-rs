@@ -1,10 +1,11 @@
+//! Collection of utilities for cryptography related components.
 pub mod encryptor;
 pub mod signer;
 
 #[cfg(feature = "raw-crypto")]
 pub use {encryptor::CryptoAlgorithm, signer::SignatureAlgorithm};
 
-pub use crate::Error;
+use crate::Error;
 
 /// Return `FnOnce` signature definition for symmetric cryptography method.
 /// Arguments sequence: Nonce, Key, Message.
@@ -26,7 +27,7 @@ pub type ValidationMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<bool, Erro
 /// Implemented by `CryptoAlgorithm` with `raw-crypto` feature.
 pub trait Cypher {
     fn encryptor(&self) -> SymmetricCypherMethod;
-    fn decryptor(&self) -> SymmetricCypherMethod;
+    fn decrypter(&self) -> SymmetricCypherMethod;
     fn asymmetric_encryptor(&self) -> AsymmetricCypherMethod;
 }
 

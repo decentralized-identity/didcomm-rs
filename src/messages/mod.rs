@@ -16,6 +16,7 @@ pub use message::*;
 #[cfg(feature = "raw-crypto")]
 pub use message_raw_crypto::*;
 
+/// trait that can be used to verify body, see example [here][crate]
 pub trait Shape: Sized {
     type Err;
 

@@ -1,18 +1,23 @@
 use super::{Message, Shape};
 use crate::Error;
 
+/// Mediated Message value
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Mediated {
+    /// `DidUrl` of delivery target
     pub next: String,
 
+    /// "inner" message, that should be routed to target
     #[serde(rename = "payloads~attach")]
     pub payload: Vec<u8>,
 }
 
 impl Mediated {
     /// Constructor with empty payload
-    /// # Parameters
-    /// *next - `DidUrl` of delivery target.
+    ///
+    /// # Arguments
+    ///
+    /// * `next` - `DidUrl` of delivery target.
     pub fn new(next: String) -> Self {
         Mediated {
             next,
