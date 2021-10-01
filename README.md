@@ -196,7 +196,7 @@ let ready_to_send = message.seal_signed(
 
 //... transport to destination is happening here ...
 
-//Receive - same method to receive for JWE or JWS wrapped into JWE but with pub verifying key
+// Receive - same method to receive for JWE or JWS wrapped into JWE but with pub verifying key
 let received = Message::receive(
     &ready_to_send,
     Some(&bobs_private),
