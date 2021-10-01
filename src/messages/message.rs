@@ -293,9 +293,12 @@ impl Message {
         let mut current_message: String = incoming.to_string();
 
         if get_message_type(&current_message)? == MessageType::DidCommJwe {
+            let recipient_private_key = encryption_recipient_private_key.ok_or_else(|| {
+                Error::Generic("missing encryption recipient private key".to_string())
+            })?;
             current_message = receive_jwe(
                 &current_message,
-                encryption_recipient_private_key,
+                recipient_private_key,
                 encryption_sender_public_key,
             )?;
         }
@@ -318,19 +321,19 @@ impl Message {
     ///
     /// * `sender_private_key` - encryption key for inner message payload JWE encryption
     ///
+    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
+    ///                            can be provided if key should not be resolved via recipients DID
+    ///
     /// * `mediator_did` - DID of message mediator, will be `to` of mediated envelope
     ///
     /// * `mediator_public_key` - key used to encrypt content encryption key for mediator;
     ///                           can be provided if key should not be resolved via mediators DID
-    ///
-    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
-    ///                            can be provided if key should not be resolved via recipients DID
     pub fn routed_by(
         self,
         sender_private_key: &[u8],
+        recipient_public_key: Option<&[u8]>,
         mediator_did: &str,
         mediator_public_key: Option<&[u8]>,
-        recipient_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
@@ -403,19 +406,19 @@ impl Message {
     ///
     /// * `encryption_sender_private_key` - encryption key for inner message payload JWE encryption
     ///
-    /// * `signing_sender_private_key` - signing key for enveloped message JWS encryption
-    ///
-    /// * `signing_algorithm` - encryption algorithm used
-    ///
     /// * `encryption_recipient_public_key` - key used to encrypt content encryption key for
     ///                                       recipient with; can be provided if key should not be
     ///                                       resolved via recipients DID
+    ///
+    /// * `signing_algorithm` - encryption algorithm used
+    ///
+    /// * `signing_sender_private_key` - signing key for enveloped message JWS encryption
     pub fn seal_signed(
         self,
         encryption_sender_private_key: &[u8],
-        signing_sender_private_key: &[u8],
-        signing_algorithm: SignatureAlgorithm,
         encryption_recipient_public_key: Option<&[u8]>,
+        signing_algorithm: SignatureAlgorithm,
+        signing_sender_private_key: &[u8],
     ) -> Result<String, Error> {
         let mut to = self.clone();
         let signed = self
@@ -655,8 +658,8 @@ mod crypto_tests {
             .as_jwe(&CryptoAlgorithm::XC20P, None)
             .routed_by(
                 &alice_private,
-                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
                 None,
+                "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
                 None,
             );
         assert!(sealed.is_ok());
@@ -702,9 +705,9 @@ mod crypto_tests {
 
         let jwe_string = message.seal_signed(
             &alice_private,
-            &sign_keypair.to_bytes(),
-            SignatureAlgorithm::EdDsa,
             Some(&bobs_public),
+            SignatureAlgorithm::EdDsa,
+            &sign_keypair.to_bytes(),
         )?;
 
         let received_failure_no_key =

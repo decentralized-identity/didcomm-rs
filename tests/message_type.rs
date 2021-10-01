@@ -79,9 +79,9 @@ fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(),
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        &sign_keypair.to_bytes(),
-        SignatureAlgorithm::EdDsa,
         Some(&bobs_public),
+        SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
     )?;
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
@@ -120,9 +120,9 @@ fn sets_message_type_correctly_for_forwarded_messages() -> Result<(), Error> {
 
     let jwe_string = message.routed_by(
         &alice_private,
+        Some(&bobs_public),
         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
         Some(&mediators_public),
-        Some(&bobs_public),
     )?;
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;

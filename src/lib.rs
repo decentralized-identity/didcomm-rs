@@ -191,9 +191,9 @@
 //!     //**THIS MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
 //!     .routed_by(
 //!         &alice_private,
+//!         Some(&bobs_public),
 //!         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
 //!         Some(&mediators_public),
-//!         Some(&bobs_public),
 //!     );
 //! assert!(mediated.is_ok());
 //!
@@ -280,9 +280,9 @@
 //! // Send as signed and encrypted JWS wrapped into JWE
 //! let ready_to_send = message.seal_signed(
 //!     &alice_private,
-//!     &sign_keypair.to_bytes(),
-//!     SignatureAlgorithm::EdDsa,
 //!     Some(&bobs_public),
+//!     SignatureAlgorithm::EdDsa,
+//!     &sign_keypair.to_bytes(),
 //! ).unwrap();
 //!
 //! //... transport to destination is happening here ...

@@ -26,9 +26,9 @@ fn can_create_flat_jwe_json() -> Result<(), Error> {
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        &sign_keypair.to_bytes(),
-        SignatureAlgorithm::EdDsa,
         Some(&bobs_public),
+        SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
     )?;
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
@@ -72,9 +72,9 @@ fn can_receive_flat_jwe_json() -> Result<(), Error> {
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        &sign_keypair.to_bytes(),
-        SignatureAlgorithm::EdDsa,
         Some(&bobs_public),
+        SignatureAlgorithm::EdDsa,
+        &sign_keypair.to_bytes(),
     )?;
 
     let received = Message::receive(&jwe_string, Some(&bobs_private), Some(&alice_public), None);
