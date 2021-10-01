@@ -47,6 +47,7 @@ fn send_receive_encrypted_xc20p_json_test() {
         alice_public,
         bobs_private,
         bobs_public,
+        mediators_public: carol_public,
         ..
     } = get_keypair_set();
 
@@ -64,7 +65,12 @@ fn send_receive_encrypted_xc20p_json_test() {
         .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#); // set kid header
 
     // Act
-    let ready_to_send = message.seal(&alice_private, Some(&bobs_public)).unwrap();
+    let ready_to_send = message
+        .seal(
+            &alice_private,
+            Some(vec![Some(&bobs_public), Some(&carol_public)]),
+        )
+        .unwrap();
     let received = Message::receive(
         &ready_to_send,
         Some(&bobs_private),
@@ -96,7 +102,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
         .routed_by(
             &alice_private,
-            Some(&bobs_public),
+            Some(vec![Some(&bobs_public)]),
             "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
             Some(&mediators_public),
         );
@@ -169,6 +175,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
         alice_private,
         bobs_private,
         bobs_public,
+        mediators_public: carol_public,
         ..
     } = get_keypair_set();
     let sign_keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
@@ -191,7 +198,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     let ready_to_send = message
         .seal_signed(
             &alice_private,
-            Some(&bobs_public),
+            Some(vec![Some(&bobs_public), Some(&carol_public)]),
             SignatureAlgorithm::EdDsa,
             &sign_keypair.to_bytes(),
         )

@@ -321,8 +321,8 @@ impl Message {
     ///
     /// * `sender_private_key` - encryption key for inner message payload JWE encryption
     ///
-    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
-    ///                            can be provided if key should not be resolved via recipients DID
+    /// * `recipient_public_keys` - keys used to encrypt content encryption key for recipient;
+    ///                             can be provided if key should not be resolved via recipients DID
     ///
     /// * `mediator_did` - DID of message mediator, will be `to` of mediated envelope
     ///
@@ -331,14 +331,14 @@ impl Message {
     pub fn routed_by(
         self,
         sender_private_key: &[u8],
-        recipient_public_key: Option<&[u8]>,
+        recipient_public_keys: Option<Vec<Option<&[u8]>>>,
         mediator_did: &str,
         mediator_public_key: Option<&[u8]>,
     ) -> Result<String, Error> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
         let body = Mediated::new(self.didcomm_header.to[0].clone().into()).with_payload(
-            self.seal(sender_private_key, recipient_public_key)?
+            self.seal(sender_private_key, recipient_public_keys)?
                 .as_bytes()
                 .to_vec(),
         );
@@ -348,7 +348,7 @@ impl Message {
             .as_jwe(&alg, mediator_public_key)
             .m_type(MessageType::DidCommForward)
             .body(&serde_json::to_string(&body)?)
-            .seal(sender_private_key, mediator_public_key)
+            .seal(sender_private_key, Some(vec![mediator_public_key]))
     }
 
     /// Seals (encrypts) self and returns ready to send JWE
@@ -357,23 +357,36 @@ impl Message {
     ///
     /// * `sender_private_key` - encryption key for inner message payload JWE encryption
     ///
-    /// * `recipient_public_key` - key used to encrypt content encryption key for recipient;
-    ///                            can be provided if key should not be resolved via recipients DID
+    /// * `recipient_public_keys` - keys used to encrypt content encryption key for recipient;
+    ///                             can be provided if key should not be resolved via recipients DID
     pub fn seal(
         mut self,
         sender_private_key: impl AsRef<[u8]>,
-        recipient_public_key: Option<&[u8]>,
+        recipient_public_keys: Option<Vec<Option<&[u8]>>>,
     ) -> Result<String, Error> {
         if sender_private_key.as_ref().len() != 32 {
             return Err(Error::InvalidKeySize("!32".into()));
         }
+        let to_len = self.didcomm_header.to.len();
+        let public_keys: Vec<Option<&[u8]>>;
+        if let Some(recipient_public_keys_value) = recipient_public_keys {
+            if recipient_public_keys_value.len() != to_len {
+                return Err(Error::Generic(
+                    "`to` and `recipient_public_keys` must have same length".to_string(),
+                ));
+            }
+            public_keys = recipient_public_keys_value;
+        } else {
+            public_keys = vec![None; to_len];
+        }
+
         // generate content encryption key
         let mut cek = [0u8; 32];
         let mut rng = ChaCha20Rng::from_seed(Default::default());
         rng.fill_bytes(&mut cek);
         trace!("sealing message with shared_key: {:?}", &cek.as_ref());
 
-        if self.didcomm_header.to.len() == 0 as usize {
+        if to_len == 0 as usize {
             todo!(); // What should happen in this scenario?
         } else if self.serialize_flat_jwe && self.didcomm_header.to.len() > 1 {
             return Err(Error::Generic(
@@ -383,13 +396,13 @@ impl Message {
 
         let mut recipients: Vec<Recipient> = vec![];
         // create jwk from static secret per recipient
-        for dest in &self.didcomm_header.to {
+        for i in 0..to_len {
             let rv = encrypt_cek(
                 &self,
                 &sender_private_key.as_ref(),
-                dest,
+                &self.didcomm_header.to[i],
                 &cek,
-                recipient_public_key,
+                public_keys[i],
             )?;
             recipients.push(Recipient::new(rv.header, rv.encrypted_key));
         }
@@ -406,9 +419,9 @@ impl Message {
     ///
     /// * `encryption_sender_private_key` - encryption key for inner message payload JWE encryption
     ///
-    /// * `encryption_recipient_public_key` - key used to encrypt content encryption key for
-    ///                                       recipient with; can be provided if key should not be
-    ///                                       resolved via recipients DID
+    /// * `encryption_recipient_public_keys` - keys used to encrypt content encryption key for
+    ///                                        recipient with; can be provided if key should not be
+    ///                                        resolved via recipients DID
     ///
     /// * `signing_algorithm` - encryption algorithm used
     ///
@@ -416,7 +429,7 @@ impl Message {
     pub fn seal_signed(
         self,
         encryption_sender_private_key: &[u8],
-        encryption_recipient_public_key: Option<&[u8]>,
+        encryption_recipient_public_keys: Option<Vec<Option<&[u8]>>>,
         signing_algorithm: SignatureAlgorithm,
         signing_sender_private_key: &[u8],
     ) -> Result<String, Error> {
@@ -427,7 +440,7 @@ impl Message {
         to.body = serde_json::from_str(&signed)?;
         return to.m_type(MessageType::DidCommJws).seal(
             encryption_sender_private_key,
-            encryption_recipient_public_key,
+            encryption_recipient_public_keys,
         );
     }
 }
@@ -466,7 +479,7 @@ mod crypto_tests {
             ..
         } = get_keypair_set();
         let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
-        let p = m.seal(&alice_private, Some(&bobs_public));
+        let p = m.seal(&alice_private, Some(vec![Some(&bobs_public)]));
         assert!(p.is_ok());
     }
 
@@ -510,7 +523,9 @@ mod crypto_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
-        let jwe = m.seal(&alice_private, Some(&bobs_public)).unwrap();
+        let jwe = m
+            .seal(&alice_private, Some(vec![Some(&bobs_public)]))
+            .unwrap();
 
         // Act
         // bob receives JWE
@@ -554,7 +569,7 @@ mod crypto_tests {
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
 
-        let jwe = m.seal(&alice_private, Some(&bobs_public));
+        let jwe = m.seal(&alice_private, Some(vec![Some(&bobs_public)]));
         assert!(jwe.is_ok());
 
         let received = Message::receive(
@@ -705,7 +720,7 @@ mod crypto_tests {
 
         let jwe_string = message.seal_signed(
             &alice_private,
-            Some(&bobs_public),
+            Some(vec![Some(&bobs_public)]),
             SignatureAlgorithm::EdDsa,
             &sign_keypair.to_bytes(),
         )?;

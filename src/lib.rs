@@ -80,7 +80,7 @@
 //! #         }
 //! #     ]
 //! # }"###;
-//! # let KeyPairSet { bobs_public, .. } = get_keypair_set();
+//! # let KeyPairSet { bobs_public, mediators_public: carol_public, .. } = get_keypair_set();
 //! // sender key as bytes
 //! let ek = [130, 110, 93, 113, 105, 127, 4, 210, 65, 234, 112, 90, 150, 120, 189, 252, 212, 165, 30, 209, 194, 213, 81, 38, 250, 187, 216, 14, 246, 250, 166, 92];
 //!
@@ -106,7 +106,10 @@
 //!     .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#);
 //!
 //! // recipient public key is automatically resolved
-//! let ready_to_send = message.seal(&ek, Some(&bobs_public)).unwrap();
+//! let ready_to_send = message.seal(
+//!     &ek,
+//!     Some(vec![Some(&bobs_public), Some(&carol_public)]),
+//! ).unwrap();
 //!
 //! //... transport is happening here ...
 //! ```
@@ -191,7 +194,7 @@
 //!     //**THIS MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
 //!     .routed_by(
 //!         &alice_private,
-//!         Some(&bobs_public),
+//!         Some(vec![Some(&bobs_public)]),
 //!         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
 //!         Some(&mediators_public),
 //!     );
@@ -280,7 +283,7 @@
 //! // Send as signed and encrypted JWS wrapped into JWE
 //! let ready_to_send = message.seal_signed(
 //!     &alice_private,
-//!     Some(&bobs_public),
+//!     Some(vec![Some(&bobs_public)]),
 //!     SignatureAlgorithm::EdDsa,
 //!     &sign_keypair.to_bytes(),
 //! ).unwrap();
@@ -312,7 +315,7 @@
 # let KeyPairSet {
 #     alice_private,
 #     bobs_private,
-#     mediators_private: clarice_private,
+#     mediators_private: carol_private,
 #     ..
 # } = get_keypair_set();
 // Creating message with multiple recipients.
@@ -332,7 +335,7 @@ let jwe = jwe.unwrap();
 
 // Each of the recipients receive it in same way as before (direct with single recipient)
 let received_first = Message::receive(&jwe, Some(&bobs_private), None, None);
-let received_second = Message::receive(&jwe, Some(&clarice_private), None, None);
+let received_second = Message::receive(&jwe, Some(&carol_private), None, None);
 
 // All good without any extra inputs
 assert!(received_first.is_ok());
