@@ -396,13 +396,13 @@ impl Message {
 
         let mut recipients: Vec<Recipient> = vec![];
         // create jwk from static secret per recipient
-        for i in 0..to_len {
+        for (i, public_key) in public_keys.iter().enumerate().take(to_len) {
             let rv = encrypt_cek(
                 &self,
                 sender_private_key.as_ref(),
                 &self.didcomm_header.to[i],
                 &cek,
-                public_keys[i],
+                *public_key,
             )?;
             recipients.push(Recipient::new(rv.header, rv.encrypted_key));
         }
@@ -442,6 +442,12 @@ impl Message {
             encryption_sender_private_key,
             encryption_recipient_public_keys,
         )
+    }
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

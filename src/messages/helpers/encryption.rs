@@ -252,7 +252,7 @@ pub(crate) fn get_signing_sender_public_key(
 
 /// Concatenates key derivation function
 fn concat_kdf(
-    secret: &Vec<u8>,
+    secret: &[u8],
     alg: &str,
     producer_info: Option<&Vec<u8>>,
     consumer_info: Option<&Vec<u8>>,
