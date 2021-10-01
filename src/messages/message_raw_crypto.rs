@@ -109,7 +109,8 @@ impl Message {
         let aad = aad_string.as_bytes();
         let tag = jwe
             .tag
-            .as_ref().ok_or("JWE is missing tag")
+            .as_ref()
+            .ok_or("JWE is missing tag")
             .map_err(|e| Error::Generic(e.to_string()))?;
         let mut ciphertext_and_tag: Vec<u8> = vec![];
         ciphertext_and_tag.extend(&jwe.get_payload());
