@@ -92,7 +92,7 @@ impl Message {
     ///
     /// * `received_message` - received message as byte array
     ///
-    /// * `decryptor` - decryptor that should be used
+    /// * `decrypter` - decrypter that should be used
     ///
     /// * `cek` - content encryption key to decrypt message with
     pub fn decrypt(
@@ -255,7 +255,7 @@ mod raw_tests {
                     .map_err(|e| Error::Generic(e.to_string()))
             },
         );
-        // Pluggable decryptor function to decrypt data
+        // Pluggable decrypter function to decrypt data
         let my_decrypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let aead = XChaCha20Poly1305::new(k.into());
@@ -289,7 +289,7 @@ mod raw_tests {
                 ))
             },
         );
-        // Pluggable decryptor function to decrypt data
+        // Pluggable decrypter function to decrypt data
         let my_decrypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let nonce = secretbox::Nonce::from_slice(n).unwrap();
@@ -332,7 +332,7 @@ mod raw_tests {
                     .map_err(|e| Error::Generic(e.to_string()))
             },
         );
-        // Pluggable decryptor function to decrypt data
+        // Pluggable decrypter function to decrypt data
         let my_decrypter = Box::new(
             |n: &[u8], k: &[u8], m: &[u8], _a: &[u8]| -> Result<Vec<u8>, Error> {
                 let aead = XChaCha20Poly1305::new(k.into());

@@ -117,12 +117,12 @@ pub(crate) fn receive_jwe(
             }
         }
         if !key.is_empty() {
-            m = Message::decrypt(incoming.as_bytes(), a.decryptor(), &key)?;
+            m = Message::decrypt(incoming.as_bytes(), a.decrypter(), &key)?;
         } else {
             return Err(Error::JweParseError);
         }
     } else {
-        m = Message::decrypt(incoming.as_bytes(), a.decryptor(), shared.as_bytes())?;
+        m = Message::decrypt(incoming.as_bytes(), a.decrypter(), shared.as_bytes())?;
     }
 
     Ok(serde_json::to_string(&m)?)

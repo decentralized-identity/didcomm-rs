@@ -54,7 +54,7 @@ impl Cypher for CryptoAlgorithm {
 
     /// Generates + invokes crypto of `SymmetricCypherMethod` which performs decryption.
     /// Algorithm selected is based on struct's `CryptoAlgorithm` property.
-    fn decryptor(&self) -> SymmetricCypherMethod {
+    fn decrypter(&self) -> SymmetricCypherMethod {
         match self {
             CryptoAlgorithm::XC20P => Box::new(
                 |nonce: &[u8], key: &[u8], message: &[u8], aad: &[u8]| -> Result<Vec<u8>, Error> {
@@ -140,7 +140,7 @@ mod batteries_tests {
         assert!(&jwe.tag.is_some());
         let s = Message::decrypt(
             &jwe_string.as_bytes(),
-            CryptoAlgorithm::XC20P.decryptor(),
+            CryptoAlgorithm::XC20P.decrypter(),
             key,
         )?;
         let received_payload = &s.get_body()?;
@@ -164,7 +164,7 @@ mod batteries_tests {
         assert!(&jwe.is_ok());
         let s = Message::decrypt(
             &jwe.unwrap().as_bytes(),
-            CryptoAlgorithm::A256GCM.decryptor(),
+            CryptoAlgorithm::A256GCM.decrypter(),
             key,
         )?;
         let received_payload = &s.get_body()?;
