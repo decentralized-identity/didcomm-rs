@@ -128,7 +128,7 @@ fn es256k_test() {
     };
     // Arrange
     let sk = SigningKey::random(&mut OsRng);
-    let vk = &sk.verify_key();
+    let vk = &sk.verifying_key();
     let m = b"this is the message we're signing in this test...";
     // Act
     let signer = SignatureAlgorithm::Es256k.signer();
