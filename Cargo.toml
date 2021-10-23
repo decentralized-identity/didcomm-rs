@@ -3,7 +3,7 @@ name = "didcomm-rs"
 version = "0.6.0"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
-repository = "https://github.com/decentralized-identity/didcomm-rs"
+#repository = "https://github.com/decentralized-identity/didcomm-rs"
 documentation = "https://docs.rs/didcomm-rs/"
 description = "DIDComm messaging v2 specifications implementation: https://identity.foundation/didcomm-messaging/spec/"
 license = "Apache-2.0"
@@ -25,12 +25,23 @@ ddoresolver-rs = { git = "https://github.com/jolocom/ddoresolver-rs", branch = "
 x25519-dalek = "1.1"
 arrayref = "0.3"
 # cbor = "0.4"
+rust-base58 = "*"
 
 # Other
 regex = "1"
 rand = "0.8"
 rand_chacha = "0.3.0"
 thiserror = "1.0"
+# Include uniffi dependencies
+uniffi = "0.14.0"
+
+# Include uniffi dependencies
+[build-dependencies]
+uniffi_build = "0.14.0"
+
+# Include uniffi dependencies
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dev-dependencies]
 sodiumoxide = "0.2.6"

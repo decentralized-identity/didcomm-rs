@@ -1,5 +1,11 @@
 use std::{convert::TryInto, time::SystemTime};
 use base64_url::{encode, decode};
+
+// --- Added for uniffi ---
+use rust_base58::{FromBase58};
+use std::sync::{Arc, RwLock};
+// --- End for uniffi ---
+
 use serde::{Serialize, Deserialize};
 use super::{
     mediated::Mediated,
@@ -46,20 +52,20 @@ use crate::{
 /// DIDComm message structure.
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
 ///
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone)] // , PartialEq)]
 pub struct Message {
     /// JOSE header, which is sent as public part with JWE.
     #[serde(flatten)]
-    pub jwm_header: JwmHeader,
+    pub jwm_header: Arc<RwLock<JwmHeader>>,
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
-    didcomm_header: DidcommHeader,
+    didcomm_header: Arc<RwLock<DidcommHeader>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
     ///     as base64url String of raw bytes of data.
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
-    body: String,
+    body: Arc<RwLock<String>>,
 }
 
 impl Message {
@@ -68,59 +74,270 @@ impl Message {
     ///
     pub fn new() -> Self {
         Message {
-            jwm_header: JwmHeader::default(),
-            didcomm_header: DidcommHeader::new(),
+            jwm_header: Arc::new(RwLock::new(JwmHeader::default())),
+            didcomm_header: Arc::new(RwLock::new(DidcommHeader::new())),
             recepients: None,
-            body: String::default(),
+            body: Arc::new(RwLock::new(String::default())),
         }
     }
+
+    // ----- For uniffi -----
+    // Note: while this is *temporary*, currently, uniffi is unable to return objects 
+    // from functions ... however, it can return objects from constructors.  
+    // As a result, the receive() function defined by didcomm_rs was redefined as an 
+    // additional constructor.  This lets the string data be input to the constructor that 
+    // in turn calls the original Message::receive() and returns the new Message structure.  
+    pub fn new_receive(incomming: &str, sk: &[u8]) -> Self {
+
+        // Process the incomming data string.
+        let m = Message::receive(&incomming, sk);
+        let result = match m {
+
+            Ok(message) => message,
+            Err(e) => { 
+                // Once uniffi supports returning objects, the Result structure can be used.
+                // This is a temporary work-around until returing objects is supported.
+                let x = Message::new(); 
+                x.set_body(e.to_string().as_bytes());
+                x
+            }
+        };
+
+        return result;
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than accessing data directly.  This is a helper function.
+    pub fn get_jwm_header(&self) -> JwmHeader {
+
+        return self.jwm_header.read().unwrap().clone()
+    }
+    
+    // The capabilities provided by uniffi need getters and setters rather
+    // than accessing data directly.  This is a helper function.
+    pub fn get_didcomm_header2(&self) -> DidcommHeader {
+
+        return self.didcomm_header.read().unwrap().clone();
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than accessing data directly.  This is a helper function.
+    pub fn get_recipients(&self) -> Option<Vec<Recepient>> {
+
+        return self.recepients.clone();
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than accessing data directly.  This is a helper function.
+    pub fn get_to(&self) -> Vec<String> {
+
+        return self.didcomm_header.read().unwrap().to.clone();
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than accessing data directly.  This is a helper function.
+    // NOTE:  the parameter "self: Arc<Self>" is used in place of "&mut self".
+    pub fn set_to(self: Arc<Self>, to: Vec<String>) -> () {
+
+        let mut header = self.didcomm_header.write().unwrap();
+
+        for s in to {
+            header.to.push(s.to_string());
+        }
+        while let Some(a) = header.to.iter().position(|e| e == &String::default()) {
+            header.to.remove(a);
+        }
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than manipulating data directly.  This is a helper function.
+    pub fn get_from(&self) -> String {
+
+        let header = (*self).didcomm_header.read().unwrap();
+
+        match &header.from {
+            None => "".to_string(),
+            Some(x) => x.to_string(),
+        }
+    }
+    
+    // The capabilities provided by uniffi need getters and setters rather
+    // than accessing data directly.  This is a helper function.
+    // NOTE:  the parameter "self: Arc<Self>" is used in place of "&mut self".
+    pub fn set_from(self: Arc<Self>, from: String) -> () {
+
+        let mut header = self.didcomm_header.write().unwrap();
+
+        // self.didcomm_header.from = Some(String::from(from));
+        header.from = Some(String::from(from));
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than manipulating data directly.  This is a helper function. 
+    // The existing Message::get_body() returns a Result, so this function 
+    // was added until uniffi supports returning objects.
+    pub fn get_body2(&self) -> Vec<u8> {
+        
+        let r_value = match decode(&self.body.read().unwrap().as_bytes()) {
+            Ok(x) => x,
+            Err(..) => self.body.read().unwrap().as_bytes().to_vec()
+        };
+
+        return r_value
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than manipulating data directly.  This is a helper function. 
+    // The existing Message::set_body() returns a Result, so this function 
+    // was added until uniffi supports returning objects.
+    // NOTE:  the parameter "self: Arc<Self>" is used in place of "&mut self".
+    pub fn set_body2(self: Arc<Self>, body: &[u8]) -> () {
+
+        self.body.write().unwrap().clear();
+        self.body.write().unwrap().push_str(&encode(body));
+    }
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than manipulating data directly.  This is a helper function.  
+    // The existing Message::as_raw_json() returns a Result, so this function 
+    // was added until uniffi supports returning objects.
+    pub fn as_raw_json2(&self) -> String {
+
+        let json = serde_json::to_string(&self);
+        let r_value = match json {
+            Ok(data) => data,
+            Err(..) => "Error".to_string()
+        };
+
+        return r_value;
+    }
+
+    // The CryptoAlgorithm values used for specifying the encryption algorithm
+    // are part of a separate Rust crate that is imported by didcomm_rs and that crate 
+    // is not available to non-Rust languages.  Theoretically, this crate's enum values
+    // can be extended by the uniffi UDL file and on to the other languages.  
+    // However, a simpler method is to create a didcomm_rs defined enum structure
+    // that denotes each of the supported encryption algorithms, which would then handle 
+    // the Rust side of the encryption algorithm specification.  Until another 
+    // architectural solution can be evaluated, this function was created to enable 
+    // other languages to set the encryption algorithm.
+    pub fn set_crypto_algorithm_xc20_p(self: Arc<Self>) -> () {
+
+        let my_dh = (*self).didcomm_header.read().unwrap();
+        let mut my_jh = (*self).jwm_header.write().unwrap();
+
+        my_jh.as_encrypted(&CryptoAlgorithm::XC20P);
+        #[cfg(feature = "resolve")]
+        {
+            if let Some(from) = &my_dh.from {
+                if let Some(document) = resolve_any(from) {
+                    match &CryptoAlgorithm::XC20P {
+                        CryptoAlgorithm::XC20P => 
+                                my_jh.kid = document.find_public_key_id_for_curve("X25519"),
+                        CryptoAlgorithm::A256GCM => todo!()
+                    }
+                }
+            }
+        }
+    }
+
+    // Some languages (e.g., Swift) do not have a native base58 encoder/decoder.
+    // While there are other open source packages that do provide base58 functionality,
+    // none have been evaluated, so far.  In order to interface with didcomm_rs' 
+    // key management routines, a base58 unwrapping function has been created.  
+    // By creating unwrap_base58_key(), the same native functionality used within
+    // didcomm_rs can be extended to external languages.
+    pub fn unwrap_base58_key(&self, key: String) -> Vec<u8> {
+
+        return key.as_str().from_base58().unwrap();
+    }
+
+    // Due to Rust's ownership rules, seal2() needed to receive a "&mut self" parameter 
+    // to modify the message data.  Since both seal() and seal2() needed the "&mut self" 
+    // parameter and since Rust requires that data be owned by a single owner, self was 
+    // cloned and passed to seal()  
+    pub fn seal2(&self, sk: &[u8]) -> String {
+
+        // I'm not sure why "self.clone()" is necessary.  It must be that
+        // seal() mutates the data somewhere.
+        let r = self.clone().seal(sk);
+        let r_value = match r {
+            Ok(s) => s,
+            Err(..) => "Error".to_string()
+        };
+        return r_value.to_string();
+    } 
+
+    // The capabilities provided by uniffi need getters and setters rather
+    // than manipulating data directly.  This is a helper function.  Since there
+    // was already a as_raw_json(), the name as_raw_json2() was chosen to ensure that 
+    // this situation was explicitly noted.
+    pub fn set_routed_by(&self, ek: &[u8], mediator_did: &str) -> String {
+
+        let result = self.routed_by(ek, mediator_did);
+        let e = "Error".to_string();
+        let r_value: String = match result {
+
+            Ok(m) => m.to_string(),
+            Err(..) => e
+        };
+
+        return r_value.to_string();
+    }
+
+    // --- End for uniffi ---
+    
     /// Setter of `from` header
     /// Helper method.
     ///
-    pub fn from(mut self, from: &str) -> Self {
-        self.didcomm_header.from = Some(String::from(from));
+    pub fn from(self, from: &str) -> Self {
+        self.didcomm_header.write().unwrap().from = Some(String::from(from));
         self
     }
     /// Setter of `to` header
     /// Helper method.
     ///
-    pub fn to(mut self, to: &[&str]) -> Self {
+    pub fn to(self, to: &[&str]) -> Self {
         for s in to {
-            self.didcomm_header.to.push(s.to_string());
+            self.didcomm_header.write().unwrap().to.push(s.to_string());
         }
-        while let Some(a) = self.didcomm_header.to.iter().position(|e| e == &String::default()) {
-            self.didcomm_header.to.remove(a);
+        while let Some(a) = self.didcomm_header.read().unwrap().to.iter().position(|e| e == &String::default()) {
+            self.didcomm_header.write().unwrap().to.remove(a);
         }
         self
     }
     /// Setter of `m_type` @type header
     /// Helper method.
     ///
-    pub fn m_type(mut self, m_type: MessageType) -> Self {
-        self.didcomm_header.m_type = m_type;
+    pub fn m_type(self, m_type: MessageType) -> Self {
+        self.didcomm_header.write().unwrap().m_type = m_type;
         self
     }
     /// Getter of the `body` as ref of bytes slice.
     /// Helpe method.
     ///
     pub fn get_body(&self) -> Result<impl AsRef<[u8]>, Error> {
-        Ok(decode(&self.body)?)
+        let s = self.body.read().unwrap().clone();
+        let sb = s.as_bytes();
+//        Ok(decode(&self.body)?)
+        Ok(decode(&sb)?)
     }
     /// Setter of the `body`
     /// Helper method.
     ///
-    pub fn set_body(mut self, body: &[u8]) -> Self {
-        self.body = encode(body);
-        self
+    pub fn set_body(&self, body: &[u8]) -> Self {
+
+        self.body.write().unwrap().push_str(&encode(body));
+        (*self).clone()
     }
     // Setter of the `kid` header
     // Helper method.
     //
-    pub fn kid(mut self, kid: &str) -> Self {
-        match &mut self.jwm_header.kid {
+    pub fn kid(self, kid: &str) -> Self {
+        match &mut self.jwm_header.write().unwrap().kid {
             Some(h) => *h = kid.into(),
             None => {
-                self.jwm_header.kid = Some(kid.into());
+                self.jwm_header.write().unwrap().kid = Some(kid.into());
             }
         }
         self
@@ -130,9 +347,9 @@ impl Message {
     /// * `expires` - time in seconds since Unix Epoch when message is
     /// considered to be invalid.
     ///
-    pub fn timed(mut self, expires: Option<u64>) -> Self {
-        self.didcomm_header.expires_time = expires;
-        self.didcomm_header.created_time = 
+    pub fn timed(self, expires: Option<u64>) -> Self {
+        self.didcomm_header.write().unwrap().expires_time = expires;
+        self.didcomm_header.write().unwrap().created_time = 
             match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(t) => Some(t.as_secs()),
                 Err(_) => None,
@@ -143,47 +360,47 @@ impl Message {
     /// Exposed for explicit checks on calling code level.
     ///
     pub fn is_rotation(&self) -> bool {
-        self.didcomm_header.from_prior().is_some()
+        self.didcomm_header.read().unwrap().from_prior().is_some()
     }
     /// If message `is_rotation()` true - returns from_prion claims.
     /// Errors otherwise with `Error::NoRotationData`
     /// 
     pub fn get_prior(&self) -> Result<PriorClaims, Error> {
         if self.is_rotation() {
-            Ok(self.didcomm_header.from_prior().clone().unwrap())
+            Ok(self.didcomm_header.read().unwrap().from_prior().clone().unwrap())
         } else {
            Err(Error::NoRotationData)
         }
     }
     /// `&DidcommHeader` getter.
     ///
-    pub fn get_didcomm_header(&self) -> &DidcommHeader {
-        &self.didcomm_header
+    pub fn get_didcomm_header(&self) -> DidcommHeader {
+        self.didcomm_header.write().unwrap().clone()
     }
     /// Setter of `didcomm_header`.
     /// Replaces existing one with provided by consuming both values.
     /// Returns modified instance of `Self`.
     ///
-    pub fn set_didcomm_header(mut self, h: DidcommHeader) -> Self {
-        self.didcomm_header = h;
+    pub fn set_didcomm_header(self, h: DidcommHeader) -> Self {
+        *self.didcomm_header.write().unwrap() = h;
         self
     }
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     ///
-    pub fn add_header_field(mut self, key: String, value: String) -> Self {
+    pub fn add_header_field(self, key: String, value: String) -> Self {
         if key.len() == 0 {
             return self;
         }
-        self.didcomm_header.other.insert(key, value);
+        self.didcomm_header.write().unwrap().other.insert(key, value);
         self
     }
     /// Creates set of Jwm related headers for the JWE
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
-    pub fn as_jws(mut self, alg: &SignatureAlgorithm) -> Self {
-        self.jwm_header.as_signed(alg);
+    pub fn as_jws(self, alg: &SignatureAlgorithm) -> Self {
+        self.jwm_header.write().unwrap().as_signed(alg);
         self
     }
     /// Creates set of Jwm related headers for the JWS
@@ -194,15 +411,16 @@ impl Message {
     /// For `resolve` feature will set `kid` header automatically
     ///     based on the did document resolved.
     ///
-    pub fn as_jwe(mut self, alg: &CryptoAlgorithm) -> Self {
-        self.jwm_header.as_encrypted(alg);
+    pub fn as_jwe(self, alg: &CryptoAlgorithm) -> Self {
+        self.jwm_header.write().unwrap().as_encrypted(alg);
         #[cfg(feature = "resolve")]
         {
-            if let Some(from) = &self.didcomm_header.from {
+            if let Some(from) = &self.didcomm_header.read().unwrap().from {
                 if let Some(document) = resolve_any(from) {
                     match alg {
                         CryptoAlgorithm::XC20P => 
-                                self.jwm_header.kid = 
+                                // self.jwm_header.read().unwrap().kid = 
+                                self.jwm_header.write().unwrap().kid = 
                                     document.find_public_key_id_for_curve("X25519"),
                         CryptoAlgorithm::A256GCM => todo!()
                     }
@@ -230,11 +448,12 @@ impl Message {
   //  #[cfg(feature = "resolve")]
     pub fn seal(mut self, sk: impl AsRef<[u8]>) -> Result<String, Error> {
         if sk.as_ref().len() != 32 { return Err(Error::InvalidKeySize("!32".into())); }
-        match &self.didcomm_header.to.len() {
+        let x = &self.didcomm_header.read().unwrap().to.len();
+        match x {
             1 => {
-                let to = self.didcomm_header.to[0].clone();
+                let to = self.didcomm_header.read().unwrap().to[0].clone();
                 let shared = gen_shared_for_recepient(sk, &to)?;
-                let alg = crypter_from_header(&self.jwm_header)?;
+                let alg = crypter_from_header(&self.jwm_header.read().unwrap())?;
                 self.encrypt(alg.encryptor(), shared.as_ref())
             },
             0 => todo!(), // What should happen in this scenario?
@@ -245,7 +464,7 @@ impl Message {
                 rng.fill_bytes(&mut shared_key);
                 let mut recepients: Vec<Recepient> = vec!();
                 // create jwk from static secret per recepient
-                for dest in &self.didcomm_header.to {
+                for dest in &self.didcomm_header.read().unwrap().to {
                     let shared = gen_shared_for_recepient(sk.as_ref(), dest)?;
                     let mut jwk = Jwk::new();
                     jwk.alg = KeyAlgorithm::EcdhEsA256kw;
@@ -254,7 +473,7 @@ impl Message {
                     jwk.kid = Some(key_id_from_didurl( &dest));
                 // encrypt jwk for each recepient using shared secret
                     let crypter = XChaCha20Poly1305::new(shared.as_ref().into());
-                    let iv = self.jwm_header.get_iv();
+                    let iv = self.jwm_header.read().unwrap().get_iv();
                     let nonce = XNonce::from_slice(iv.as_ref());
                     let sealed_key = crypter
                         .encrypt(nonce, shared_key.as_ref())
@@ -263,7 +482,7 @@ impl Message {
                 }
                 self.recepients = Some(recepients);
                 // encrypt original message with static secret
-                let alg = crypter_from_header(&self.jwm_header)?;
+                let alg = crypter_from_header(&self.jwm_header.read().unwrap())?;
                 self.encrypt(alg.encryptor(), shared_key.as_ref())
             }
         }
@@ -288,7 +507,7 @@ impl Message {
         let signed = self
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), sk)?;
-        to.body = encode(&signed.as_bytes());
+        to.body = Arc::new(RwLock::new(encode(&signed)));
         return to
             .m_type(MessageType::DidcommJws)
             .seal(ek);
@@ -318,12 +537,16 @@ impl Message {
     /// `form` - used same as in wrapped message, fails if not present with `DidResolveFailed` error.
     ///
     /// TODO: Add examples
-    pub fn routed_by(self, ek: &[u8], mediator_did: &str)
+    pub fn routed_by(&self, ek: &[u8], mediator_did: &str)
         -> Result<String, Error> {
-            let from = &self.didcomm_header.from.clone().unwrap_or_default();
-            let alg = crypter_from_header(&self.jwm_header)?;
-            let body = Mediated::new(self.didcomm_header.to[0].clone().into())
-                .with_payload(self.seal(ek)?.as_bytes().to_vec());
+            let from = self.didcomm_header.read().unwrap().from.clone().unwrap_or_default();
+            let alg = crypter_from_header(&self.jwm_header.read().unwrap())?;
+            let dh_header = self.didcomm_header.read().unwrap().to[0].clone().into();
+
+            // I'm not sure why "self.clone()" is necessary.  It must be that
+            // seal() mutates the data somewhere.
+            let body = Mediated::new(dh_header)
+                .with_payload(self.clone().seal(ek)?.as_bytes().to_vec());
             Message::new()
                 .to(&[mediator_did])
                 .from(&from)
@@ -452,9 +675,9 @@ impl Message {
                     } else {
                         m = Message::decrypt(incomming.as_bytes(), a.decryptor(), shared.as_bytes())?;
                     }
-                    if &m.didcomm_header.m_type == &MessageType::DidcommJws {
-                        if m.jwm_header.alg.is_none() { return Err(Error::JweParseError); }
-                        if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.alg.clone().unwrap_or_default()) {
+                    if &m.didcomm_header.read().unwrap().m_type == &MessageType::DidcommJws {
+                        if m.jwm_header.read().unwrap().alg.is_none() { return Err(Error::JweParseError); }
+                        if let Some(verifying_key) = document.find_public_key_for_curve(&m.jwm_header.read().unwrap().alg.clone().unwrap_or_default()) {
                             Ok(Message::verify(m.get_body()?.as_ref(), &verifying_key)?)
                         } else {
                             Err(Error::JwsParseError)

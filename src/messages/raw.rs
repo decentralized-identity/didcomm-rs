@@ -22,9 +22,9 @@ impl Message {
     ///
     pub fn encrypt(self, crypter: SymmetricCypherMethod, encryption_key: &[u8])
         -> Result<String, Error> {
-            let header = self.jwm_header.clone();
+            let header = self.jwm_header.read().unwrap().clone();
             let d_header = self.get_didcomm_header();
-            let cyphertext = crypter(self.jwm_header.get_iv().as_ref(), encryption_key, serde_json::to_string(&self)?.as_bytes())?;
+            let cyphertext = crypter(self.jwm_header.read().unwrap().get_iv().as_ref(), encryption_key, serde_json::to_string(&self)?.as_bytes())?;
             let mut jwe = Jwe::new(header, self.recepients.clone(), cyphertext);
             let multi = self.recepients.is_some();
             jwe.header.skid = Some(d_header.from.clone().unwrap_or_default())   ; 
@@ -55,13 +55,14 @@ impl Message {
     /// `Err` is returned if message is not properly prepared or data is malformed.
     /// Jws enveloped payload is base64_url encoded
     pub fn sign(self, signer: SigningMethod, signing_key: &[u8]) -> Result<String, Error> {
-        let h = self.jwm_header.clone();
+        let h = &*self.jwm_header.read().unwrap();
+        // let h = self.jwm_header.clone();
         if h.alg.is_none() {
             Err(Error::JwsParseError)
         } else {
             let payload = base64_url::encode(&serde_json::to_string(&self)?);
             let signature = signer(signing_key, &payload.as_bytes())?;
-            Ok(serde_json::to_string(&Jws::new(payload, h, signature))?)
+            Ok(serde_json::to_string(&Jws::new(payload, h.clone(), signature))?)
         }
     }
     /// Verifyes signature and returns payload message on verification success.

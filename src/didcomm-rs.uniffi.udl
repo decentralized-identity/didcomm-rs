@@ -1,0 +1,35 @@
+interface Message {
+
+    [Name=new]
+    constructor();
+
+    [Name=new_receive]
+    constructor([ByRef] string incomming, [ByRef] sequence<u8> sk);
+
+    sequence<string> get_to();
+    [Self=ByArc]
+    void set_to(sequence<string> str);
+
+    string get_from();
+    [Self=ByArc]
+    void set_from(string from);
+
+    sequence<u8> get_body2();
+    [Self=ByArc]
+    void set_body2([ByRef] sequence<u8> body);
+
+    string as_raw_json2();
+
+    [Self=ByArc]
+    void set_crypto_algorithm_xc20_p();
+
+    sequence<u8> unwrap_base58_key(string key);
+
+    string seal2([ByRef] sequence<u8> sk);
+
+    string set_routed_by([ByRef] sequence<u8> ekey, [ByRef] string mediator_did_string);
+};
+
+namespace didcomm_rs {
+
+};

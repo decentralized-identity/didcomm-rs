@@ -237,6 +237,28 @@ impl Shape for DesiredShape {
 let received_typed_body = DesiredShape::shape(&m).unwrap(); // Where m = Message
 ```
 
+# Building wrappers for multiple languages
+
+The *didcomm_rs* library has been created in Rust and is available for use in Rust applications.  Using the Foreign Function Interface (FFI) functionality, *didcomm_rs* can also be included in other languages that are capable of including libraries and making C language calls.  The main drawback of FFI is that it uses C-language method calling and memory management techniques.  Since mixing architectural models can introduce errors and imposes a new architecture on native language developers, it is often an unwanted level of complexity.  
+
+In order to simplify including Rust libraries in non-Rust applications, [Mozilla](https://www.mozilla.org) launched the [Uniffi](https://github.com/mozilla/uniffi-rs) project, which is used to automatically generate language wrappers that interface with Rust libraries.  Since these language wrappers are automatically generated, the FFI methods they employ are abstracted from developers who are presented with actual native language interfaces to Rust libraries.  Currently, Mozilla's Uniffi automatically generates language wrappers for Swift, Python, Kotlin, and C/C++.
+
+The Uniffi processes have been added to *didcomm_rs* in order to provide additional language wrappers without the development costs of creating them.  For a detailed tutorial on how to create Uniffi-based language wrappers for Rust libraries, please see the [FFI Tutorials](https://github.com/sudoplatform-labs/ffi-tutorials) created by [Anonyome Labs](https://anonyome.com), which provide detailed steps and descriptions.
+
+In order to compile *didcomm_rs*, the following high level steps are provided:
+
+1. Install the [Uniffi development tools](https://github.com/mozilla/uniffi-rs)
+2. Change directory to the didcomm_rs root directory
+3. Build the scaffolding layer via the command line by executing
+	* *uniffi-bindgen scaffolding ./src/didcomm-rs.uniffi.udl*
+4. Build the language wrapper via the command line (for Swift) by executing
+	* *uniffi-bindgen generate ./src/didcomm-rs.uniffi.udl --language swift*
+	* Note:  substituting *kotlin* or *python* for *swift* in the above command will generate wrappers for those languages
+5.  Build the *didcomm_rs* library by executing
+	* *cargo build*
+6. Run the sample Swift test application contained in the root directory 
+
+
 # Disclaimer
 
 This is a sample implementation of the DIDComm V2 spec. The DIDComm V2 spec is still actively being developed by the DIDComm WG in the DIF and therefore subject to change.
