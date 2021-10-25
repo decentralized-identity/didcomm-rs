@@ -158,7 +158,7 @@ pub(crate) fn encrypt_cek(
 
     // start building jwk
     let mut jwk = Jwk::new();
-    jwk.kid = Some(get_key_id_from_didurl(dest));
+    jwk.kid = Some(get_did_from_didurl(dest));
 
     let sealed_cek_and_tag: Vec<u8> = match alg.as_ref() {
         "ECDH-1PU+A256KW" => {
@@ -383,17 +383,31 @@ fn get_length_and_input(vector: &[u8]) -> Result<Vec<u8>, Error> {
     Ok(collected)
 }
 
-/// Extracts key id part from a did url (basically the part after the method).
-fn get_key_id_from_didurl(url: &str) -> String {
+/// Extracts key did part from a did url (drops path, query, and segment).
+fn get_did_from_didurl(url: &str) -> String {
     let re = regex::Regex::new(
-        r"(?x)(?P<prefix>[did]{3}):(?P<method>[a-z]*):(?P<key_id>[a-zA-Z0-9]*)([:?/]?)(\S)*$",
+        r"(?x)
+        ^
+        (?P<key_id>
+            did             # scheme
+            :
+            [a-z]+          # method
+            :
+            (?:[a-z]*:)*    # optional subdomains, postfixed with a ':'
+            [a-zA-Z0-9]+    # method specific identifier
+        )
+        (?:/[^?\#]*)?        # optional path
+        (?:\?[^\#]*)?        # optional query
+        (?:\#.*)?            # optional fragment
+        $
+    ",
     )
     .unwrap();
     match re.captures(url) {
-        Some(s) => match s.name("key_id") {
-            Some(name) => format!("did:key:{}", name.as_str()),
-            None => String::default(),
-        },
+        Some(s) => s
+            .name("key_id")
+            .map(|v| v.as_str().to_string())
+            .unwrap_or_else(|| String::default()),
         None => String::default(),
     }
 }
