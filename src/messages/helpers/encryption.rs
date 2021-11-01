@@ -388,7 +388,7 @@ fn get_did_from_didurl(url: &str) -> String {
     let re = regex::Regex::new(
         r"(?x)
         ^
-        (?P<key_id>
+        (?P<did>
             did             # scheme
             :
             [a-z]+          # method
@@ -405,7 +405,7 @@ fn get_did_from_didurl(url: &str) -> String {
     .unwrap();
     match re.captures(url) {
         Some(s) => s
-            .name("key_id")
+            .name("did")
             .map(|v| v.as_str().to_string())
             .unwrap_or_else(|| String::default()),
         None => String::default(),
