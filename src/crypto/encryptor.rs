@@ -140,7 +140,7 @@ mod batteries_tests {
         assert!(&jwe.tag.is_some());
         let s = Message::decrypt(
             jwe_string.as_bytes(),
-            CryptoAlgorithm::XC20P.decryptor(),
+            CryptoAlgorithm::XC20P.decrypter(),
             key,
         )?;
         let received_payload = &s.get_body()?;
@@ -164,7 +164,7 @@ mod batteries_tests {
         assert!(&jwe.is_ok());
         let s = Message::decrypt(
             jwe.unwrap().as_bytes(),
-            CryptoAlgorithm::A256GCM.decryptor(),
+            CryptoAlgorithm::A256GCM.decrypter(),
             key,
         )?;
         let received_payload = &s.get_body()?;
