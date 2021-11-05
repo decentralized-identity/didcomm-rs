@@ -63,7 +63,9 @@ pub(crate) fn receive_jwe(
     encryption_sender_public_key: Option<&[u8]>,
 ) -> Result<String, Error> {
     let jwe: Jwe = serde_json::from_str(incoming)?;
-    let alg = &jwe.get_alg().ok_or(Error::JweParseError)?;
+    let alg = &jwe.get_alg().ok_or(Error::Generic(
+        "missing algorithm in JWE header(s)".to_string(),
+    ))?;
 
     // get public key from input or from senders DID document
     let sender_public_key = match encryption_sender_public_key {
@@ -101,7 +103,8 @@ pub(crate) fn receive_jwe(
         recipients_from_jwe = None;
     }
     if let Some(recipients) = recipients_from_jwe {
-        let mut key: Vec<u8> = vec![];
+        let mut key_result: Result<Vec<u8>, Error> =
+            Err(Error::Generic("no recipients found in JWE".to_string()));
         for recipient in recipients {
             let decrypted_key = decrypt_cek(
                 &jwe,
@@ -109,16 +112,15 @@ pub(crate) fn receive_jwe(
                 &recipient,
                 encryption_sender_public_key,
             );
-            if decrypted_key.is_ok() {
-                key = decrypted_key?;
+            key_result = decrypted_key;
+            if key_result.is_ok() {
                 break;
             }
         }
-        if !key.is_empty() {
-            m = Message::decrypt(incoming.as_bytes(), a.decrypter(), &key)?;
-        } else {
-            return Err(Error::JweParseError);
-        }
+
+        let key: Vec<u8> =
+            key_result.map_err(|e| Error::Generic(format!("could not decrypt cek; {}", &e)))?;
+        m = Message::decrypt(incoming.as_bytes(), a.decrypter(), &key)?;
     } else {
         m = Message::decrypt(incoming.as_bytes(), a.decrypter(), shared.as_bytes())?;
     }
