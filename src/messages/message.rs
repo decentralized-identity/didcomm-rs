@@ -213,6 +213,25 @@ impl Message {
             serde_json::to_string(&self)?.as_bytes().to_vec(),
         ))
     }
+    /// Builds JWE from current message and it's pre-encrypted payload:
+    ///  `expert_for_encryption` should be used prior to this call and it's output
+    ///  provided as payload.
+    ///
+    /// # Parameters
+    /// `cyphertext` - encrypted output of `export_for_encryption` as JWE payload
+    ///
+    /// Returns serialized JSON JWE message, which is ready to be sent to receipent
+    ///
+    pub fn seal_pre_encrypted(self, cyphertext: impl AsRef<[u8]>) -> Result<String, Error> {
+        let d_header = self.get_didcomm_header();
+        let mut jwe = Jwe::new(self.jwm_header.clone(), self.recepients.clone(), cyphertext);
+        jwe.header.skid = Some(d_header.from.clone().unwrap_or_default());
+        if !self.recepients.is_some() {
+            jwe.header.kid = Some(d_header.to[0].clone());
+        }
+        jwe.header.skid = d_header.from.clone();
+        Ok(serde_json::to_string(&jwe)?)
+    }
     /// Seals self and returns ready to send JWE
     ///
     /// # Parameters
