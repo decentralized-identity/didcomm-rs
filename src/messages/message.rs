@@ -390,6 +390,37 @@ impl Message {
             Err(Error::Generic("iv is not found in JOSE header".into()))
         }
     }
+    /// Transforms incomming into `Jwe` if it is one
+    /// Also checks if `skid` field is present or returns `None` othervise
+    /// Key resolution and validation fall onto caller of this method
+    ///
+    /// # Parameters
+    ///
+    /// * `incomming` - incomming message
+    ///
+    /// Returns `Option<Jwe>` where `.header.skid` is skid and `.payload()` is cyphertext
+    ///
+    pub fn received_as_jwe(incomming: &str) -> Option<Jwe> {
+        if let Ok(jwe) = serde_json::from_str::<Jwe>(incomming) {
+            if jwe.header.skid.is_some() {
+                Some(jwe)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    /// Transforms decrypted `Jwe` into `Message`
+    ///
+    /// # Parameters
+    ///
+    /// * `decrypted` - result of decrypting of Jwe payload retreived after
+    ///  decrypting content of `as_jwe` function call output.
+    ///
+    pub fn receive_external_crypto(decrypted: impl AsRef<[u8]>) -> Result<Self, Error> {
+        Ok(serde_json::from_slice(decrypted.as_ref())?)
+    }
     /// Construct a message from received data.
     /// Raw or JWE payload is accepted.
     ///
