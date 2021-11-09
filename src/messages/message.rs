@@ -6,26 +6,19 @@ use super::{
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
+use crate::{Error, Jwe, Jwk, KeyAlgorithm, MessageType, Recepient};
 use arrayref::array_ref;
 use base64_url::{decode, encode};
-#[cfg(feature = "resolve")]
-pub use ddoresolver_rs::*;
-use serde::{Deserialize, Serialize};
-use std::{convert::TryInto, time::SystemTime};
-use crate::{
-    Jwk,
-    Jwe,
-    MessageType,
-    KeyAlgorithm,
-    Recepient,
-    Error,
-};
 use chacha20poly1305::{
     aead::{Aead, NewAead},
     XChaCha20Poly1305, XNonce,
 };
+#[cfg(feature = "resolve")]
+pub use ddoresolver_rs::*;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
+use serde::{Deserialize, Serialize};
+use std::{convert::TryInto, time::SystemTime};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 /// DIDComm message structure.
@@ -194,9 +187,9 @@ impl Message {
                         CryptoAlgorithm::XC20P => {
                             self.jwm_header.kid = document.find_public_key_id_for_curve("X25519")
                         }
-                        CryptoAlgorithm::A256GCM |
-                        CryptoAlgorithm::A256CBC => 
+                        CryptoAlgorithm::A256GCM | CryptoAlgorithm::A256CBC => {
                             self.jwm_header.kid = document.find_public_key_id_for_curve("P-256")
+                        }
                     }
                 }
             }
@@ -208,6 +201,17 @@ impl Message {
     ///
     pub fn as_raw_json(self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self)?)
+    }
+    /// Presents IV and Payload to be externally encrypted and then sealed with `seal_pre_encrypted` method.
+    ///
+    /// # Returns
+    /// Tuple of bytes where .0 is IV and .1 is payload for ercryption
+    ///
+    pub fn export_for_encryption(&self) -> Result<(Vec<u8>, Vec<u8>), Error> {
+        Ok((
+            self.jwm_header.get_iv().as_ref().to_vec(),
+            serde_json::to_string(&self)?.as_bytes().to_vec(),
+        ))
     }
     /// Seals self and returns ready to send JWE
     ///
@@ -231,7 +235,7 @@ impl Message {
                 let alg = crypter_from_header(&self.jwm_header)?;
                 self.encrypt(alg.encryptor(), shared.as_ref())
             }
-            0 => Err(Error::NoJweRecepient), 
+            0 => Err(Error::NoJweRecepient),
             _ => {
                 // generate static secret
                 let mut shared_key = [0u8; 32];
