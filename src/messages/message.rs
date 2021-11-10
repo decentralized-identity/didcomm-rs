@@ -400,8 +400,8 @@ impl Message {
     ///
     /// Returns `Option<Jwe>` where `.header.skid` is skid and `.payload()` is cyphertext
     ///
-    pub fn received_as_jwe(incomming: &str) -> Option<Jwe> {
-        if let Ok(jwe) = serde_json::from_str::<Jwe>(incomming) {
+    pub fn received_as_jwe(incomming: impl AsRef<[u8]>) -> Option<Jwe> {
+        if let Ok(jwe) = serde_json::from_slice::<Jwe>(incomming.as_ref()) {
             if jwe.header.skid.is_some() {
                 Some(jwe)
             } else {
