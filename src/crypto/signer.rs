@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 /// Signature related batteries for DIDComm.
 /// Implementation of all algorithms required by (spec)[https://identity.foundation/didcomm-messaging/spec/#algorithms]
-/// 
+///
 #[derive(Debug, Clone)]
 pub enum SignatureAlgorithm {
     /// `ed25519` signature
@@ -27,7 +27,7 @@ impl Signer for SignatureAlgorithm {
     ///
     fn signer(&self) -> SigningMethod {
         match self {
-            // an &[u8] representing the scalar for the secret key, and a compressed Edwards-Y coordinate of a point on curve25519, both as bytes. 
+            // an &[u8] representing the scalar for the secret key, and a compressed Edwards-Y coordinate of a point on curve25519, both as bytes.
             SignatureAlgorithm::EdDsa => {
                 Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
                     use ed25519_dalek::{Keypair, Signer};
@@ -35,26 +35,20 @@ impl Signer for SignatureAlgorithm {
                     let s = key.sign(message);
                     Ok(s.to_bytes().to_vec())
                 })
-            },
+            }
             SignatureAlgorithm::Es256 => {
                 Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
-                    use p256::ecdsa::{SigningKey, Signature, signature::Signer};
+                    use p256::ecdsa::{signature::Signer, Signature, SigningKey};
                     let sk = SigningKey::from_bytes(key)?;
                     let signature: Signature = sk.sign(message);
                     Ok(signature.as_ref().to_vec())
                 })
-            },
+            }
             SignatureAlgorithm::Es256k => {
                 Box::new(|key: &[u8], message: &[u8]| -> Result<Vec<u8>, Error> {
-                    use k256::{
-                        ecdsa::{
-                            SigningKey,
-                            Signature,
-                            signature::Signer,
-                        },
-                    };
-                    let sk = SigningKey::from_bytes(key)
-                        .map_err(|e| Error::Generic(e.to_string()))?;
+                    use k256::ecdsa::{signature::Signer, Signature, SigningKey};
+                    let sk =
+                        SigningKey::from_bytes(key).map_err(|e| Error::Generic(e.to_string()))?;
                     let signature: Signature = sk.sign(message);
                     Ok(signature.as_ref().to_vec())
                 })
@@ -73,36 +67,30 @@ impl Signer for SignatureAlgorithm {
     ///
     fn validator(&self) -> ValidationMethod {
         match self {
-            SignatureAlgorithm::EdDsa => {
-                Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
+            SignatureAlgorithm::EdDsa => Box::new(
+                |key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
                     use ed25519_dalek::{PublicKey, Signature, Verifier};
                     let key = PublicKey::from_bytes(key)?;
                     let s = Signature::try_from(signature)?;
                     Ok(key.verify(message, &s).is_ok())
-                })
-            },
-            SignatureAlgorithm::Es256 => {
-                Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
-                    use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+                },
+            ),
+            SignatureAlgorithm::Es256 => Box::new(
+                |key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
+                    use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
                     let key = VerifyingKey::from_sec1_bytes(key)?;
                     let s = Signature::try_from(signature)?;
                     Ok(key.verify(message, &s).is_ok())
-                })
-            },
-            SignatureAlgorithm::Es256k => {
-                Box::new(|key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
-                    use k256::{
-                        ecdsa::{
-                            VerifyingKey,
-                            Signature,
-                            signature::Verifier,
-                        },
-                    };
+                },
+            ),
+            SignatureAlgorithm::Es256k => Box::new(
+                |key: &[u8], message: &[u8], signature: &[u8]| -> Result<bool, Error> {
+                    use k256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
                     let vk = VerifyingKey::from_sec1_bytes(key)?;
                     let signature = Signature::try_from(signature)?;
                     Ok(vk.verify(message, &signature).is_ok())
-                })
-            }
+                },
+            ),
         }
     }
 }
@@ -115,17 +103,14 @@ impl TryFrom<&String> for SignatureAlgorithm {
             "EdDSA" => Ok(Self::EdDsa),
             "ES256" => Ok(Self::Es256),
             "ES256K" => Ok(Self::Es256k),
-            _ => Err(Error::JwsParseError)
+            _ => Err(Error::JwsParseError),
         }
     }
 }
 
 #[test]
 fn es256k_test() {
-    use k256::{
-        elliptic_curve::rand_core::OsRng,
-        ecdsa::SigningKey,
-    };
+    use k256::{ecdsa::SigningKey, elliptic_curve::rand_core::OsRng};
     // Arrange
     let sk = SigningKey::random(&mut OsRng);
     let vk = &sk.verifying_key();

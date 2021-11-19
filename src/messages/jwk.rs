@@ -27,8 +27,7 @@ impl Jwk {
     /// Creates `epk` jwk entry with required properties.
     /// Correctness is not verified by this constructor and totaly rely on caller.
     ///
-    pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: String)
-        -> Self {
+    pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: String) -> Self {
         self.kty = Some(kty);
         self.crv = Some(crv);
         self.other.insert("x".into(), x);
@@ -116,4 +115,3 @@ impl std::default::Default for KeyAlgorithm {
         KeyAlgorithm::None
     }
 }
-

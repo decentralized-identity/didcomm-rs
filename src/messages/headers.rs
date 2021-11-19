@@ -1,21 +1,11 @@
-use rand::{
-    Rng,
-    seq::SliceRandom,
-};
-use std::{
-    time::SystemTime,
-    collections::HashMap,
-};
-use crate::{
-    Error,
-    Jwk,
-    crypto::{
-        CryptoAlgorithm,
-        SignatureAlgorithm
-    },
-};
-use base64_url::{encode, decode};
 use super::{MessageType, PriorClaims};
+use crate::{
+    crypto::{CryptoAlgorithm, SignatureAlgorithm},
+    Error, Jwk,
+};
+use base64_url::{decode, encode};
+use rand::{seq::SliceRandom, Rng};
+use std::{collections::HashMap, time::SystemTime};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
@@ -31,7 +21,7 @@ pub struct DidcommHeader {
     pub expires_time: Option<u64>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub(crate) other: HashMap<String, String>,
-    /// A JWT, with sub: new DID and iss: prior DID, 
+    /// A JWT, with sub: new DID and iss: prior DID,
     /// with a signature from a key authorized by prior DID.
     #[serde(skip_serializing_if = "Option::is_none")]
     from_prior: Option<PriorClaims>,
@@ -43,7 +33,7 @@ impl DidcommHeader {
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
             m_type: MessageType::DidcommRaw,
-            to: vec!(String::default()),
+            to: vec![String::default()],
             from: Some(String::default()),
             created_time: None,
             expires_time: None,
@@ -54,7 +44,7 @@ impl DidcommHeader {
     /// Generates random `id`
     /// TODO: Should this be public?
     pub fn gen_random_id() -> usize {
-            rand::thread_rng().gen()
+        rand::thread_rng().gen()
     }
     /// Getter method for `from_prior` retreival
     ///
@@ -63,13 +53,21 @@ impl DidcommHeader {
     }
     /// Creates set of DIDComm related headers with the static forward type
     ///
-    pub fn forward(to: Vec<String>, from: Option<String>, expires_time: Option<u64>) -> Result<Self, Error> {
+    pub fn forward(
+        to: Vec<String>,
+        from: Option<String>,
+        expires_time: Option<u64>,
+    ) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: rand::thread_rng().gen(),
             m_type: MessageType::DidcommRaw,
             to,
             from,
-            created_time: Some(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs()),
+            created_time: Some(
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_secs(),
+            ),
             expires_time,
             ..DidcommHeader::new()
         })
@@ -141,13 +139,13 @@ impl JwmHeader {
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
-            },
+            }
             SignatureAlgorithm::Es256 => {
                 self.alg = Some(String::from("ES256"));
-            },
+            }
             SignatureAlgorithm::Es256k => {
                 self.alg = Some(String::from("ES256K"));
-            },
+            }
         }
     }
     /// Setter of JOSE header preperties to identify which crypto alg and key type used.
@@ -156,13 +154,15 @@ impl JwmHeader {
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         self.typ = String::from("JWM");
         match alg {
-            CryptoAlgorithm::A256GCM => { 
-                self.enc = Some("A256GCM".into());
-                self.alg = Some("ECDH-ES+A256KW".into());
+            CryptoAlgorithm::A256GCM => {
+                self.alg = Some("A256GCM".into());
             },
             CryptoAlgorithm::XC20P => {
-                self.enc = Some("XC20P".into());
-                self.alg = Some("ECDH-ES+A256KW".into());
+                self.alg = Some("XC20P".into());
+            },
+            CryptoAlgorithm::A256CBC => {
+                self.alg = Some("A256CBC".into());
+                self.enc = Some("ECDH-1PU+A256KW".into())
             }
         }
     }
@@ -199,14 +199,14 @@ impl Default for JwmHeader {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Recepient {
     pub header: Jwk,
-    pub encrypted_key: String
+    pub encrypted_key: String,
 }
 
 impl Recepient {
     pub fn new(header: Jwk, encrypted_key: String) -> Self {
         Recepient {
             header,
-            encrypted_key
+            encrypted_key,
         }
     }
 }
