@@ -15,7 +15,7 @@ use std::convert::TryFrom;
 pub enum CryptoAlgorithm {
     XC20P,
     A256GCM,
-    A256CBC
+    A256CBC,
 }
 
 impl Cypher for CryptoAlgorithm {
@@ -60,8 +60,8 @@ impl Cypher for CryptoAlgorithm {
                     if nonce.len() != 16 {
                         return Err(Error::InvalidKeySize("expected 16 bytes nonce".into()));
                     }
-                    use libaes::Cipher;
                     use arrayref::array_ref;
+                    use libaes::Cipher;
                     let aead = Cipher::new_256(array_ref!(key, 0, 32));
                     Ok(aead.cbc_encrypt(nonce, message))
                 },
@@ -125,7 +125,7 @@ impl TryFrom<&String> for CryptoAlgorithm {
     fn try_from(incomming: &String) -> Result<Self, Error> {
         match &incomming[..] {
             "A256GCM" => Ok(Self::A256GCM),
-            "ECDH-ES+A256KW" => Ok(Self::XC20P),
+            "ECDH-ES+A256KW" | "XC20P" => Ok(Self::XC20P),
             _ => return Err(Error::JweParseError),
         }
     }
