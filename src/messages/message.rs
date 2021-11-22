@@ -3,6 +3,7 @@ use super::{
     headers::{DidcommHeader, JwmHeader},
     mediated::Mediated,
     prior_claims::PriorClaims,
+    Attachment,
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
@@ -38,6 +39,8 @@ pub struct Message {
     ///     as base64url String of raw bytes of data.
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
     body: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    attachments: Vec<Attachment>,
 }
 
 impl Message {
@@ -50,6 +53,7 @@ impl Message {
             didcomm_header: DidcommHeader::new(),
             recepients: None,
             body: String::default(),
+            attachments: Vec::new(),
         }
     }
     /// Setter of `from` header
