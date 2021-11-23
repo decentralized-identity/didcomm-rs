@@ -40,7 +40,7 @@ pub struct Message {
     /// No direct access for encode/decode purposes! Use `get_body()` / `set_body()` methods instead.
     body: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    attachments: Vec<Attachment>,
+    pub(crate) attachments: Vec<Attachment>,
 }
 
 impl Message {
