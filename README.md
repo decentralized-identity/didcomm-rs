@@ -216,7 +216,8 @@ or
 ```rust
 use didcomm_rs::{Message, AttachmentBuilder, AttachmentDataBuilder};
 
-let attachments: Vec<AttachmentBuilder
+let attachments: Vec<AttachmentBuilder>; // instantiate properly
+
 let mut m = Message:new();
 
 for attachment in attachments {
