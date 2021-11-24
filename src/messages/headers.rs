@@ -53,6 +53,22 @@ impl DidcommHeader {
     pub fn gen_random_id() -> usize {
         rand::thread_rng().gen()
     }
+    /// Returns DIDComm message URI as defined by spec:
+    /// https://identity.foundation/didcomm-messaging/spec/#didcomm-message-uris
+    ///
+    pub fn get_message_uri(&self) -> String {
+        format!("didcomm://{}{}{}", self.id, &self.thid, &self.pthid)
+    }
+    /// Sets current message's `thid` and `pthid` to one from `replying_to`
+    ///
+    /// # Parameters
+    ///
+    /// * `replying_to` - ref to header we're replying
+    ///
+    pub fn reply_to(&mut self, replying_to: &Self) {
+        self.thid = replying_to.thid.clone();
+        self.pthid = replying_to.pthid.clone();
+    }
     /// Getter method for `from_prior` retreival
     ///
     pub fn from_prior(&self) -> &Option<PriorClaims> {
