@@ -10,6 +10,10 @@ use std::{collections::HashMap, time::SystemTime};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
     pub id: usize,
+    #[serde(default)]
+    pub thid: String,
+    #[serde(default)]
+    pub pthid: String,
     #[serde(rename = "type")]
     pub m_type: MessageType,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -30,8 +34,11 @@ pub struct DidcommHeader {
 impl DidcommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
+        let uuid = uuid::Uuid::new_v4();
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
+            thid: uuid.to_string(),
+            pthid: String::default(),
             m_type: MessageType::DidcommRaw,
             to: vec![String::default()],
             from: Some(String::default()),
@@ -156,10 +163,10 @@ impl JwmHeader {
         match alg {
             CryptoAlgorithm::A256GCM => {
                 self.alg = Some("A256GCM".into());
-            },
+            }
             CryptoAlgorithm::XC20P => {
                 self.alg = Some("XC20P".into());
-            },
+            }
             CryptoAlgorithm::A256CBC => {
                 self.alg = Some("A256CBC".into());
                 self.enc = Some("ECDH-1PU+A256KW".into())
