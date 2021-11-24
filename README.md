@@ -192,6 +192,53 @@ assert!(received_first.is_ok());
 assert!(received_second.is_ok());
 ```
 
+## 7. Working with `attachments`
+
+### 7.1 Adding `Attachment`
+
+```rust
+use didcomm_rs::{Message, AttachmentBuilder, AttachmentDataBuilder};
+
+let payload = b"some usefull data";
+let mut m = Message:new();
+    m.append_attachment(
+        AttachmentBuilder::new(true)
+            .with_id("best attachment")
+            .with_data(
+                AttachmentDataBuilder::new()
+                    .with_raw_payload(payload)
+            )
+        );
+```
+
+or
+
+```rust
+use didcomm_rs::{Message, AttachmentBuilder, AttachmentDataBuilder};
+
+let attachments: Vec<AttachmentBuilder>; // instantiate properly
+
+let mut m = Message:new();
+
+for attachment in attachments {
+    m.append_attachment(attachment);
+}
+```
+
+### 7.2 Parsing `Attachment`'s
+
+```rust
+// `m` is `receive()`'d instance of a `Message`
+
+let something_im_looking_for = m.get_attachments().filter(|single| single.id == "id I'm looking for");
+assert!(something_im_looking_for.next().is_some());
+
+for found in something_im_looking_for {
+    // process attachments
+}
+
+```
+
 # Plugable cryptography
 
 In order to use your own implementation[s] of message crypto and/or signature algorythms implement these trait[s]:
