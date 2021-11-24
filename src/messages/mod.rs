@@ -1,25 +1,25 @@
-mod mediated;
-mod message;
-// mod didurl;
+mod attachment;
 mod headers;
 mod jwe;
 mod jwk;
 mod jws;
+mod mediated;
+mod message;
 mod prior_claims;
 mod types;
 
 #[cfg(feature = "raw-crypto")]
 mod raw;
 
+pub use attachment::*;
 pub use headers::*;
 pub use jwe::*;
 pub use jwk::*;
 pub use jws::*;
+pub use mediated::*;
 pub use message::*;
 pub use prior_claims::*;
 pub use types::*;
-// pub use didurl::*;
-pub use mediated::*;
 
 #[cfg(feature = "raw-crypto")]
 pub use raw::*;
