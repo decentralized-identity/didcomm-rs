@@ -10,6 +10,10 @@ use std::{collections::HashMap, time::SystemTime};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct DidcommHeader {
     pub id: usize,
+    #[serde(default)]
+    pub thid: String,
+    #[serde(default)]
+    pub pthid: String,
     #[serde(rename = "type")]
     pub m_type: MessageType,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -30,8 +34,11 @@ pub struct DidcommHeader {
 impl DidcommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
+        let uuid = uuid::Uuid::new_v4();
         DidcommHeader {
             id: DidcommHeader::gen_random_id(),
+            thid: uuid.to_string(),
+            pthid: String::default(),
             m_type: MessageType::DidcommRaw,
             to: vec![String::default()],
             from: Some(String::default()),
@@ -45,6 +52,22 @@ impl DidcommHeader {
     /// TODO: Should this be public?
     pub fn gen_random_id() -> usize {
         rand::thread_rng().gen()
+    }
+    /// Returns DIDComm message URI as defined by spec:
+    /// https://identity.foundation/didcomm-messaging/spec/#didcomm-message-uris
+    ///
+    pub fn get_message_uri(&self) -> String {
+        format!("didcomm://{}{}{}", self.id, &self.thid, &self.pthid)
+    }
+    /// Sets current message's `thid` and `pthid` to one from `replying_to`
+    ///
+    /// # Parameters
+    ///
+    /// * `replying_to` - ref to header we're replying
+    ///
+    pub fn reply_to(&mut self, replying_to: &Self) {
+        self.thid = replying_to.thid.clone();
+        self.pthid = replying_to.pthid.clone();
     }
     /// Getter method for `from_prior` retreival
     ///
@@ -156,10 +179,10 @@ impl JwmHeader {
         match alg {
             CryptoAlgorithm::A256GCM => {
                 self.alg = Some("A256GCM".into());
-            },
+            }
             CryptoAlgorithm::XC20P => {
                 self.alg = Some("XC20P".into());
-            },
+            }
             CryptoAlgorithm::A256CBC => {
                 self.alg = Some("A256CBC".into());
                 self.enc = Some("ECDH-1PU+A256KW".into())

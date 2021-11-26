@@ -56,6 +56,31 @@ impl Message {
             attachments: Vec::new(),
         }
     }
+    /// Shortcut to `DidcommHeader::get_message_uri`
+    ///
+    pub fn get_message_uri(&self) -> String {
+        self.didcomm_header.get_message_uri()
+    }
+    /// Sets `thid` and `pthid` same as those in `replying_to`
+    /// Shortcut to `DidcommHeader::reply_to` method
+    ///
+    /// # Parameters
+    ///
+    /// * `replying_to` - ref to message we're replying to
+    pub fn reply_to(mut self, replying_to: &Self) -> Self {
+        self.didcomm_header.reply_to(&replying_to.didcomm_header);
+        self
+    }
+    /// Sets `pthid` to the one specified in `parent`'s `thid`
+    ///
+    /// # Parameters
+    ///
+    /// * `parent` - ref to a parent threaded `Message`
+    ///
+    pub fn with_parent(mut self, parent: &Self) -> Self {
+        self.didcomm_header.pthid = parent.didcomm_header.thid.clone();
+        self
+    }
     /// Setter of `from` header
     /// Helper method.
     ///
@@ -158,12 +183,17 @@ impl Message {
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     ///
-    pub fn add_header_field(mut self, key: String, value: String) -> Self {
+    pub fn add_header_field(mut self, key: &str, value: &str) -> Self {
         if key.len() == 0 {
             return self;
         }
-        self.didcomm_header.other.insert(key, value);
+        self.didcomm_header.other.insert(key.into(), value.into());
         self
+    }
+    /// Gets `Iterator` over key-value pairs of application level headers
+    ///
+    pub fn get_application_params(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.didcomm_header.other.iter()
     }
     /// Creates set of Jwm related headers for the JWE
     /// Modifies JWM related header portion to match

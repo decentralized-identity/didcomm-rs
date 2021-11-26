@@ -239,6 +239,53 @@ for found in something_im_looking_for {
 
 ```
 
+## 8. Threading
+
+By default all new messages are created with random UUID as `thid` header value and with empty `pthid` value.
+
+To reply to a message in thread with both `thid` and `pthid` copied  use `reply_to` method:
+
+```rust
+
+let m = Message::new()
+    .reply_to(&received)
+    // - other methods to form a message
+    ;
+```
+
+To set parent thread id (or `pthid` header), use `with_parent` method:
+
+```rust
+
+let m = Message::new()
+    .with_parent(&receievd)
+    // - other methods to form a message
+    ;
+```
+
+## 9. Other application-level headers and decorators
+
+In order to satisfy any other header values universal method is present: `Message::add_header_field'
+This method is backed up by a `HashMap` of <String, String>. If the key was present - it's value will be updated.
+
+```rust
+
+let m = Message::new()
+    .add_header_field("key", "value")
+    .add_header_field("~decorator", "value")
+    // - other methods to form a message
+    ;
+```
+
+To find if specific application level header is present and get it's value `get_application_params` method should be used.
+
+```rust
+
+let m: Message; // proprely instantiated received message
+
+if let Some((my_key, my_value)) = m.get_application_params().filter(|(key, _)| key == "my_key").first();
+```
+
 # Plugable cryptography
 
 In order to use your own implementation[s] of message crypto and/or signature algorythms implement these trait[s]:
