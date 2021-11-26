@@ -15,7 +15,7 @@ pub struct DidcommHeader {
     #[serde(default)]
     pub pthid: String,
     #[serde(rename = "type")]
-    pub m_type: MessageType,
+    pub m_type: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
     pub from: Option<String>,
@@ -39,7 +39,7 @@ impl DidcommHeader {
             id: DidcommHeader::gen_random_id(),
             thid: uuid.to_string(),
             pthid: String::default(),
-            m_type: MessageType::DidcommRaw,
+            m_type: "JWM".into(),
             to: vec![String::default()],
             from: Some(String::default()),
             created_time: None,
@@ -83,7 +83,7 @@ impl DidcommHeader {
     ) -> Result<Self, Error> {
         Ok(DidcommHeader {
             id: rand::thread_rng().gen(),
-            m_type: MessageType::DidcommRaw,
+            m_type: "JWM".into(),
             to,
             from,
             created_time: Some(
@@ -113,7 +113,7 @@ impl Default for DidcommHeader {
 ///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct JwmHeader {
-    pub typ: String,
+    pub typ: MessageType,
     // Some(String) if JWM is JWE encrypted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enc: Option<String>,
@@ -158,7 +158,7 @@ impl JwmHeader {
     /// Modifies `typ` and `alg` headers.
     ///
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
-        self.typ = String::from("JWM");
+        self.typ = MessageType::DidcommJws;
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
@@ -175,7 +175,7 @@ impl JwmHeader {
     /// Modifies `enc`, `typ` and `alg` headers.
     ///
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
-        self.typ = String::from("JWM");
+        self.typ = MessageType::DidcommJwe;
         match alg {
             CryptoAlgorithm::A256GCM => {
                 self.alg = Some("A256GCM".into());
@@ -201,7 +201,7 @@ impl Default for JwmHeader {
         let mut a = rng.gen::<[u8; 24]>().to_vec();
         a.shuffle(&mut rng);
         JwmHeader {
-            typ: "JWM".into(),
+            typ: MessageType::DidcommRaw,
             iv: encode(&a),
             enc: None,
             kid: None,
