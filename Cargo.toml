@@ -1,6 +1,6 @@
 [package]
 name = "didcomm-rs"
-version = "0.6.2"
+version = "0.6.3"
 authors = ["Ivan Temchenko <35359595i@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/decentralized-identity/didcomm-rs"
@@ -40,7 +40,8 @@ rand_core = "0.5"
 base58 = "0.2.0"
 
 [features]
-default = ["raw-crypto", "resolve"]
+default = ["raw-crypto", "resolve", "out-of-band"]
 raw-crypto = ["chacha20poly1305", "aes-gcm", "k256", "p256", "ed25519-dalek", "libaes"]
 resolve = ["ddoresolver-rs"]
+out-of-band = []
 

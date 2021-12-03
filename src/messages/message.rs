@@ -32,7 +32,7 @@ pub struct Message {
     pub jwm_header: JwmHeader,
     /// DIDComm headers part, sent as part of encrypted message in JWE.
     #[serde(flatten)]
-    didcomm_header: DidcommHeader,
+    pub(crate) didcomm_header: DidcommHeader,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) recepients: Option<Vec<Recepient>>,
     /// Message payload, which can be basically anything (JSON, text, file, etc.) represented
@@ -108,8 +108,18 @@ impl Message {
     /// Setter of `m_type` @type header
     /// Helper method.
     ///
-    pub fn m_type(mut self, m_type: MessageType) -> Self {
-        self.didcomm_header.m_type = m_type;
+    pub fn m_type(mut self, m_type: &str) -> Self {
+        self.didcomm_header.m_type = m_type.into();
+        self
+    }
+    /// Setter of `typ` header property.
+    ///
+    /// # Parameters
+    ///
+    /// * `typ` - `MessageType` to be set for `typ` property
+    ///
+    pub fn typ(mut self, typ: MessageType) -> Self {
+        self.jwm_header.typ = typ;
         self
     }
     /// Getter of the `body` as ref of bytes slice.
@@ -340,7 +350,7 @@ impl Message {
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), sk)?;
         to.body = encode(&signed.as_bytes());
-        return to.m_type(MessageType::DidcommJws).seal(ek);
+        return to.typ(MessageType::DidcommJws).seal(ek);
     }
     // #[cfg(feature = "resolve")]
     // pub fn seal_signed(
@@ -376,7 +386,7 @@ impl Message {
             .to(&[mediator_did])
             .from(&from)
             .as_jwe(&alg)
-            .m_type(MessageType::DidcommForward)
+            .typ(MessageType::DidcommForward)
             .set_body(serde_json::to_string(&body)?.as_bytes())
             .seal(ek)
     }
@@ -480,6 +490,7 @@ impl Message {
     //                 } else {
     //                     if let Ok(mediated) = serde_json::from_slice::<Mediated>(&decode(&m.body)?) {
     //                         Ok(Message {
+
     //                             body: encode(&mediated.payload),
     //                             ..m
     //                         })
@@ -537,7 +548,7 @@ impl Message {
                             shared.as_bytes(),
                         )?;
                     }
-                    if &m.didcomm_header.m_type == &MessageType::DidcommJws {
+                    if &m.jwm_header.typ == &MessageType::DidcommJws {
                         if m.jwm_header.alg.is_none() {
                             return Err(Error::JweParseError);
                         }

@@ -11,6 +11,9 @@ mod types;
 #[cfg(feature = "raw-crypto")]
 mod raw;
 
+#[cfg(feature = "out-of-band")]
+pub mod out_of_band;
+
 pub use attachment::*;
 pub use headers::*;
 pub use jwe::*;
