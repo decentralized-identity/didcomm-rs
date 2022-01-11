@@ -23,6 +23,7 @@ pub use jws::*;
 pub use mediated::*;
 pub use message::*;
 pub use prior_claims::*;
+pub use problem_report::*;
 pub use types::*;
 
 #[cfg(feature = "raw-crypto")]
