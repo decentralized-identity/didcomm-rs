@@ -6,6 +6,7 @@ mod jws;
 mod mediated;
 mod message;
 mod prior_claims;
+mod problem_report;
 mod types;
 
 #[cfg(feature = "raw-crypto")]
