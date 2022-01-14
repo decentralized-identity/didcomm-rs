@@ -60,6 +60,7 @@ impl DidcommHeader {
         format!("didcomm://{}{}{}", self.id, &self.thid, &self.pthid)
     }
     /// Sets current message's `thid` and `pthid` to one from `replying_to`
+    /// Also adds `replying_to.from` into `to` set.
     ///
     /// # Parameters
     ///
@@ -68,6 +69,7 @@ impl DidcommHeader {
     pub fn reply_to(&mut self, replying_to: &Self) {
         self.thid = replying_to.thid.clone();
         self.pthid = replying_to.pthid.clone();
+        self.to.push(replying_to.from.clone().unwrap_or_default());
     }
     /// Getter method for `from_prior` retreival
     ///
