@@ -406,7 +406,7 @@ fn get_did_from_didurl(url: &str) -> String {
         Some(s) => s
             .name("did")
             .map(|v| v.as_str().to_string())
-            .unwrap_or_else(|| String::default()),
+            .unwrap_or_else(String::default),
         None => String::default(),
     }
 }

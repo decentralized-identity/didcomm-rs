@@ -356,7 +356,7 @@ impl Message {
 
         let mut unprotected = JwmHeader::default();
         unprotected.skid = d_header.from.clone();
-        if !self.recipients.is_some() {
+        if self.recipients.is_none() {
             unprotected.kid = Some(d_header.to[0].clone());
         }
 

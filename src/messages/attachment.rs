@@ -1,5 +1,6 @@
-use crate::Message;
 use serde::{Deserialize, Serialize};
+
+use crate::Message;
 
 /// Attachment holding structure
 ///
@@ -123,6 +124,12 @@ impl AttachmentDataBuilder {
 
     fn finalize(self) -> AttachmentData {
         self.inner
+    }
+}
+
+impl Default for AttachmentDataBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

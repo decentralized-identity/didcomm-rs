@@ -5,6 +5,7 @@ use common::sample_dids;
 #[cfg(not(feature = "resolve"))]
 use didcomm_rs::crypto::{SignatureAlgorithm, Signer};
 use didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message};
+#[cfg(not(feature = "resolve"))]
 use rand_core::OsRng;
 use serde_json::Value;
 use utilities::{get_keypair_set, KeyPairSet};
