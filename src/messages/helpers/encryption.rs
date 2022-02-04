@@ -9,7 +9,6 @@ use chacha20poly1305::{
 };
 #[cfg(feature = "resolve")]
 use ddoresolver_rs::*;
-use k256::elliptic_curve::rand_core;
 use rand::{prelude::SliceRandom, Rng};
 use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};

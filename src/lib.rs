@@ -121,7 +121,7 @@
 //!
 //! ```rust
 //! # use didcomm_rs::{crypto::{Signer, SignatureAlgorithm}, Message};
-//! # use k256::elliptic_curve::rand_core::OsRng;
+//! # use rand_core::OsRng;
 //! # const TEST_DID: &'static str = r###"{
 //! #     "@context": "https://www.w3.org/ns/did/v1",
 //! #     "id": "did:jun:ErJ3ahRB-zmOvTp0QmcJQfLq3hCAHBpXmoYLeHK8fHhw",
@@ -242,7 +242,7 @@
 //!
 //! ```rust
 //! # use didcomm_rs::{crypto::{CryptoAlgorithm, Signer, SignatureAlgorithm}, Message};
-//! # use k256::elliptic_curve::rand_core::OsRng;
+//! # use rand_core::OsRng;
 //! # use utilities::{get_keypair_set, KeyPairSet};
 //! # const TEST_DID: &'static str = r###"{
 //! #     "@context": "https://www.w3.org/ns/did/v1",

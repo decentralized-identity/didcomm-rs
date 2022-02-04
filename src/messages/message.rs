@@ -1,5 +1,7 @@
+#![allow(dead_code)]
 use std::time::SystemTime;
 
+use base64_url::decode;
 #[cfg(feature = "resolve")]
 use ddoresolver_rs::*;
 use rand::{RngCore, SeedableRng};
@@ -10,12 +12,14 @@ use serde_json::{json, Value};
 use super::{
     headers::{DidCommHeader, JwmHeader},
     mediated::Mediated,
+    Attachment,
 };
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
 use crate::{
     helpers::{encrypt_cek, get_crypter_from_header, get_message_type, receive_jwe, receive_jws},
     Error,
+    Jwe,
     MessageType,
     PriorClaims,
     Recipient,
@@ -65,6 +69,9 @@ pub struct Message {
     /// Not part of the serialized JSON and ignored when deserializing.
     #[serde(skip)]
     pub(crate) serialize_flat_jws: bool,
+
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub(crate) attachments: Vec<Attachment>,
 }
 
 // field getters/setters, default format handling
@@ -80,14 +87,12 @@ impl Message {
             didcomm_header: DidCommHeader::new(),
             recipients: None,
             body: json!({}),
+            attachments: Vec::new(),
             serialize_flat_jwe: false,
             serialize_flat_jws: false,
         }
     }
-}
 
-// getters/setters for fields, function to update fields on `Message`
-impl Message {
     /// Adds (or updates) custom unique header key-value pair to the header.
     /// This portion of header is not sent as JOSE header.
     pub fn add_header_field(mut self, key: String, value: String) -> Self {
@@ -116,10 +121,36 @@ impl Message {
         self.as_jws(alg)
     }
 
-    /// Creates set of Jwm related headers for the JWS
-    /// Modifies JWM related header portion to match
-    ///     signature implementation and leaves Other
-    ///     parts unchanged.
+    /// Shortcut to `DidCommHeader::get_message_uri`
+    ///
+    pub fn get_message_uri(&self) -> String {
+        self.didcomm_header.get_message_uri()
+    }
+
+    /// Sets `thid` and `pthid` same as those in `replying_to`
+    /// Shortcut to `DidCommHeader::reply_to` method
+    ///
+    /// # Parameters
+    ///
+    /// * `replying_to` - ref to message we're replying to
+    pub fn reply_to(mut self, replying_to: &Self) -> Self {
+        self.didcomm_header.reply_to(&replying_to.didcomm_header);
+        self
+    }
+
+    /// Sets `pthid` to the one specified in `parent`'s `thid`
+    ///
+    /// # Parameters
+    ///
+    /// * `parent` - ref to a parent threaded `Message`
+    ///
+    pub fn with_parent(mut self, parent: &Self) -> Self {
+        self.didcomm_header.pthid = parent.didcomm_header.thid.clone();
+        self
+    }
+
+    /// Setter of `from` header
+    /// Helper method.
     ///
     /// For `resolve` feature will set `kid` header automatically
     ///     based on the did document resolved.
@@ -133,9 +164,12 @@ impl Message {
                 if let Some(from) = &self.didcomm_header.from {
                     if let Some(document) = resolve_any(from) {
                         match alg {
-                            CryptoAlgorithm::XC20P | CryptoAlgorithm::A256GCM => {
+                            CryptoAlgorithm::XC20P => {
                                 self.jwm_header.kid =
                                     document.find_public_key_id_for_curve("X25519")
+                            }
+                            CryptoAlgorithm::A256GCM | CryptoAlgorithm::A256CBC => {
+                                self.jwm_header.kid = document.find_public_key_id_for_curve("P-256")
                             }
                         }
                     }
@@ -214,6 +248,22 @@ impl Message {
         self
     }
 
+    /// Setter of `m_type` @type header
+    pub fn m_type(mut self, m_type: &str) -> Self {
+        self.didcomm_header.m_type = m_type.into();
+        self
+    }
+
+    /// Setter of `typ` header property.
+    ///
+    /// # Parameters
+    ///
+    /// * `typ` - `MessageType` to be set for `typ` property
+    pub fn typ(mut self, typ: MessageType) -> Self {
+        self.jwm_header.typ = typ;
+        self
+    }
+
     // Setter of the `kid` header
     pub fn kid(mut self, kid: &str) -> Self {
         match &mut self.jwm_header.kid {
@@ -222,12 +272,6 @@ impl Message {
                 self.jwm_header.kid = Some(kid.into());
             }
         }
-        self
-    }
-
-    /// Setter of `m_type` @type header
-    pub fn m_type(mut self, m_type: MessageType) -> Self {
-        self.jwm_header.typ = m_type;
         self
     }
 
@@ -262,6 +306,20 @@ impl Message {
         }
         self
     }
+
+    /// Setter of `didcomm_header`.
+    /// Replaces existing one with provided by consuming both values.
+    /// Returns modified instance of `Self`.
+    pub fn set_didcomm_header(mut self, h: DidCommHeader) -> Self {
+        self.didcomm_header = h;
+        self
+    }
+
+    /// Gets `Iterator` over key-value pairs of application level headers
+    ///
+    pub fn get_application_params(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.didcomm_header.other.iter()
+    }
 }
 
 // Interactions with messages (sending, receiving, etc.)
@@ -270,6 +328,48 @@ impl Message {
     /// Consumes original message - use as raw sealing of envelope.
     pub fn as_raw_json(self) -> Result<String, Error> {
         Ok(serde_json::to_string(&self)?)
+    }
+
+    /// Presents IV and Payload to be externally encrypted and then sealed with `seal_pre_encrypted` method.
+    ///
+    /// # Returns
+    /// Tuple of bytes where .0 is IV and .1 is payload for encryption
+    ///
+    pub fn export_for_encryption(&self) -> Result<(Vec<u8>, Vec<u8>), Error> {
+        Ok((
+            decode(&Jwe::generate_iv())?,
+            serde_json::to_string(&self)?.as_bytes().to_vec(),
+        ))
+    }
+
+    /// Builds JWE from current message and it's pre-encrypted payload:
+    ///  `expert_for_encryption` should be used prior to this call and it's output
+    ///  provided as payload.
+    ///
+    /// # Parameters
+    /// `cyphertext` - encrypted output of `export_for_encryption` as JWE payload
+    ///
+    /// Returns serialized JSON JWE message, which is ready to be sent to receipent
+    ///
+    pub fn seal_pre_encrypted(self, cyphertext: impl AsRef<[u8]>) -> Result<String, Error> {
+        let d_header = self.get_didcomm_header();
+
+        let mut unprotected = JwmHeader::default();
+        unprotected.skid = d_header.from.clone();
+        if !self.recipients.is_some() {
+            unprotected.kid = Some(d_header.to[0].clone());
+        }
+
+        let jwe = Jwe::new(
+            Some(unprotected),
+            self.recipients.clone(),
+            cyphertext,
+            Some(self.jwm_header.clone()),
+            None::<&[u8]>,
+            None,
+        );
+
+        Ok(serde_json::to_string(&jwe)?)
     }
 
     /// Construct a message from received data.
@@ -346,7 +446,7 @@ impl Message {
             .to(&[mediator_did])
             .from(from)
             .as_jwe(&alg, mediator_public_key)
-            .m_type(MessageType::DidCommForward)
+            .typ(MessageType::DidCommForward)
             .body(&serde_json::to_string(&body)?)
             .seal(sender_private_key, Some(vec![mediator_public_key]))
     }
@@ -387,7 +487,7 @@ impl Message {
         trace!("sealing message with shared_key: {:?}", &cek.as_ref());
 
         if to_len == 0_usize {
-            todo!(); // What should happen in this scenario?
+            return Err(Error::NoJweRecipient);
         } else if self.serialize_flat_jwe && self.didcomm_header.to.len() > 1 {
             return Err(Error::Generic(
                 "flat JWE serialization only supports a single `to`".to_string(),
@@ -410,6 +510,73 @@ impl Message {
         // encrypt original message with static secret
         let alg = get_crypter_from_header(&self.jwm_header)?;
         self.encrypt(alg.encryptor(), cek.as_ref())
+    }
+}
+
+/// Associated functions implementations.
+/// Possibly not required as Jwe serialization covers this.
+impl Message {
+    /// Parses `iv` value as `Vec<u8>` from public header.
+    /// Both regular JSON and Compact representations are accepted.
+    /// Returns `Error` on failure.
+    /// TODO: Add examples
+    pub fn get_iv(received: &[u8]) -> Result<Vec<u8>, Error> {
+        // parse from compact
+        let as_str = String::from_utf8(received.to_vec())?;
+        let json: serde_json::Value = if let Some(header_end) = as_str.find('.') {
+            serde_json::from_str(&String::from_utf8(base64_url::decode(
+                &as_str[..header_end],
+            )?)?)?
+        } else {
+            serde_json::from_str(&as_str)?
+        };
+        if let Some(iv) = json.get("iv") {
+            if let Some(t) = iv.as_str() {
+                if t.len() != 24 {
+                    Err(Error::Generic(format!(
+                        "IV [nonce] size is incorrect: {}",
+                        t.len()
+                    )))
+                } else {
+                    Ok(t.as_bytes().to_vec())
+                }
+            } else {
+                Err(Error::Generic("wrong nonce format".into()))
+            }
+        } else {
+            Err(Error::Generic("iv is not found in JOSE header".into()))
+        }
+    }
+    /// Transforms incomming into `Jwe` if it is one
+    /// Also checks if `skid` field is present or returns `None` othervise
+    /// Key resolution and validation fall onto caller of this method
+    ///
+    /// # Parameters
+    ///
+    /// * `incomming` - incomming message
+    ///
+    /// Returns `Option<Jwe>` where `.header.skid` is skid and `.payload()` is cyphertext
+    ///
+    pub fn received_as_jwe(incomming: impl AsRef<[u8]>) -> Option<Jwe> {
+        if let Ok(jwe) = serde_json::from_slice::<Jwe>(incomming.as_ref()) {
+            if jwe.get_skid().is_some() {
+                Some(jwe)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    /// Transforms decrypted `Jwe` into `Message`
+    ///
+    /// # Parameters
+    ///
+    /// * `decrypted` - result of decrypting of Jwe payload retreived after
+    ///  decrypting content of `as_jwe` function call output.
+    ///
+    pub fn receive_external_crypto(decrypted: impl AsRef<[u8]>) -> Result<Self, Error> {
+        Ok(serde_json::from_slice(decrypted.as_ref())?)
     }
 
     /// Signs raw message and then packs it to encrypted envelope
@@ -438,7 +605,7 @@ impl Message {
             .as_jws(&signing_algorithm)
             .sign(signing_algorithm.signer(), signing_sender_private_key)?;
         to.body = serde_json::from_str(&signed)?;
-        to.m_type(MessageType::DidCommJws).seal(
+        to.typ(MessageType::DidCommJws).seal(
             encryption_sender_private_key,
             encryption_recipient_public_keys,
         )
@@ -452,18 +619,75 @@ impl Default for Message {
 }
 
 #[cfg(test)]
+mod parse_tests {
+    use super::*;
+
+    #[test]
+    fn iv_from_json_test() {
+        // Arrange
+        // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+        // Extendet twice to be 192bit (24byte) nonce.
+        let raw_json = r#" { "protected": "eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiZXBrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiLU5oN1NoUkJfeGFDQlpSZElpVkN1bDNTb1IwWXc0VEdFUXFxR2lqMXZKcyIsInkiOiI5dEx4ODFQTWZRa3JPdzh5dUkyWXdJMG83TXROemFDR2ZDQmJaQlc1WXJNIn19",
+                "recipients": [
+                  {
+                    "encrypted_key": "J1Fs9JaDjOT_5481ORQWfEZmHy7OjE3pTNKccnK7hlqjxbPalQWWLg"
+                  }
+                ],
+                "iv": "u5kIzo0m_d2PjI4mu5kIzo0m",
+                "ciphertext": "qGuFFoHy7HBmkf2BaY6eREwzEjn6O_FnRoXj2H-DAXo1PgQdfON-_1QbxtnT8e8z_M6Gown7s8fLtYNmIHAuixqFQnSA4fdMcMSi02z1MYEn2JC-1EkVbWr4TqQgFP1EyymB6XjCWDiwTYd2xpKoUshu8WW601HLSgFIRUG3-cK_ZSdFaoWosIgAH5EQ2ayJkRB_7dXuo9Bi1MK6TYGZKezc6rpCK_VRSnLXhFwa1C3T0QBes",
+                "tag": "doeAoagwJe9BwKayfcduiw"
+            }"#;
+        // Act
+        let iv = Message::get_iv(raw_json.as_bytes());
+        // Assert
+        assert!(iv.is_ok());
+        assert_eq!(
+            "u5kIzo0m_d2PjI4mu5kIzo0m",
+            &String::from_utf8(iv.unwrap()).unwrap()
+        );
+    }
+    #[test]
+    fn iv_from_compact_json_test() {
+        // Arrange
+        // Example JWM from RFC: https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3
+        let compact = r#"eyJ0eXAiOiJKV00iLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiUEdvWHpzME5XYVJfbWVLZ1RaTGJFdURvU1ZUYUZ1eXJiV0k3VjlkcGpDZyIsImFsZyI6IkVDREgtRVMrQTI1NktXIiwiaXYiOiAidTVrSXpvMG1fZDJQakk0bXU1a0l6bzBtIn0."#;
+        // Act
+        let iv = Message::get_iv(compact.as_bytes());
+        // Assert
+        assert!(iv.is_ok());
+        assert_eq!(
+            "u5kIzo0m_d2PjI4mu5kIzo0m",
+            &String::from_utf8(iv.unwrap()).unwrap()
+        );
+    }
+}
+
+#[cfg(test)]
 mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
 
     #[cfg(feature = "resolve")]
     use base58::FromBase58;
-    use k256::elliptic_curve::rand_core::OsRng;
+    use rand_core::OsRng;
     use utilities::{get_keypair_set, KeyPairSet};
 
     use super::*;
     #[cfg(feature = "resolve")]
     use crate::{Jwe, Mediated};
+
+    #[test]
+    #[cfg(not(feature = "resolve"))]
+    fn create_and_send() {
+        let KeyPairSet {
+            alice_private,
+            bobs_public,
+            ..
+        } = get_keypair_set();
+        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+        let p = m.seal(&alice_private, Some(vec![Some(&bobs_public)]));
+        assert!(p.is_ok());
+    }
 
     #[test]
     #[cfg(feature = "resolve")]

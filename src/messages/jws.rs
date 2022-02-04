@@ -1,8 +1,7 @@
 use crate::{
     helpers::create_fallback_getter,
     messages::helpers::{serialization_base64_buffer, serialization_base64_jwm_header},
-    Jwk,
-    JwmHeader,
+    Jwk, JwmHeader,
 };
 
 /// Signature data for [JWS](https://datatracker.ietf.org/doc/html/rfc7515) envelopes.

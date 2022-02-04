@@ -15,6 +15,7 @@ use super::*;
 pub enum CryptoAlgorithm {
     XC20P,
     A256GCM,
+    A256CBC,
 }
 
 impl Cypher for CryptoAlgorithm {
@@ -47,6 +48,22 @@ impl Cypher for CryptoAlgorithm {
                     let aead = Aes256Gcm::new(GenericArray::from_slice(key));
                     aead.encrypt(nonce, Payload { msg: message, aad })
                         .map_err(|e| Error::Generic(e.to_string()))
+                },
+            ),
+            CryptoAlgorithm::A256CBC => Box::new(
+                |nonce: &[u8], key: &[u8], message: &[u8], _aad: &[u8]| -> Result<Vec<u8>, Error> {
+                    if key.len() != 32 {
+                        return Err(Error::InvalidKeySize(
+                            "expected 256 bit (32 byte) key".into(),
+                        ));
+                    }
+                    if nonce.len() != 16 {
+                        return Err(Error::InvalidKeySize("expected 16 bytes nonce".into()));
+                    }
+                    use arrayref::array_ref;
+                    use libaes::Cipher;
+                    let aead = Cipher::new_256(array_ref!(key, 0, 32));
+                    Ok(aead.cbc_encrypt(nonce, message))
                 },
             ),
         }
@@ -83,6 +100,9 @@ impl Cypher for CryptoAlgorithm {
                         .map_err(|e| Error::Generic(e.to_string()))
                 },
             ),
+            CryptoAlgorithm::A256CBC => {
+                todo!()
+            }
         }
     }
 
@@ -93,6 +113,9 @@ impl Cypher for CryptoAlgorithm {
                 todo!()
             }
             CryptoAlgorithm::A256GCM => {
+                todo!()
+            }
+            CryptoAlgorithm::A256CBC => {
                 todo!()
             }
         }

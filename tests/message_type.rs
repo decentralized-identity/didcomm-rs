@@ -10,7 +10,7 @@ use didcomm_rs::{
     Message,
     MessageType,
 };
-use k256::elliptic_curve::rand_core::OsRng;
+use rand_core::OsRng;
 use serde_json::Value;
 use utilities::{get_keypair_set, KeyPairSet};
 

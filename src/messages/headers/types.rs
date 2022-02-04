@@ -9,6 +9,8 @@ pub enum MessageType {
     DidCommRaw,
     #[serde(rename = "https://didcomm.org/routing/2.0/forward")]
     DidCommForward,
+    #[serde(rename = "https://didcomm.org/out-of-band/2.0/invitation")]
+    DidCommInvitation,
 }
 
 /// Enum that represents DIDComm message payload type

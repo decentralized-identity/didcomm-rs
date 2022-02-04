@@ -1,15 +1,13 @@
 /// Integration tests of full cycles of message lifetime.
 mod common;
 
-use didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message};
-use utilities::{get_keypair_set, KeyPairSet};
+use common::sample_dids;
 #[cfg(not(feature = "resolve"))]
-use {
-    common::*,
-    didcomm_rs::crypto::{SignatureAlgorithm, Signer},
-    k256::elliptic_curve::rand_core::OsRng,
-    serde_json::Value,
-};
+use didcomm_rs::crypto::{SignatureAlgorithm, Signer};
+use didcomm_rs::{crypto::CryptoAlgorithm, Jwe, Mediated, Message};
+use rand_core::OsRng;
+use serde_json::Value;
+use utilities::{get_keypair_set, KeyPairSet};
 
 #[test]
 #[cfg(not(feature = "resolve"))]
@@ -99,7 +97,10 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     let sealed = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
+        .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+        .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
+        .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .routed_by(
             &alice_private,
             Some(vec![Some(&bobs_public)]),
@@ -131,6 +132,11 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
         None,
     );
     assert!(bob_received.is_ok());
+    // convert to serde values to compare contents and not formatting
+    let sample_body: Value = serde_json::from_str(sample_dids::TEST_DID_SIGN_1).unwrap();
+    let bob_received_body: Value =
+        serde_json::from_str(&bob_received.unwrap().get_body().unwrap()).unwrap();
+    assert_eq!(sample_body.to_string(), bob_received_body.to_string());
 }
 
 #[test]
@@ -162,7 +168,7 @@ fn send_receive_signed_json_test() {
     let sample_body: Value = serde_json::from_str(sample_dids::TEST_DID_SIGN_1).unwrap();
     let received_body: Value =
         serde_json::from_str(&received.unwrap().get_body().unwrap()).unwrap();
-    assert_eq!(sample_body.to_string(), received_body.to_string(),);
+    assert_eq!(sample_body.to_string(), received_body.to_string());
 }
 
 #[test]
