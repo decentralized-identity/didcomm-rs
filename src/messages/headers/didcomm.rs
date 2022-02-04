@@ -10,6 +10,15 @@ use crate::{Error, PriorClaims};
 pub struct DidCommHeader {
     pub id: String,
 
+    #[serde(default)]
+    pub thid: String,
+
+    #[serde(default)]
+    pub pthid: String,
+
+    #[serde(rename = "type")]
+    pub m_type: String,
+
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub to: Vec<String>,
 
@@ -21,8 +30,7 @@ pub struct DidCommHeader {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_time: Option<u64>,
 
-    #[serde(flatten)]
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
     pub(crate) other: HashMap<String, String>,
 
     /// A JWT, with sub: new DID and iss: prior DID,
@@ -34,8 +42,12 @@ pub struct DidCommHeader {
 impl DidCommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
+        let uuid = uuid::Uuid::new_v4();
         DidCommHeader {
             id: DidCommHeader::gen_random_id(),
+            thid: uuid.to_string(),
+            pthid: String::default(),
+            m_type: "JWM".into(),
             to: vec![String::default()],
             from: Some(String::default()),
             created_time: None,
@@ -50,6 +62,26 @@ impl DidCommHeader {
     pub fn gen_random_id() -> String {
         let id_number: usize = rand::thread_rng().gen();
         format!("{}", id_number)
+    }
+
+    /// Returns DIDComm message URI as defined by spec:
+    /// https://identity.foundation/didcomm-messaging/spec/#didcomm-message-uris
+    ///
+    pub fn get_message_uri(&self) -> String {
+        format!("didcomm://{}{}{}", self.id, &self.thid, &self.pthid)
+    }
+
+    /// Sets current message's `thid` and `pthid` to one from `replying_to`
+    /// Also adds `replying_to.from` into `to` set.
+    ///
+    /// # Parameters
+    ///
+    /// * `replying_to` - ref to header we're replying
+    ///
+    pub fn reply_to(&mut self, replying_to: &Self) {
+        self.thid = replying_to.thid.clone();
+        self.pthid = replying_to.pthid.clone();
+        self.to.push(replying_to.from.clone().unwrap_or_default());
     }
 
     /// Getter method for `from_prior` retrieval

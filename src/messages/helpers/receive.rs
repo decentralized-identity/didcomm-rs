@@ -63,9 +63,9 @@ pub(crate) fn receive_jwe(
     encryption_sender_public_key: Option<&[u8]>,
 ) -> Result<String, Error> {
     let jwe: Jwe = serde_json::from_str(incoming)?;
-    let alg = &jwe.get_alg().ok_or(Error::Generic(
-        "missing algorithm in JWE header(s)".to_string(),
-    ))?;
+    let alg = &jwe
+        .get_alg()
+        .ok_or_else(|| Error::Generic("missing algorithm in JWE header(s)".to_string()))?;
 
     // get public key from input or from senders DID document
     let sender_public_key = match encryption_sender_public_key {

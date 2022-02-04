@@ -6,7 +6,7 @@ use didcomm_rs::{
     Error,
     Message,
 };
-use k256::elliptic_curve::rand_core::OsRng;
+use rand_core::OsRng;
 use serde_json::Value;
 use utilities::{get_keypair_set, KeyPairSet};
 

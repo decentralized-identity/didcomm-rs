@@ -9,7 +9,6 @@ use chacha20poly1305::{
 };
 #[cfg(feature = "resolve")]
 use ddoresolver_rs::*;
-use k256::elliptic_curve::rand_core;
 use rand::{prelude::SliceRandom, Rng};
 use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
@@ -407,7 +406,7 @@ fn get_did_from_didurl(url: &str) -> String {
         Some(s) => s
             .name("did")
             .map(|v| v.as_str().to_string())
-            .unwrap_or_else(|| String::default()),
+            .unwrap_or_else(String::default),
         None => String::default(),
     }
 }

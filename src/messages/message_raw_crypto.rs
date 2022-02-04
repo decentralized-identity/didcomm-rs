@@ -65,7 +65,7 @@ impl Message {
             jwe = Jwe::new_flat(
                 None,
                 recipients[0].clone(),
-                ciphertext.to_vec(),
+                ciphertext,
                 Some(jwe_header),
                 Some(tag),
                 Some(iv),
@@ -74,7 +74,7 @@ impl Message {
             jwe = Jwe::new(
                 None,
                 self.recipients.clone(),
-                ciphertext.to_vec(),
+                ciphertext,
                 Some(jwe_header),
                 Some(tag),
                 Some(iv),
@@ -182,7 +182,7 @@ impl Message {
         let payload = &jws.payload;
 
         let mut verified = false;
-        for signature_value in signatures_values_to_verify.clone() {
+        for signature_value in signatures_values_to_verify {
             let alg = &signature_value.get_alg().ok_or(Error::JweParseError)?;
             let signature = &signature_value.signature[..];
             let verifier: SignatureAlgorithm = alg.try_into()?;

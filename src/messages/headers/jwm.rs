@@ -4,7 +4,7 @@ use crate::{
     MessageType,
 };
 
-// JWM Header as specified in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
+/// JWM Header as specified in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
 ///
 /// Designed to work for both [JWE](https://tools.ietf.org/html/rfc7516) and [JWS](https://tools.ietf.org/html/rfc7515) message types.
@@ -57,6 +57,7 @@ impl JwmHeader {
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
+        self.typ = MessageType::DidCommJws;
         match alg {
             SignatureAlgorithm::EdDsa => {
                 self.alg = Some(String::from("EdDSA"));
@@ -73,6 +74,7 @@ impl JwmHeader {
     /// Setter of JOSE header properties to identify which crypto alg and key type used.
     /// Modifies `enc`, `typ` and `alg` headers.
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
+        self.typ = MessageType::DidCommJwe;
         match alg {
             CryptoAlgorithm::A256GCM => {
                 self.enc = Some("A256GCM".into());
@@ -81,6 +83,10 @@ impl JwmHeader {
             CryptoAlgorithm::XC20P => {
                 self.enc = Some("XC20P".into());
                 self.alg = Some("ECDH-1PU+XC20PKW".into());
+            }
+            CryptoAlgorithm::A256CBC => {
+                self.alg = Some("A256CBC".into());
+                self.enc = Some("ECDH-1PU+A256KW".into())
             }
         }
     }
