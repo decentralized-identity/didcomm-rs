@@ -1,14 +1,13 @@
 /// Integration tests of full cycles of message lifetime.
 ///
-
 mod common;
 
 #[cfg(not(feature = "resolve"))]
 use {
     common::*,
+    didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer},
     k256::elliptic_curve::rand_core::OsRng,
     x25519_dalek::{EphemeralSecret, PublicKey},
-    didcomm_rs::crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer},
 };
 
 #[test]
@@ -17,7 +16,10 @@ fn send_receive_raw() {
     // Arrange
     let m = Message::new()
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_")
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"])
+        .to(&[
+            "did::xyz:34r3cu403hnth03r49g03",
+            "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
+        ])
         .set_body(sample_dids::TEST_DID_ENCRYPT_1.as_bytes());
 
     // Act
@@ -53,7 +55,10 @@ fn send_receive_encrypted_xc20p_json_test() {
     // Message construction
     let message = Message::new() // creating message
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp") // setting from
-        .to(&["did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp", "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"]) // setting to
+        .to(&[
+            "did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp",
+            "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
+        ]) // setting to
         .set_body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
@@ -66,12 +71,20 @@ fn send_receive_encrypted_xc20p_json_test() {
     #[cfg(not(feature = "resolve"))]
     let received = Message::receive(&ready_to_send, Some(rk.as_bytes()), None); // and now we parse received
     #[cfg(feature = "resolve")]
-    let received = Message::receive(&ready_to_send, &"6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR".from_base58().unwrap()); // and now we parse received
+    let received = Message::receive(
+        &ready_to_send,
+        &"6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR"
+            .from_base58()
+            .unwrap(),
+    ); // and now we parse received
 
     // Assert
     assert!(&received.is_ok());
     let received = received.unwrap();
-    assert_eq!(sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(), received.get_body().unwrap().as_ref().to_vec());
+    assert_eq!(
+        sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(),
+        received.get_body().unwrap().as_ref().to_vec()
+    );
 }
 
 #[test]
@@ -94,13 +107,19 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     // Message construction
     let message = Message::new() // creating message
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp") // setting from
-        .to(&["did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp", "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"]) // setting to
+        .to(&[
+            "did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp",
+            "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
+        ]) // setting to
         .set_body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#) // set kid header
-        .routed_by(ek_to_bob.as_bytes(), "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf"); // here we use destination key to bob and `to` header of mediator
+        .routed_by(
+            ek_to_bob.as_bytes(),
+            "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
+        ); // here we use destination key to bob and `to` header of mediator
 
     // Act + Assert as we go
     assert!(&message.is_ok());
@@ -116,21 +135,39 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     // Received by mediator
     let rk_mediator = bob_mediator_secret.diffie_hellman(&alice_public_2); // key to decrypt mediated message
     #[cfg(not(feature = "resolve"))]
-    let received_mediated = Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()), None);
+    let received_mediated =
+        Message::receive(&ready_to_send.unwrap(), Some(rk_mediator.as_bytes()), None);
     #[cfg(feature = "resolve")]
-    let received_mediated = Message::receive(&ready_to_send.unwrap(), &"ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2".from_base58().unwrap());
+    let received_mediated = Message::receive(
+        &ready_to_send.unwrap(),
+        &"ACa4PPJ1LnPNq1iwS33V3Akh7WtnC71WkKFZ9ccM6sX2"
+            .from_base58()
+            .unwrap(),
+    );
 
     assert!(&received_mediated.is_ok());
 
     // Received by Bob
     let rk_bob = bob_secret.diffie_hellman(&alice_public); // key to decrypt final message
     #[cfg(not(feature = "resolve"))]
-    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().get_body().unwrap().as_ref()), Some(rk_bob.as_bytes()), None);
+    let received_bob = Message::receive(
+        &String::from_utf8_lossy(&received_mediated.unwrap().get_body().unwrap().as_ref()),
+        Some(rk_bob.as_bytes()),
+        None,
+    );
     #[cfg(feature = "resolve")]
-    let received_bob = Message::receive(&String::from_utf8_lossy(&received_mediated.unwrap().body), &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap());
+    let received_bob = Message::receive(
+        &String::from_utf8_lossy(&received_mediated.unwrap().body),
+        &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP"
+            .from_base58()
+            .unwrap(),
+    );
 
     assert!(&received_bob.is_ok());
-    assert_eq!(received_bob.unwrap().get_body().unwrap().as_ref(), sample_dids::TEST_DID_SIGN_1.as_bytes());
+    assert_eq!(
+        received_bob.unwrap().get_body().unwrap().as_ref(),
+        sample_dids::TEST_DID_SIGN_1.as_bytes()
+    );
 }
 
 #[test]
@@ -141,7 +178,10 @@ fn send_receive_signed_json_test() {
     // Message construction an JWS wrapping
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
+        .to(&[
+            "did::xyz:34r3cu403hnth03r49g03",
+            "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
+        ]) // setting to
         .set_body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jws(&SignatureAlgorithm::EdDsa)
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes());
@@ -149,10 +189,16 @@ fn send_receive_signed_json_test() {
     assert!(&message.is_ok());
 
     // Receiving JWS
-    let received = Message::verify(&message.unwrap().as_bytes(), &sign_keypair.public.to_bytes());
+    let received = Message::verify(
+        &message.unwrap().as_bytes(),
+        &sign_keypair.public.to_bytes(),
+    );
     // Assert
     assert!(&received.is_ok());
-    assert_eq!(sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(), received.unwrap().get_body().unwrap().as_ref());
+    assert_eq!(
+        sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(),
+        received.unwrap().get_body().unwrap().as_ref()
+    );
 }
 
 #[test]
@@ -171,7 +217,10 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     // Message construction
     let message = Message::new() // creating message
         .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
-        .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
+        .to(&[
+            "did::xyz:34r3cu403hnth03r49g03",
+            "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
+        ]) // setting to
         .set_body(sample_dids::TEST_DID_SIGN_1.as_bytes()) // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
@@ -180,10 +229,12 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
 
     // Act
     // Send
-    let ready_to_send = message.seal_signed(
-        ek.as_bytes(),
-        &sign_keypair.to_bytes(),
-        SignatureAlgorithm::EdDsa)
+    let ready_to_send = message
+        .seal_signed(
+            ek.as_bytes(),
+            &sign_keypair.to_bytes(),
+            SignatureAlgorithm::EdDsa,
+        )
         .unwrap();
 
     //Receive
@@ -192,12 +243,21 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     let received = Message::receive(
         &ready_to_send,
         Some(rk.as_bytes()),
-        Some(&sign_keypair.public.to_bytes())); // and now we parse received
+        Some(&sign_keypair.public.to_bytes()),
+    ); // and now we parse received
     #[cfg(feature = "resolve")]
-    let received = Message::receive(&ready_to_send, &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP".from_base58().unwrap());
+    let received = Message::receive(
+        &ready_to_send,
+        &"HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP"
+            .from_base58()
+            .unwrap(),
+    );
 
     // Assert
     assert!(&received.is_ok());
     let received = received.unwrap();
-    assert_eq!(sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(), received.get_body().unwrap().as_ref());
+    assert_eq!(
+        sample_dids::TEST_DID_SIGN_1.as_bytes().to_vec(),
+        received.get_body().unwrap().as_ref()
+    );
 }

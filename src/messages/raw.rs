@@ -1,15 +1,9 @@
-use std::convert::TryInto;
-use crate::{
-    Error,
-    Jwe,
-    Jws,
-    crypto::{
-        SignatureAlgorithm,
-        SymmetricCypherMethod,
-        SigningMethod,
-        Signer,
-    }};
 use super::Message;
+use crate::{
+    crypto::{SignatureAlgorithm, Signer, SigningMethod, SymmetricCypherMethod},
+    Error, Jwe, Jws,
+};
+use std::convert::TryInto;
 
 #[cfg(feature = "raw-crypto")]
 impl Message {
@@ -20,19 +14,26 @@ impl Message {
     ///     possible post packaging / sending.
     /// Returns `(JwmHeader, Vec<u8>)` to be sent to receiver.
     ///
-    pub fn encrypt(self, crypter: SymmetricCypherMethod, encryption_key: &[u8])
-        -> Result<String, Error> {
-            let header = self.jwm_header.clone();
-            let d_header = self.get_didcomm_header();
-            let cyphertext = crypter(self.jwm_header.get_iv().as_ref(), encryption_key, serde_json::to_string(&self)?.as_bytes())?;
-            let mut jwe = Jwe::new(header, self.recepients.clone(), cyphertext);
-            let multi = self.recepients.is_some();
-            jwe.header.skid = Some(d_header.from.clone().unwrap_or_default())   ; 
-            if !multi {
-                jwe.header.kid = Some(d_header.to[0].clone());
-            }
-            jwe.header.skid = d_header.from.clone();
-            Ok(serde_json::to_string(&jwe)?)
+    pub fn encrypt(
+        self,
+        crypter: SymmetricCypherMethod,
+        encryption_key: &[u8],
+    ) -> Result<String, Error> {
+        let header = self.jwm_header.clone();
+        let d_header = self.get_didcomm_header();
+        let cyphertext = crypter(
+            self.jwm_header.get_iv().as_ref(),
+            encryption_key,
+            serde_json::to_string(&self)?.as_bytes(),
+        )?;
+        let mut jwe = Jwe::new(header, self.recepients.clone(), cyphertext);
+        let multi = self.recepients.is_some();
+        jwe.header.skid = Some(d_header.from.clone().unwrap_or_default());
+        if !multi {
+            jwe.header.kid = Some(d_header.to[0].clone());
+        }
+        jwe.header.skid = d_header.from.clone();
+        Ok(serde_json::to_string(&jwe)?)
     }
     /// Decrypts received cypher into instance of `Message`.
     /// Received message should be encrypted with our pub key.
@@ -42,10 +43,11 @@ impl Message {
     pub fn decrypt(
         received_message: &[u8],
         decrypter: SymmetricCypherMethod,
-        key: &[u8]) 
-            -> Result<Self, Error> {
+        key: &[u8],
+    ) -> Result<Self, Error> {
         let jwe: Jwe = serde_json::from_slice(received_message)?;
-        if let Ok(raw_message_bytes) = decrypter(jwe.header.get_iv().as_ref(), key, &jwe.payload()) {
+        if let Ok(raw_message_bytes) = decrypter(jwe.header.get_iv().as_ref(), key, &jwe.payload())
+        {
             Ok(serde_json::from_slice(&raw_message_bytes)?)
         } else {
             Err(Error::PlugCryptoFailure)
@@ -83,25 +85,18 @@ impl Message {
     }
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod raw_tests {
-    use chacha20poly1305::{XChaCha20Poly1305, Key, XNonce};
-    use chacha20poly1305::aead::{Aead, NewAead};
-    use k256::elliptic_curve::rand_core::OsRng;
-    use sodiumoxide::crypto::secretbox;
-    use x25519_dalek::{
-        EphemeralSecret,
-        PublicKey,
-    };
-    use super::{
-        Message,
-        Error,
-    };
+    use super::{Error, Message};
     use crate::crypto::CryptoAlgorithm;
-    
+    use chacha20poly1305::aead::{Aead, NewAead};
+    use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
+    use sodiumoxide::crypto::secretbox;
+    use x25519_dalek::{EphemeralSecret, PublicKey};
+
     #[test]
     #[allow(non_snake_case)]
-    #[cfg(feature="raw-crypto")]
+    #[cfg(feature = "raw-crypto")]
     fn plugin_crypto_xChaCha20Paly1305_dummy_key() {
         // Arrange
         let key = Key::from_slice(b"an example very very secret key.");
@@ -109,7 +104,8 @@ mod raw_tests {
         let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);
-            aead.encrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
+            aead.encrypt(nonce, m)
+                .map_err(|e| Error::Generic(e.to_string()))
         });
         // Plugable decryptor function to decrypt data
         let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
@@ -117,8 +113,7 @@ mod raw_tests {
             let nonce = XNonce::from_slice(n);
             Ok(aead.decrypt(nonce, m).unwrap())
         });
-        let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::A256GCM);
+        let m = Message::new().as_jwe(&CryptoAlgorithm::A256GCM);
         let id = m.get_didcomm_header().id;
 
         // Act and Assert
@@ -130,24 +125,24 @@ mod raw_tests {
     }
 
     #[test]
-    #[cfg(feature="raw-crypto")]
+    #[cfg(feature = "raw-crypto")]
     fn plugin_crypto_libsodium_box() {
         // Arrange
         // Plugable encryptor function to encrypt data
-        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
-            -> Result<Vec<u8>, Error> {
+        let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let nonce = secretbox::Nonce::from_slice(n).unwrap();
-            Ok(secretbox::seal(m, &nonce, &secretbox::Key::from_slice( k).unwrap()))
+            Ok(secretbox::seal(
+                m,
+                &nonce,
+                &secretbox::Key::from_slice(k).unwrap(),
+            ))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
-            -> Result<Vec<u8>, Error> {
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let nonce = secretbox::Nonce::from_slice(n).unwrap();
-            Ok(secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap())
-                .unwrap())
+            Ok(secretbox::open(m, &nonce, &secretbox::Key::from_slice(k).unwrap()).unwrap())
         });
-        let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::A256GCM);
+        let m = Message::new().as_jwe(&CryptoAlgorithm::A256GCM);
         let id = m.get_didcomm_header().id;
         let key = secretbox::gen_key();
 
@@ -163,37 +158,40 @@ mod raw_tests {
 
     #[test]
     #[allow(non_snake_case)]
-    #[cfg(feature="raw-crypto")]
+    #[cfg(feature = "raw-crypto")]
     fn plugin_crypto_xChaCha20Paly1305_x25519_dalek_shared_secret() {
         // Arrange
-        let sender_sk = EphemeralSecret::new(OsRng);
+        let sender_sk = EphemeralSecret::new(rand_core::OsRng);
         let sender_pk = PublicKey::from(&sender_sk);
-        let receiver_sk = EphemeralSecret::new(OsRng);
+        let receiver_sk = EphemeralSecret::new(rand_core::OsRng);
         let receiver_pk = PublicKey::from(&receiver_sk);
         let sender_shared = sender_sk.diffie_hellman(&receiver_pk);
         let receiver_shared = receiver_sk.diffie_hellman(&sender_pk);
-        let m = Message::new()
-            .as_jwe(&CryptoAlgorithm::XC20P);
+        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P);
         let id = m.get_didcomm_header().id;
         // Plugable encryptor function to encrypt data
         let my_crypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);
-            aead.encrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
+            aead.encrypt(nonce, m)
+                .map_err(|e| Error::Generic(e.to_string()))
         });
         // Plugable decryptor function to decrypt data
-        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]|
-            -> Result<Vec<u8>, Error> {
+        let my_decrypter = Box::new(|n: &[u8], k: &[u8], m: &[u8]| -> Result<Vec<u8>, Error> {
             let aead = XChaCha20Poly1305::new(k.into());
             let nonce = XNonce::from_slice(n);
-            aead.decrypt(nonce, m).map_err(|e| Error::Generic(e.to_string()))
+            aead.decrypt(nonce, m)
+                .map_err(|e| Error::Generic(e.to_string()))
         });
 
         // Act and Assert
         let crypted = m.encrypt(my_crypter, sender_shared.as_bytes());
         assert!(&crypted.is_ok()); // Encryption check
-        let raw_m =
-            Message::decrypt(&crypted.unwrap().as_bytes(), my_decrypter, receiver_shared.as_bytes());
+        let raw_m = Message::decrypt(
+            &crypted.unwrap().as_bytes(),
+            my_decrypter,
+            receiver_shared.as_bytes(),
+        );
         assert!(&raw_m.is_ok()); // Decryption check
         assert_eq!(id, raw_m.unwrap().get_didcomm_header().id); // Data consistancy check
     }

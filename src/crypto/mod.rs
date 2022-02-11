@@ -14,7 +14,8 @@ pub type SymmetricCypherMethod = Box<dyn Fn(&[u8], &[u8], &[u8]) -> Result<Vec<u
 /// Return `FnOnce` signature definition for assymmetric cryptography method.
 /// Arguments sequence: Nonce, Key, Message.
 ///
-pub type AssymetricCyptherMethod = Box<dyn Fn(&[u8], &[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
+pub type AssymetricCyptherMethod =
+    Box<dyn Fn(&[u8], &[u8], &[u8], &[u8]) -> Result<Vec<u8>, Error>>;
 /// Return `FnOnce` signature definition for signature signing method.
 /// .0 == `key: &[u8]`; .1 == `message`;
 ///

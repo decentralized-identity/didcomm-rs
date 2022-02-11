@@ -15,7 +15,7 @@ impl Jws {
             payload,
             protected: None,
             header: header,
-            signature
+            signature,
         }
     }
 }
