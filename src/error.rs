@@ -18,6 +18,8 @@ pub enum Error {
     DidResolveFailed,
     #[error("invalid key size {0}")]
     InvalidKeySize(String),
+    #[error("{0} is not set")]
+    PropertyIsNotSet(&'static str),
     #[error("{0}")]
     Generic(String),
     #[error(transparent)]

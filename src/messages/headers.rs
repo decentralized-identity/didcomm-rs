@@ -101,6 +101,8 @@ pub struct JwmHeader {
     pub kid: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encrypted_skid: Option<String>,
     // None if raw text message, Some(String) for
     //  both JWE and/or JWS.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -168,6 +170,12 @@ impl JwmHeader {
     }
     pub fn kid(&mut self, kid: Option<String>) {
         self.kid = kid;
+    }
+    pub fn encrypt_skid(&mut self) -> Result<(), Error> {
+        if self.kid.is_empty() {
+            return Err(Error::PropertyIsNotSet("kid"));
+        }
+        todo!()
     }
 }
 
