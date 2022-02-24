@@ -23,8 +23,8 @@ fn can_create_flattened_jws_json() -> Result<(), Error> {
 
     let jws_object: Value = serde_json::from_str(&jws_string)?;
 
-    assert_eq!(jws_object["signature"].as_str().is_some(), true);
-    assert_eq!(jws_object["signatures"].as_array().is_some(), false);
+    assert!(jws_object["signature"].as_str().is_some());
+    assert!(jws_object["signatures"].as_array().is_none());
 
     Ok(())
 }
@@ -41,8 +41,8 @@ fn can_create_general_jws_json() -> Result<(), Error> {
 
     let jws_object: Value = serde_json::from_str(&jws_string)?;
 
-    assert_eq!(jws_object["signature"].as_str().is_some(), false);
-    assert_eq!(jws_object["signatures"].as_array().is_some(), true);
+    assert!(jws_object["signature"].as_str().is_none());
+    assert!(jws_object["signatures"].as_array().is_some());
 
     Ok(())
 }
@@ -59,7 +59,7 @@ fn can_receive_flattened_jws_json() -> Result<(), Error> {
 
     // 'verify' style receive
     let received = Message::verify(jws_string.as_bytes(), &sign_keypair.public.to_bytes());
-    assert_eq!(received.is_ok(), true);
+    assert!(received.is_ok());
 
     // generic 'receive' style
     let received = Message::receive(
@@ -68,7 +68,7 @@ fn can_receive_flattened_jws_json() -> Result<(), Error> {
         Some(&sign_keypair.public.to_bytes()),
         None,
     );
-    assert_eq!(received.is_ok(), true);
+    assert!(received.is_ok());
 
     Ok(())
 }
@@ -85,7 +85,7 @@ fn can_receive_general_jws_json() -> Result<(), Error> {
 
     // 'verify' style receive
     let received = Message::verify(jws_string.as_bytes(), &sign_keypair.public.to_bytes());
-    assert_eq!(received.is_ok(), true);
+    assert!(received.is_ok());
 
     // generic 'receive' style
     let received = Message::receive(
@@ -94,7 +94,7 @@ fn can_receive_general_jws_json() -> Result<(), Error> {
         Some(&sign_keypair.public.to_bytes()),
         None,
     );
-    assert_eq!(received.is_ok(), true);
+    assert!(received.is_ok());
 
     Ok(())
 }

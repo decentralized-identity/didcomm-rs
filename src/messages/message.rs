@@ -354,8 +354,11 @@ impl Message {
     pub fn seal_pre_encrypted(self, cyphertext: impl AsRef<[u8]>) -> Result<String, Error> {
         let d_header = self.get_didcomm_header();
 
-        let mut unprotected = JwmHeader::default();
-        unprotected.skid = d_header.from.clone();
+        let mut unprotected = JwmHeader {
+            skid: d_header.from.clone(),
+            ..Default::default()
+        };
+
         if self.recipients.is_none() {
             unprotected.kid = Some(d_header.to[0].clone());
         }
@@ -468,17 +471,16 @@ impl Message {
             return Err(Error::InvalidKeySize("!32".into()));
         }
         let to_len = self.didcomm_header.to.len();
-        let public_keys: Vec<Option<&[u8]>>;
-        if let Some(recipient_public_keys_value) = recipient_public_keys {
+        let public_keys = if let Some(recipient_public_keys_value) = recipient_public_keys {
             if recipient_public_keys_value.len() != to_len {
                 return Err(Error::Generic(
                     "`to` and `recipient_public_keys` must have same length".to_string(),
                 ));
             }
-            public_keys = recipient_public_keys_value;
+            recipient_public_keys_value
         } else {
-            public_keys = vec![None; to_len];
-        }
+            vec![None; to_len]
+        };
 
         // generate content encryption key
         let mut cek = [0u8; 32];

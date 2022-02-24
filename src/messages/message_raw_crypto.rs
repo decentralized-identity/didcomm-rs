@@ -51,8 +51,7 @@ impl Message {
             aad,
         )?;
         let (ciphertext, tag) = ciphertext_and_tag.split_at(ciphertext_and_tag.len() - 16);
-        let jwe;
-        if self.serialize_flat_jwe {
+        let jwe = if self.serialize_flat_jwe {
             let recipients = self.recipients.ok_or_else(|| {
                 Error::Generic("flat JWE JSON serialization needs a recipient".to_string())
             })?;
@@ -62,24 +61,24 @@ impl Message {
                 ));
             }
 
-            jwe = Jwe::new_flat(
+            Jwe::new_flat(
                 None,
                 recipients[0].clone(),
                 ciphertext,
                 Some(jwe_header),
                 Some(tag),
                 Some(iv),
-            );
+            )
         } else {
-            jwe = Jwe::new(
+            Jwe::new(
                 None,
                 self.recipients.clone(),
                 ciphertext,
                 Some(jwe_header),
                 Some(tag),
                 Some(iv),
-            );
-        }
+            )
+        };
         Ok(serde_json::to_string(&jwe)?)
     }
 
@@ -149,9 +148,8 @@ impl Message {
         let signature = signer(signing_sender_private_key, payload_to_sign.as_bytes())?;
         let signature_value = Signature::new(Some(jws_header), None, signature);
 
-        let jws: Jws;
-        if self.serialize_flat_jws {
-            jws = Jws::new_flat(payload_string_base64, signature_value);
+        let jws: Jws = if self.serialize_flat_jws {
+            Jws::new_flat(payload_string_base64, signature_value)
         } else {
             let signature_values = self
                 .didcomm_header
@@ -159,8 +157,8 @@ impl Message {
                 .iter()
                 .map(|_| signature_value.clone())
                 .collect();
-            jws = Jws::new(payload_string_base64, signature_values);
-        }
+            Jws::new(payload_string_base64, signature_values)
+        };
 
         Ok(serde_json::to_string(&jws)?)
     }

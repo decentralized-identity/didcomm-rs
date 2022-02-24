@@ -23,7 +23,7 @@ fn sets_message_type_correctly_for_plain_messages() -> Result<(), Error> {
     let jwm_string: String = serde_json::to_string(&message)?;
     let jwm_object: Value = serde_json::from_str(&jwm_string)?;
 
-    assert_eq!(jwm_object["typ"].as_str().is_some(), true);
+    assert!(jwm_object["typ"].as_str().is_some());
     assert_eq!(
         jwm_object["typ"]
             .as_str()
@@ -44,7 +44,7 @@ fn sets_message_type_correctly_for_signed_messages() -> Result<(), Error> {
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes())?;
 
     let jws_object: Value = serde_json::from_str(&jws_string)?;
-    assert_eq!(jws_object["protected"].as_str().is_some(), true);
+    assert!(jws_object["protected"].as_str().is_some());
     let protected_encoded = jws_object["protected"]
         .as_str()
         .ok_or(Error::JwmHeaderParseError)?;
@@ -86,7 +86,7 @@ fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(),
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
 
-    assert_eq!(jwe_object["protected"].as_str().is_some(), true);
+    assert!(jwe_object["protected"].as_str().is_some());
     let protected_encoded = jwe_object["protected"]
         .as_str()
         .ok_or(Error::JwmHeaderParseError)?;
@@ -127,7 +127,7 @@ fn sets_message_type_correctly_for_forwarded_messages() -> Result<(), Error> {
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
 
-    assert_eq!(jwe_object["protected"].as_str().is_some(), true);
+    assert!(jwe_object["protected"].as_str().is_some());
     let protected_encoded = jwe_object["protected"]
         .as_str()
         .ok_or(Error::JwmHeaderParseError)?;
@@ -199,7 +199,7 @@ fn serializes_missing_body_as_empty_object() -> Result<(), Error> {
     let jwm_string: String = serde_json::to_string(&message)?;
     let jwm_object: Value = serde_json::from_str(&jwm_string)?;
 
-    assert_eq!(jwm_object["body"].as_object().is_some(), true);
+    assert!(jwm_object["body"].as_object().is_some());
     assert_eq!(serde_json::to_string(&jwm_object["body"])?, "{}",);
 
     Ok(())
@@ -215,7 +215,7 @@ fn serializes_existing_body_as_object() -> Result<(), Error> {
     let jwm_string: String = serde_json::to_string(&message)?;
     let jwm_object: Value = serde_json::from_str(&jwm_string)?;
 
-    assert_eq!(jwm_object["body"].as_object().is_some(), true);
+    assert!(jwm_object["body"].as_object().is_some());
     assert_eq!(
         serde_json::to_string(&jwm_object["body"])?,
         r#"{"foo":"bar"}"#,

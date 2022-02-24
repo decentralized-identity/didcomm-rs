@@ -29,9 +29,9 @@ pub fn get_keypair_set() -> KeyPairSet {
     let mediator_secret_key: StaticSecret =
         StaticSecret::from(array_ref!(mediator_private, 0, 32).to_owned());
 
-    let alice_public: PublicKey = (&alice_secret_key).into();
-    let bob_public: PublicKey = (&bob_secret_key).into();
-    let mediator_public: PublicKey = (&mediator_secret_key).into();
+    let alice_public = PublicKey::from(&alice_secret_key);
+    let bob_public = PublicKey::from(&bob_secret_key);
+    let mediator_public = PublicKey::from(&mediator_secret_key);
 
     KeyPairSet {
         alice_public: alice_public.to_bytes(),

@@ -33,19 +33,16 @@ fn can_create_flat_jwe_json() -> Result<(), Error> {
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
 
-    assert_eq!(
+    assert!(
         jwe_object["recipients"].as_array().is_none(),
-        true,
         "recipients present in JWE"
     );
-    assert_eq!(
+    assert!(
         jwe_object["encrypted_key"].as_str().is_some(),
-        true,
         "no recipients fields in JWE top level"
     );
-    assert_eq!(
+    assert!(
         jwe_object["header"].as_object().is_some(),
-        true,
         "no recipients fields in JWE top level"
     );
 
