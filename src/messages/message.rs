@@ -228,7 +228,11 @@ impl Message {
     /// Errors otherwise with `Error::NoRotationData`
     pub fn get_prior(&self) -> Result<PriorClaims, Error> {
         if self.is_rotation() {
-            Ok(self.didcomm_header.from_prior().clone().unwrap())
+            Ok(self
+                .didcomm_header
+                .from_prior()
+                .ok_or(Error::NoRotationData)?
+                .clone())
         } else {
             Err(Error::NoRotationData)
         }

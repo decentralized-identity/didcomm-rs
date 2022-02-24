@@ -85,8 +85,8 @@ impl DidCommHeader {
     }
 
     /// Getter method for `from_prior` retrieval
-    pub fn from_prior(&self) -> &Option<PriorClaims> {
-        &self.from_prior
+    pub fn from_prior(&self) -> Option<&PriorClaims> {
+        self.from_prior.as_ref()
     }
 
     /// Creates set of DIDComm related headers with the static forward type
