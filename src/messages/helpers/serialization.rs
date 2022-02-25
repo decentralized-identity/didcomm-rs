@@ -9,16 +9,14 @@ pub(crate) mod serialization_base64_buffer {
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
-        let base64 = String::deserialize(d)?;
-        base64_url::decode(base64.as_bytes()).map_err(serde::de::Error::custom)
+        let s: &[u8] = Deserialize::deserialize(d)?;
+        base64_url::decode(s).map_err(serde::de::Error::custom)
     }
 }
 
 /// (de)serialzies between `Option<JwmHeader>` and base64 `String`
 /// see `<https://users.rust-lang.org/t/serialize-a-vec-u8-to-json-as-base64/57781/2>`
 pub(crate) mod serialization_base64_jwm_header {
-    use std::str::from_utf8;
-
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     use crate::JwmHeader;
@@ -27,8 +25,7 @@ pub(crate) mod serialization_base64_jwm_header {
         let base64 = match v {
             Some(v) => {
                 let header_string = serde_json::to_string(&v).map_err(serde::ser::Error::custom)?;
-                let header_buffer = header_string.into_bytes();
-                Some(base64_url::encode(&header_buffer))
+                Some(base64_url::encode(&header_string))
             }
             None => None,
         };
@@ -41,8 +38,7 @@ pub(crate) mod serialization_base64_jwm_header {
             Some(v) => {
                 let header_buffer =
                     base64_url::decode(v.as_bytes()).map_err(serde::de::Error::custom)?;
-                let header_string = from_utf8(&header_buffer).map_err(serde::de::Error::custom)?;
-                serde_json::from_str(header_string).map_err(serde::de::Error::custom)
+                serde_json::from_slice(&header_buffer).map_err(serde::de::Error::custom)
             }
             None => Ok(None),
         }
