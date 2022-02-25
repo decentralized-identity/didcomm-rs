@@ -3,7 +3,7 @@ use crate::Error;
 /// header used for [DID rotation](https://identity.foundation/didcomm-messaging/spec/#did-rotation)
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct PriorClaims {
-    sub: String,
+    sub: Option<String>,
 
     iss: String,
 }
