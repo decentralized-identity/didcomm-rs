@@ -14,7 +14,7 @@ impl FromStr for PriorClaims {
     type Err = CrateError;
 
     fn from_str(jwt: &str) -> Result<Self, Self::Err> {
-        Ok(serde_json::from_str(&jwt)?)
+        Ok(serde_json::from_str(jwt)?)
     }
 }
 

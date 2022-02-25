@@ -57,7 +57,7 @@ impl DidCommHeader {
     /// Generates random `id`
     /// TODO: Should this be public?
     pub fn gen_random_id() -> String {
-        return uuid::Uuid::new_v4().to_string();
+        uuid::Uuid::new_v4().to_string()
     }
 
     /// Returns DIDComm message URI as defined by spec:
