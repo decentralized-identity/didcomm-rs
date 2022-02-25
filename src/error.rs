@@ -1,3 +1,5 @@
+use std::str::Utf8Error;
+
 /// `Error` type used througout crate
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -30,6 +32,8 @@ pub enum Error {
     BisquitError(#[from] biscuit::errors::Error),
     #[error(transparent)]
     TryFromError(#[from] core::convert::Infallible),
+    #[error(transparent)]
+    Utf8ParseError(#[from] Utf8Error),
     #[cfg(feature = "raw-crypto")]
     #[error(transparent)]
     EdDsaError(#[from] ed25519_dalek::SignatureError),

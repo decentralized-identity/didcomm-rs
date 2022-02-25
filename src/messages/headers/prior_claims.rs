@@ -1,4 +1,6 @@
-use crate::Error;
+use std::{convert::TryFrom, str::FromStr};
+
+use crate::Error as CrateError;
 
 /// header used for [DID rotation](https://identity.foundation/didcomm-messaging/spec/#did-rotation)
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -8,12 +10,18 @@ pub struct PriorClaims {
     iss: String,
 }
 
-impl PriorClaims {
-    pub fn from_string(jwt: String) -> Result<Self, Error> {
+impl FromStr for PriorClaims {
+    type Err = CrateError;
+
+    fn from_str(jwt: &str) -> Result<Self, Self::Err> {
         Ok(serde_json::from_str(&jwt)?)
     }
+}
 
-    pub fn from_bytes(jwt: &[u8]) -> Result<Self, Error> {
-        Self::from_string(String::from_utf8(jwt.to_vec())?)
+impl TryFrom<&[u8]> for PriorClaims {
+    type Error = CrateError;
+
+    fn try_from(jwt: &[u8]) -> Result<Self, Self::Error> {
+        std::str::from_utf8(jwt)?.parse::<Self>()
     }
 }
