@@ -1,7 +1,5 @@
 use std::{collections::HashMap, time::SystemTime};
 
-use rand::Rng;
-
 use crate::{Error, PriorClaims};
 
 /// Collection of DIDComm message specific headers, will be flattened into DIDComm plain message
@@ -59,8 +57,7 @@ impl DidCommHeader {
     /// Generates random `id`
     /// TODO: Should this be public?
     pub fn gen_random_id() -> String {
-        let id_number: usize = rand::thread_rng().gen();
-        format!("{}", id_number)
+        return uuid::Uuid::new_v4().to_string();
     }
 
     /// Returns DIDComm message URI as defined by spec:
@@ -98,7 +95,6 @@ impl DidCommHeader {
         expires_time: Option<u64>,
     ) -> Result<Self, Error> {
         Ok(DidCommHeader {
-            id: DidCommHeader::gen_random_id(),
             to,
             from,
             created_time: Some(
