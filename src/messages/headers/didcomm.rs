@@ -10,11 +10,11 @@ use crate::{Error, PriorClaims};
 pub struct DidCommHeader {
     pub id: String,
 
-    #[serde(default)]
-    pub thid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thid: Option<String>,
 
-    #[serde(default)]
-    pub pthid: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pthid: Option<String>,
 
     #[serde(rename = "type")]
     pub m_type: String,
@@ -42,11 +42,10 @@ pub struct DidCommHeader {
 impl DidCommHeader {
     /// Constructor function with ~default values.
     pub fn new() -> Self {
-        let uuid = uuid::Uuid::new_v4();
         DidCommHeader {
             id: DidCommHeader::gen_random_id(),
-            thid: uuid.to_string(),
-            pthid: String::default(),
+            thid: None,
+            pthid: None,
             m_type: "JWM".into(),
             to: vec![String::default()],
             from: Some(String::default()),
@@ -66,9 +65,13 @@ impl DidCommHeader {
 
     /// Returns DIDComm message URI as defined by spec:
     /// https://identity.foundation/didcomm-messaging/spec/#didcomm-message-uris
-    ///
     pub fn get_message_uri(&self) -> String {
-        format!("didcomm://{}{}{}", self.id, &self.thid, &self.pthid)
+        format!(
+            "didcomm://{}{}{}",
+            self.id,
+            self.thid.clone().unwrap_or_default(),
+            self.pthid.clone().unwrap_or_default(),
+        )
     }
 
     /// Sets current message's `thid` and `pthid` to one from `replying_to`
@@ -77,7 +80,6 @@ impl DidCommHeader {
     /// # Parameters
     ///
     /// * `replying_to` - ref to header we're replying
-    ///
     pub fn reply_to(&mut self, replying_to: &Self) {
         self.thid = replying_to.thid.clone();
         self.pthid = replying_to.pthid.clone();

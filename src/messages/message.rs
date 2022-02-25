@@ -138,14 +138,22 @@ impl Message {
         self
     }
 
-    /// Sets `pthid` to the one specified in `parent`'s `thid`
+    /// Sets `pthid` to the one specified in `parent`'s `thid`.
+    /// Uses `id` for same purpose if `thid` is missing.
     ///
     /// # Parameters
     ///
     /// * `parent` - ref to a parent threaded `Message`
     ///
     pub fn with_parent(mut self, parent: &Self) -> Self {
-        self.didcomm_header.pthid = parent.didcomm_header.thid.clone();
+        self.didcomm_header.pthid = Some(
+            if let Some(thid_ref) = parent.didcomm_header.thid.as_ref() {
+                thid_ref.clone()
+            } else {
+                parent.didcomm_header.id.clone()
+            },
+        );
+
         self
     }
 
@@ -320,9 +328,20 @@ impl Message {
     }
 
     /// Gets `Iterator` over key-value pairs of application level headers
-    ///
     pub fn get_application_params(&self) -> impl Iterator<Item = (&String, &String)> {
         self.didcomm_header.other.iter()
+    }
+
+    /// Setter of `thid` header
+    pub fn thid(mut self, thid: &str) -> Self {
+        self.didcomm_header.thid = Some(thid.to_string());
+        self
+    }
+
+    /// Setter of `pthid` header
+    pub fn pthid(mut self, pthid: &str) -> Self {
+        self.didcomm_header.pthid = Some(pthid.to_string());
+        self
     }
 }
 
