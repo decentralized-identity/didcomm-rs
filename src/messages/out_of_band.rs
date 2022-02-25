@@ -21,6 +21,6 @@ impl Message {
                 self.apeend_attachment(attachment);
             }
         }
-        self.body(&String::from_utf8(body.as_ref().to_vec()).unwrap())
+        self.body(std::str::from_utf8(body.as_ref()).unwrap())
     }
 }
