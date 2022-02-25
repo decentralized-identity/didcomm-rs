@@ -9,8 +9,8 @@ pub(crate) mod serialization_base64_buffer {
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
-        let s: &[u8] = Deserialize::deserialize(d)?;
-        base64_url::decode(s).map_err(serde::de::Error::custom)
+        let buffer: &[u8] = Deserialize::deserialize(d)?;
+        base64_url::decode(buffer).map_err(serde::de::Error::custom)
     }
 }
 
