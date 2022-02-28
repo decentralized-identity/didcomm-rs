@@ -1,41 +1,58 @@
 use std::collections::HashMap;
 
+/// Encryption public key
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct Epk {
+    pub kty: String,
+
+    pub crv: String,
+
+    pub x: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<String>,
+}
+
 /// Json Web Keys structure defined by [RFC](https://tools.ietf.org/html/rfc7517)
-///
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct Jwk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kty: Option<String>,
+
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
     pub use_: Option<String>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub crv: Option<String>,
+
     pub key_ops: Vec<KeyOps>,
+
     pub alg: KeyAlgorithm,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kid: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epk: Option<Epk>,
+
     #[serde(flatten)]
     pub(crate) other: HashMap<String, String>,
 }
 
 impl Jwk {
     /// Constructor with all default, empty or `None` values.
-    ///
     pub fn new() -> Self {
         Self::default()
     }
+
     /// Creates `epk` jwk entry with required properties.
-    /// Correctness is not verified by this constructor and totaly rely on caller.
-    ///
-    pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: String) -> Self {
-        self.kty = Some(kty);
-        self.crv = Some(crv);
-        self.other.insert("x".into(), x);
-        self.other.insert("y".into(), y);
+    /// Correctness is not verified by this constructor and totally rely on caller.
+    pub fn ephemeral(mut self, kty: String, crv: String, x: String, y: Option<String>) -> Self {
+        self.epk = Some(Epk { kty, crv, x, y });
         self
     }
+
     /// Insert new custom, non-defined by spec, header.
-    ///
     pub fn add_other_header(&mut self, k: String, v: String) {
         self.other.insert(k, v);
     }
@@ -91,6 +108,10 @@ pub enum KeyAlgorithm {
     A128GCMKW,
     A192GCMKW,
     A256GCMKW,
+    #[serde(rename = "ECDH-1PU+A256KW")]
+    Ecdh1puA256kw,
+    #[serde(rename = "ECDH-1PU+XC20PKW")]
+    Ecdh1puXc20pkw,
     #[serde(rename = "PBES2-HS256+A128KW")]
     Pbes2Hs256A128kw,
     #[serde(rename = "PBES2-HS384+A192KW")]

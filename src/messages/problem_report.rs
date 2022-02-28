@@ -1,6 +1,7 @@
-use crate::Error;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+
+use crate::Error;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Problem {
