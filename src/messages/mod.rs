@@ -1,16 +1,14 @@
 mod attachment;
 mod headers;
+pub(crate) mod helpers;
 mod jwe;
-mod jwk;
 mod jws;
 mod mediated;
 mod message;
-mod prior_claims;
 mod problem_report;
-mod types;
 
 #[cfg(feature = "raw-crypto")]
-mod raw;
+mod message_raw_crypto;
 
 #[cfg(feature = "out-of-band")]
 pub mod out_of_band;
@@ -18,17 +16,14 @@ pub mod out_of_band;
 pub use attachment::*;
 pub use headers::*;
 pub use jwe::*;
-pub use jwk::*;
 pub use jws::*;
 pub use mediated::*;
 pub use message::*;
-pub use prior_claims::*;
-pub use problem_report::*;
-pub use types::*;
-
 #[cfg(feature = "raw-crypto")]
-pub use raw::*;
+pub use message_raw_crypto::*;
+pub use problem_report::*;
 
+/// trait that can be used to verify body, see example [here][crate]
 pub trait Shape: Sized {
     type Err;
 

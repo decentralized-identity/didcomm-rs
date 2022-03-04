@@ -1,21 +1,19 @@
 /// Enum that represents DIDComm envelope type
-///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum MessageType {
     #[serde(rename = "application/didcomm-encrypted+json")]
-    DidcommJwe,
+    DidCommJwe,
     #[serde(rename = "application/didcomm-signed+json")]
-    DidcommJws,
+    DidCommJws,
     #[serde(rename = "application/didcomm-plain+json")]
-    DidcommRaw,
+    DidCommRaw,
     #[serde(rename = "https://didcomm.org/routing/2.0/forward")]
-    DidcommForward,
+    DidCommForward,
     #[serde(rename = "https://didcomm.org/out-of-band/2.0/invitation")]
-    DidcommInvitation,
+    DidCommInvitation,
 }
 
 /// Enum that represents DIDComm message payload type
-///
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ContentType {
     #[serde(rename = "https://didcomm.org/routing/2.0/forward")]

@@ -1,3 +1,6 @@
+use std::str::Utf8Error;
+
+/// `Error` type used througout crate
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("plugged cryptography failure")]
@@ -6,8 +9,8 @@ pub enum Error {
     NoRotationData,
     #[error("malformed DID string")]
     BadDid,
-    #[error("no recepient set for jwe")]
-    NoJweRecepient,
+    #[error("no recipient set for jwe")]
+    NoJweRecipient,
     #[error("not a JWS compact representation")]
     JwsParseError,
     #[error("failed to parse as JWE")]
@@ -31,6 +34,8 @@ pub enum Error {
     BisquitError(#[from] biscuit::errors::Error),
     #[error(transparent)]
     TryFromError(#[from] core::convert::Infallible),
+    #[error(transparent)]
+    Utf8ParseError(#[from] Utf8Error),
     #[cfg(feature = "raw-crypto")]
     #[error(transparent)]
     EdDsaError(#[from] ed25519_dalek::SignatureError),
