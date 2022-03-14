@@ -18,11 +18,7 @@ use super::{
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
 use crate::{
     helpers::{encrypt_cek, get_crypter_from_header, get_message_type, receive_jwe, receive_jws},
-    Error,
-    Jwe,
-    MessageType,
-    PriorClaims,
-    Recipient,
+    Error, Jwe, MessageType, PriorClaims, Recipient,
 };
 
 /// DIDComm message structure.
@@ -74,7 +70,6 @@ pub struct Message {
     pub(crate) attachments: Vec<Attachment>,
 }
 
-// field getters/setters, default format handling
 impl Message {
     /// Generates EMPTY default message.
     /// Use extension messages to build final one before `send`ing.
@@ -130,16 +125,14 @@ impl Message {
     /// Sets `thid` and `pthid` same as those in `replying_to`
     /// Shortcut to `DidCommHeader::reply_to` method
     ///
-    /// # Parameters
-    ///
     /// * `replying_to` - ref to message we're replying to
     pub fn reply_to(mut self, replying_to: &Self) -> Self {
         self.didcomm_header.reply_to(&replying_to.didcomm_header);
         self
     }
 
-    /// Sets `pthid` to the one specified in `parent`'s `thid`.
-    /// Uses `id` for same purpose if `thid` is missing.
+    /// Sets `pthid` to the `parent`'s `thid`.
+    /// It defaults to `id` if `thid` is missing.
     ///
     /// # Parameters
     ///
@@ -370,7 +363,7 @@ impl Message {
     ///  provided as payload.
     ///
     /// # Parameters
-    /// `cyphertext` - encrypted output of `export_for_encryption` as JWE payload
+    /// `ciphertext` - encrypted output of `export_for_encryption` as JWE payload
     ///
     /// Returns serialized JSON JWE message, which is ready to be sent to receipent
     ///

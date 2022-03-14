@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::SystemTime};
 
-use crate::{Error, PriorClaims};
+use crate::{Error, PriorClaims, Thread};
 
 /// Collection of DIDComm message specific headers, will be flattened into DIDComm plain message
 /// according to [spec](https://datatracker.ietf.org/doc/html/draft-looker-jwm-01#section-4).
@@ -27,14 +27,16 @@ pub struct DidCommHeader {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_time: Option<u64>,
-
-    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
-    pub(crate) other: HashMap<String, String>,
-
     /// A JWT, with sub: new DID and iss: prior DID,
     /// with a signature from a key authorized by prior DID.
     #[serde(skip_serializing_if = "Option::is_none")]
     from_prior: Option<PriorClaims>,
+
+    /// Optional thread decorator.
+    #[serde(skip_serializing_if = "Option::is_none", rename = "~thread")]
+    pub thread: Option<Thread>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    pub(crate) other: HashMap<String, String>,
 }
 
 impl DidCommHeader {
@@ -50,6 +52,7 @@ impl DidCommHeader {
             created_time: None,
             expires_time: None,
             from_prior: None,
+            thread: None,
             other: HashMap::new(),
         }
     }
@@ -71,16 +74,26 @@ impl DidCommHeader {
         )
     }
 
-    /// Sets current message's `thid` and `pthid` to one from `replying_to`
-    /// Also adds `replying_to.from` into `to` set.
+    /// Sets new message's header `thid` and `pthid` using sender's header.
+    /// It also adds `sender_header.from` into `to` set.
     ///
     /// # Parameters
     ///
-    /// * `replying_to` - ref to header we're replying
-    pub fn reply_to(&mut self, replying_to: &Self) {
-        self.thid = replying_to.thid.clone();
-        self.pthid = replying_to.pthid.clone();
-        self.to.push(replying_to.from.clone().unwrap_or_default());
+    /// * `sender_header` - ref to header we're replying
+    pub fn reply_to(&mut self, sender_header: &Self) {
+        match sender_header.thread {
+            Some(ref thread) if thread.is_implicit_reply(&sender_header.id) => {
+                let thid = sender_header.thread.as_ref().unwrap().thid.clone();
+                // Do we need this?
+                self.thread = Some(Thread::implicit_reply(&thid));
+                self.thid = Some(thid);
+            }
+            _ => {
+                self.thid = sender_header.thid.clone();
+                self.pthid = sender_header.pthid.clone();
+            }
+        };
+        self.to.push(sender_header.from.clone().unwrap_or_default());
     }
 
     /// Getter method for `from_prior` retrieval
@@ -111,5 +124,15 @@ impl DidCommHeader {
 impl Default for DidCommHeader {
     fn default() -> Self {
         DidCommHeader::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reply_to_can_use_decorate_if_present() {
+        let _header = DidCommHeader::default();
     }
 }

@@ -49,6 +49,9 @@ rand_core = "0.5.1"
 sodiumoxide = "0.2.6"
 base58 = "0.2.0"
 utilities = { path = "./utilities" }
+quickcheck = "1"
+quickcheck_macros = "1"
+fake = { version = "2.4", features = ["uuid"] }
 
 [dev-dependencies.cargo-husky]
 version = "1"

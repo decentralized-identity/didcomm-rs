@@ -1,9 +1,10 @@
+pub mod decorators;
 mod didcomm;
 mod jwk;
 mod jwm;
 mod prior_claims;
 mod types;
-
+pub use decorators::*;
 pub use didcomm::*;
 pub use jwk::*;
 pub use jwm::*;
