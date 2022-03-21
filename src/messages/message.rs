@@ -103,7 +103,7 @@ impl Message {
     pub fn as_flat_jwe(
         mut self,
         alg: &CryptoAlgorithm,
-        recipient_public_key: Option<&[u8]>,
+        recipient_public_key: Option<Vec<u8>>,
     ) -> Self {
         self.serialize_flat_jwe = true;
         self.as_jwe(alg, recipient_public_key)
@@ -155,7 +155,7 @@ impl Message {
     ///
     /// For `resolve` feature will set `kid` header automatically
     ///     based on the did document resolved.
-    pub fn as_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<&[u8]>) -> Self {
+    pub fn as_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<Vec<u8>>) -> Self {
         self.jwm_header.as_encrypted(alg);
         if let Some(key) = recipient_public_key {
             self.jwm_header.kid = Some(base64_url::encode(&key));
@@ -406,7 +406,7 @@ impl Message {
     pub fn receive(
         incoming: &str,
         encryption_recipient_private_key: Option<&[u8]>,
-        encryption_sender_public_key: Option<&[u8]>,
+        encryption_sender_public_key: Option<Vec<u8>>,
         signing_sender_public_key: Option<&[u8]>,
     ) -> Result<Self, Error> {
         let mut current_message: String = incoming.to_string();
@@ -450,9 +450,9 @@ impl Message {
     pub fn routed_by(
         self,
         sender_private_key: &[u8],
-        recipient_public_keys: Option<Vec<Option<&[u8]>>>,
+        recipient_public_keys: Option<Vec<Option<Vec<u8>>>>,
         mediator_did: &str,
-        mediator_public_key: Option<&[u8]>,
+        mediator_public_key: Option<Vec<u8>>,
     ) -> Result<String, Error> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
@@ -464,7 +464,7 @@ impl Message {
         Message::new()
             .to(&[mediator_did])
             .from(from)
-            .as_jwe(&alg, mediator_public_key)
+            .as_jwe(&alg, mediator_public_key.clone())
             .typ(MessageType::DidCommForward)
             .body(&serde_json::to_string(&body)?)
             .seal(sender_private_key, Some(vec![mediator_public_key]))
@@ -481,7 +481,7 @@ impl Message {
     pub fn seal(
         mut self,
         sender_private_key: impl AsRef<[u8]>,
-        recipient_public_keys: Option<Vec<Option<&[u8]>>>,
+        recipient_public_keys: Option<Vec<Option<Vec<u8>>>>,
     ) -> Result<String, Error> {
         if sender_private_key.as_ref().len() != 32 {
             return Err(Error::InvalidKeySize("!32".into()));
@@ -520,7 +520,7 @@ impl Message {
                 sender_private_key.as_ref(),
                 &self.didcomm_header.to[i],
                 &cek,
-                *public_key,
+                public_key.to_owned(),
             )?;
             recipients.push(Recipient::new(rv.header, rv.encrypted_key));
         }
@@ -614,7 +614,7 @@ impl Message {
     pub fn seal_signed(
         self,
         encryption_sender_private_key: &[u8],
-        encryption_recipient_public_keys: Option<Vec<Option<&[u8]>>>,
+        encryption_recipient_public_keys: Option<Vec<Option<Vec<u8>>>>,
         signing_algorithm: SignatureAlgorithm,
         signing_sender_private_key: &[u8],
     ) -> Result<String, Error> {
@@ -702,8 +702,8 @@ mod crypto_tests {
             bobs_public,
             ..
         } = get_keypair_set();
-        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
-        let p = m.seal(&alice_private, Some(vec![Some(&bobs_public)]));
+        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()));
+        let p = m.seal(&alice_private, Some(vec![Some(bobs_public.to_vec())]));
         assert!(p.is_ok());
     }
 
@@ -726,8 +726,8 @@ mod crypto_tests {
             bobs_public,
             ..
         } = get_keypair_set();
-        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
-        let p = m.seal(&alice_private, Some(vec![Some(&bobs_public)]));
+        let m = Message::new().as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()));
+        let p = m.seal(&alice_private, Some(vec![Some(bobs_public.to_vec())]));
         assert!(p.is_ok());
     }
 
@@ -750,7 +750,8 @@ mod crypto_tests {
 
         // Act
         // bob receives JWE
-        let received = Message::receive(&jwe, Some(&bobs_private), Some(&alice_public), None);
+        let received =
+            Message::receive(&jwe, Some(&bobs_private), Some(alice_public.to_vec()), None);
 
         // Assert
         assert!(received.is_ok());
@@ -770,14 +771,15 @@ mod crypto_tests {
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()));
         let jwe = m
-            .seal(&alice_private, Some(vec![Some(&bobs_public)]))
+            .seal(&alice_private, Some(vec![Some(bobs_public.to_vec())]))
             .unwrap();
 
         // Act
         // bob receives JWE
-        let received = Message::receive(&jwe, Some(&bobs_private), Some(&alice_public), None);
+        let received =
+            Message::receive(&jwe, Some(&bobs_private), Some(alice_public.to_vec()), None);
 
         // Assert
         assert!(received.is_ok());
@@ -815,15 +817,15 @@ mod crypto_tests {
         let m = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+            .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()));
 
-        let jwe = m.seal(&alice_private, Some(vec![Some(&bobs_public)]));
+        let jwe = m.seal(&alice_private, Some(vec![Some(bobs_public.to_vec())]));
         assert!(jwe.is_ok());
 
         let received = Message::receive(
             &jwe.unwrap(),
             Some(&bobs_private),
-            Some(&alice_public),
+            Some(alice_public.to_vec()),
             None,
         );
         assert!(received.is_ok());
@@ -870,7 +872,7 @@ mod crypto_tests {
         let received = Message::receive(
             &jwe.unwrap(),
             Some(&bobs_private),
-            Some(&alice_public),
+            Some(alice_public.to_vec()),
             None,
         );
         assert!(received.is_ok());
@@ -963,28 +965,32 @@ mod crypto_tests {
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
             .body(body) // packing in some payload
-            .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+            .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
             .kid(&hex::encode(vec![1; 32])); // invalid key, passing no key will not succeed
 
         let jwe_string = message.seal_signed(
             &alice_private,
-            Some(vec![Some(&bobs_public)]),
+            Some(vec![Some(bobs_public.to_vec())]),
             SignatureAlgorithm::EdDsa,
             &sign_keypair.to_bytes(),
         )?;
 
-        let received_failure_no_key =
-            Message::receive(&jwe_string, Some(&bobs_private), Some(&alice_public), None);
+        let received_failure_no_key = Message::receive(
+            &jwe_string,
+            Some(&bobs_private),
+            Some(alice_public.to_vec()),
+            None,
+        );
         let received_failure_wrong_key = Message::receive(
             &jwe_string,
             Some(&bobs_private),
-            Some(&alice_public),
+            Some(alice_public.to_vec()),
             Some(&[0; 32]),
         );
         let received_success = Message::receive(
             &jwe_string,
             Some(&bobs_private),
-            Some(&alice_public),
+            Some(alice_public.to_vec()),
             Some(&sign_keypair.public.to_bytes()),
         );
 

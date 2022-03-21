@@ -58,7 +58,7 @@ fn send_receive_encrypted_xc20p_json_test() {
             "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
         ]) // setting to
         .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
-        .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
+        .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec())) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .kid(r#"#z6LShs9GGnqk85isEBzzshkuVWrVKsRp24GnDuHk8QWkARMW"#); // set kid header
@@ -67,13 +67,16 @@ fn send_receive_encrypted_xc20p_json_test() {
     let ready_to_send = message
         .seal(
             &alice_private,
-            Some(vec![Some(&bobs_public), Some(&carol_public)]),
+            Some(vec![
+                Some(bobs_public.to_vec()),
+                Some(carol_public.to_vec()),
+            ]),
         )
         .unwrap();
     let received = Message::receive(
         &ready_to_send,
         Some(&bobs_private),
-        Some(&alice_public),
+        Some(alice_public.to_vec()),
         None,
     ); // and now we parse received
 
@@ -99,21 +102,21 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
         .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
-        .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+        .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
         .routed_by(
             &alice_private,
-            Some(vec![Some(&bobs_public)]),
+            Some(vec![Some(bobs_public.to_vec())]),
             "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
-            Some(&mediators_public),
+            Some(mediators_public.to_vec()),
         );
     assert!(sealed.is_ok());
 
     let mediator_received = Message::receive(
         &sealed.unwrap(),
         Some(&mediators_private),
-        Some(&alice_public),
+        Some(alice_public.to_vec()),
         None,
     );
     assert!(mediator_received.is_ok());
@@ -129,7 +132,7 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     let bob_received = Message::receive(
         &String::from_utf8_lossy(&message_to_forward.payload),
         Some(&bobs_private),
-        Some(&alice_public),
+        Some(alice_public.to_vec()),
         None,
     );
     assert!(bob_received.is_ok());
@@ -195,7 +198,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
             "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
         ]) // setting to
         .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
-        .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
+        .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec())) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another custom header
         .kid(&hex::encode(sign_keypair.public.to_bytes())); // set kid header
@@ -205,7 +208,10 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     let ready_to_send = message
         .seal_signed(
             &alice_private,
-            Some(vec![Some(&bobs_public), Some(&carol_public)]),
+            Some(vec![
+                Some(bobs_public.to_vec()),
+                Some(carol_public.to_vec()),
+            ]),
             SignatureAlgorithm::EdDsa,
             &sign_keypair.to_bytes(),
         )
@@ -216,7 +222,7 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
     let received = Message::receive(
         &ready_to_send,
         Some(&bobs_private),
-        Some(&alice_public),
+        Some(alice_public.to_vec()),
         None,
     );
     #[cfg(feature = "resolve")]

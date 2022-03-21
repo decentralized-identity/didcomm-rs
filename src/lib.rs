@@ -96,7 +96,7 @@
 //!     // decide which [Algorithm](crypto::encryptor::CryptoAlgorithm) is used (based on key)
 //!     .as_jwe(
 //!         &CryptoAlgorithm::XC20P,
-//!         Some(&bobs_public),
+//!         Some(bobs_public.to_vec()),
 //!     )
 //!     // add some custom app/protocol related headers to didcomm header portion
 //!     // these are not included into JOSE header
@@ -108,7 +108,7 @@
 //! // recipient public key is automatically resolved
 //! let ready_to_send = message.seal(
 //!     &ek,
-//!     Some(vec![Some(&bobs_public), Some(&carol_public)]),
+//!     Some(vec![Some(bobs_public.to_vec()), Some(carol_public.to_vec())]),
 //! ).unwrap();
 //!
 //! //... transport is happening here ...
@@ -183,7 +183,7 @@
 //!     // packing in some payload
 //!     .body(r#"{"foo":"bar"}"#)
 //!     // set JOSE header for XC20P algorithm
-//!     .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+//!     .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
 //!     // custom header
 //!     .add_header_field("my_custom_key".into(), "my_custom_value".into())
 //!     // another custom header
@@ -194,9 +194,9 @@
 //!     //**THIS MUST BE LAST IN THE CHAIN** - after this call you'll get new instance of envelope `Message` destined to the mediator.
 //!     .routed_by(
 //!         &alice_private,
-//!         Some(vec![Some(&bobs_public)]),
+//!         Some(vec![Some(bobs_public.to_vec())]),
 //!         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
-//!         Some(&mediators_public),
+//!         Some(mediators_public.to_vec()),
 //!     );
 //! assert!(mediated.is_ok());
 //!
@@ -206,7 +206,7 @@
 //! let mediator_received = Message::receive(
 //!     &mediated.unwrap(),
 //!     Some(&mediators_private),
-//!     Some(&alice_public),
+//!     Some(alice_public.to_vec()),
 //!     None,
 //! );
 //! assert!(mediator_received.is_ok());
@@ -226,7 +226,7 @@
 //! let bob_received = Message::receive(
 //!     &String::from_utf8_lossy(&message_to_forward.payload),
 //!     Some(&bobs_private),
-//!     Some(&alice_public),
+//!     Some(alice_public.to_vec()),
 //!     None,
 //! );
 //! assert!(bob_received.is_ok());
@@ -275,7 +275,7 @@
 //!     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
 //!     .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
 //!     .body(TEST_DID) // packing in some payload
-//!     .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public)) // set JOSE header for XC20P algorithm
+//!     .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec())) // set JOSE header for XC20P algorithm
 //!     .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
 //!     .add_header_field("another_key".into(), "another_value".into()) // another custom header
 //!     .kid(r#"Ef1sFuyOozYm3CEY4iCdwqxiSyXZ5Br-eUDdQXk6jaQ"#); // set kid header
@@ -283,7 +283,7 @@
 //! // Send as signed and encrypted JWS wrapped into JWE
 //! let ready_to_send = message.seal_signed(
 //!     &alice_private,
-//!     Some(vec![Some(&bobs_public)]),
+//!     Some(vec![Some(bobs_public.to_vec())]),
 //!     SignatureAlgorithm::EdDsa,
 //!     &sign_keypair.to_bytes(),
 //! ).unwrap();
@@ -294,7 +294,7 @@
 //! let received = Message::receive(
 //!     &ready_to_send,
 //!     Some(&bobs_private),
-//!     Some(&alice_public),
+//!     Some(alice_public.to_vec()),
 //!     None,
 //! ); // and now we parse received
 //! ```
