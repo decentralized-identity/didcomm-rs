@@ -1,6 +1,6 @@
 [package]
 name = "didcomm-rs"
-version = "0.7.1-vec"
+version = "0.7.2"
 authors = ["Ivan Temchenko <35359595i@gmail.com>", "Sebastian Wolfram <wulfraem@users.noreply.github.com>", "Sebastian Dechant <763247+S3bb1@users.noreply.github.com>"]
 edition = "2018"
 repository = "https://github.com/decentralized-identity/didcomm-rs"
