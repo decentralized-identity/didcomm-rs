@@ -4,8 +4,7 @@ use aes_gcm::{aead::generic_array::GenericArray, Aes256Gcm};
 use arrayref::array_ref;
 use chacha20poly1305::{
     aead::{Aead, NewAead},
-    XChaCha20Poly1305,
-    XNonce,
+    XChaCha20Poly1305, XNonce,
 };
 #[cfg(feature = "resolve")]
 use ddoresolver_rs::*;
@@ -32,7 +31,7 @@ pub(crate) fn decrypt_cek(
     jwe: &Jwe,
     sk: &[u8],
     recipient: &Recipient,
-    recipient_public_key: Option<&[u8]>,
+    recipient_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     trace!("decrypting per-recipient JWE value");
     let alg = jwe
@@ -126,7 +125,7 @@ pub(crate) fn encrypt_cek(
     sk: &[u8],
     dest: &str,
     cek: &[u8; 32],
-    recipient_public_key: Option<&[u8]>,
+    recipient_public_key: Option<Vec<u8>>,
 ) -> Result<Recipient, Error> {
     trace!("creating per-recipient JWE value for {}", &dest);
     let alg = message
@@ -139,7 +138,7 @@ pub(crate) fn encrypt_cek(
     // zE (temporary secret)
     let epk = StaticSecret::new(rand_core::OsRng);
     let epk_public = PublicKey::from(&epk);
-    let ze = generate_shared_for_recipient(epk.to_bytes(), dest, recipient_public_key)?;
+    let ze = generate_shared_for_recipient(epk.to_bytes(), dest, recipient_public_key.clone())?;
     trace!(
         "ze: {:?} epk_public: {:?}, dest: {:?}",
         &ze.as_ref(),
@@ -301,7 +300,7 @@ fn generate_kek(
     sk: &[u8],
     ze: impl AsRef<[u8]>,
     alg: &str,
-    recipient_public_key: Option<&[u8]>,
+    recipient_public_key: Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Error> {
     // zS (shared for recipient)
     let shared = generate_shared_for_recipient(sk, did, recipient_public_key)?;
@@ -346,7 +345,7 @@ fn generate_kek(
 fn generate_shared_for_recipient(
     sender_private_key: impl AsRef<[u8]>,
     recipient_did: &str,
-    recipient_public_key: Option<&[u8]>,
+    recipient_public_key: Option<Vec<u8>>,
 ) -> Result<impl AsRef<[u8]>, Error> {
     let recipient_public = match recipient_public_key {
         Some(value) => value.to_vec(),

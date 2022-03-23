@@ -5,8 +5,7 @@ extern crate sodiumoxide;
 pub use ddoresolver_rs::*;
 use didcomm_rs::{
     crypto::{SignatureAlgorithm, Signer},
-    Error,
-    Message,
+    Error, Message,
 };
 use rand_core::OsRng;
 use serde_json::Value;
@@ -65,7 +64,7 @@ fn can_receive_flattened_jws_json() -> Result<(), Error> {
     let received = Message::receive(
         &jws_string,
         Some(&[]),
-        Some(&sign_keypair.public.to_bytes()),
+        Some(sign_keypair.public.as_bytes().to_vec()),
         None,
     );
     assert!(received.is_ok());
@@ -91,7 +90,7 @@ fn can_receive_general_jws_json() -> Result<(), Error> {
     let received = Message::receive(
         &jws_string,
         Some(&[]),
-        Some(&sign_keypair.public.to_bytes()),
+        Some(sign_keypair.public.to_bytes().to_vec()),
         None,
     );
     assert!(received.is_ok());

@@ -11,13 +11,7 @@ use x25519_dalek::{PublicKey, StaticSecret};
 use crate::crypto::{CryptoAlgorithm, Cypher};
 use crate::{
     helpers::{decrypt_cek, get_signing_sender_public_key},
-    Error,
-    Jwe,
-    Jws,
-    Message,
-    MessageType,
-    Recipient,
-    Signature,
+    Error, Jwe, Jws, Message, MessageType, Recipient, Signature,
 };
 
 /// Helper type to check if received message is plain, signed or encrypted
@@ -60,7 +54,7 @@ pub(crate) fn get_message_type(message: &str) -> Result<MessageType, Error> {
 pub(crate) fn receive_jwe(
     incoming: &str,
     encryption_recipient_private_key: &[u8],
-    encryption_sender_public_key: Option<&[u8]>,
+    encryption_sender_public_key: Option<Vec<u8>>,
 ) -> Result<String, Error> {
     let jwe: Jwe = serde_json::from_str(incoming)?;
     let alg = &jwe
@@ -68,7 +62,7 @@ pub(crate) fn receive_jwe(
         .ok_or_else(|| Error::Generic("missing algorithm in JWE header(s)".to_string()))?;
 
     // get public key from input or from senders DID document
-    let sender_public_key = match encryption_sender_public_key {
+    let sender_public_key = match &encryption_sender_public_key {
         Some(value) => value.to_vec(),
         None => {
             #[cfg(feature = "resolve")]
@@ -110,7 +104,7 @@ pub(crate) fn receive_jwe(
                 &jwe,
                 encryption_recipient_private_key,
                 &recipient,
-                encryption_sender_public_key,
+                encryption_sender_public_key.clone(),
             );
             key_result = decrypted_key;
             if key_result.is_ok() {

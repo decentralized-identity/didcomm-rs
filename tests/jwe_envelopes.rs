@@ -3,8 +3,7 @@ extern crate didcomm_rs;
 
 use didcomm_rs::{
     crypto::{CryptoAlgorithm, SignatureAlgorithm},
-    Error,
-    Message,
+    Error, Message,
 };
 use rand_core::OsRng;
 use serde_json::Value;
@@ -21,12 +20,12 @@ fn can_create_flat_jwe_json() -> Result<(), Error> {
     let message = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+        .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        Some(vec![Some(&bobs_public)]),
+        Some(vec![Some(bobs_public.to_vec())]),
         SignatureAlgorithm::EdDsa,
         &sign_keypair.to_bytes(),
     )?;
@@ -64,17 +63,22 @@ fn can_receive_flat_jwe_json() -> Result<(), Error> {
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
         .body(body) // packing in some payload
-        .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+        .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        Some(vec![Some(&bobs_public)]),
+        Some(vec![Some(bobs_public.to_vec())]),
         SignatureAlgorithm::EdDsa,
         &sign_keypair.to_bytes(),
     )?;
 
-    let received = Message::receive(&jwe_string, Some(&bobs_private), Some(&alice_public), None);
+    let received = Message::receive(
+        &jwe_string,
+        Some(&bobs_private),
+        Some(alice_public.to_vec()),
+        None,
+    );
 
     // Assert
     assert!(&received.is_ok());

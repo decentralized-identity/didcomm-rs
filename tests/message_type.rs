@@ -5,10 +5,7 @@ use std::str::from_utf8;
 
 use didcomm_rs::{
     crypto::{CryptoAlgorithm, SignatureAlgorithm, Signer},
-    Error,
-    JwmHeader,
-    Message,
-    MessageType,
+    Error, JwmHeader, Message, MessageType,
 };
 use rand_core::OsRng;
 use serde_json::Value;
@@ -74,12 +71,12 @@ fn sets_message_type_correctly_for_signed_and_encrypted_messages() -> Result<(),
     let message = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public))
+        .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
         .kid(&hex::encode(sign_keypair.public.to_bytes()));
 
     let jwe_string = message.seal_signed(
         &alice_private,
-        Some(vec![Some(&bobs_public)]),
+        Some(vec![Some(bobs_public.to_vec())]),
         SignatureAlgorithm::EdDsa,
         &sign_keypair.to_bytes(),
     )?;
@@ -116,13 +113,13 @@ fn sets_message_type_correctly_for_forwarded_messages() -> Result<(), Error> {
     let message = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .as_jwe(&CryptoAlgorithm::XC20P, Some(&bobs_public));
+        .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()));
 
     let jwe_string = message.routed_by(
         &alice_private,
-        Some(vec![Some(&bobs_public)]),
+        Some(vec![Some(bobs_public.to_vec())]),
         "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
-        Some(&mediators_public),
+        Some(mediators_public.to_vec()),
     )?;
 
     let jwe_object: Value = serde_json::from_str(&jwe_string)?;
