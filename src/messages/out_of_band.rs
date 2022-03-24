@@ -18,7 +18,7 @@ impl Message {
             serde_json::to_string(&MessageType::DidCommInvitation).unwrap();
         if let Some(attachments) = attachments {
             for attachment in attachments {
-                self.apeend_attachment(attachment);
+                self.append_attachment(attachment);
             }
         }
         self.body(std::str::from_utf8(body.as_ref()).unwrap())

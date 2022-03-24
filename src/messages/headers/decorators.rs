@@ -16,7 +16,6 @@ use std::collections::HashMap;
 /// A `~thread` message decorator that provides request/reply
 /// and threading semantics according to Aries RFC 0008.
 #[derive(Default, Deserialize, Serialize, PartialEq, Debug, Clone)]
-#[serde(default)]
 pub struct Thread {
     /// The ID of the message that serves as the thread start.
     pub thid: String,
