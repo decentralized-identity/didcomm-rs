@@ -257,7 +257,7 @@ impl Message {
     ///
     /// * `builder` - prepopulated instance of `AttachmentBuilder`
     ///
-    pub fn apeend_attachment(&mut self, builder: AttachmentBuilder) {
+    pub fn append_attachment(&mut self, builder: AttachmentBuilder) {
         self.attachments.push(builder.finalize());
     }
 
