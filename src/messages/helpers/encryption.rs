@@ -392,7 +392,7 @@ fn get_did_from_didurl(url: &str) -> String {
             [a-z]+          # method
             :
             (?:[a-z]*:)*    # optional subdomains, postfixed with a ':'
-            [a-zA-Z0-9]+    # method specific identifier
+            [a-zA-Z0-9.\-_%]+    # method specific identifier
         )
         (?:/[^?\#]*)?        # optional path
         (?:\?[^\#]*)?        # optional query
