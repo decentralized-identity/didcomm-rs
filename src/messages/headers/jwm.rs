@@ -1,8 +1,6 @@
-use crate::{
-    crypto::{CryptoAlgorithm, SignatureAlgorithm},
-    Jwk,
-    MessageType,
-};
+#[cfg(feature = "raw-crypto")]
+use crate::crypto::{CryptoAlgorithm, SignatureAlgorithm};
+use crate::{Jwk, MessageType};
 
 /// JWM Header as specified in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
@@ -56,6 +54,7 @@ pub struct JwmHeader {
 impl JwmHeader {
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
         self.typ = MessageType::DidCommJws;
         match alg {
@@ -73,6 +72,7 @@ impl JwmHeader {
 
     /// Setter of JOSE header properties to identify which crypto alg and key type used.
     /// Modifies `enc`, `typ` and `alg` headers.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         self.typ = MessageType::DidCommJwe;
         match alg {

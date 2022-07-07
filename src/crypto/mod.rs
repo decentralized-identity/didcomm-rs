@@ -2,7 +2,6 @@
 pub mod encryptor;
 pub mod signer;
 
-#[cfg(feature = "raw-crypto")]
 pub use {encryptor::CryptoAlgorithm, signer::SignatureAlgorithm};
 
 use crate::Error;

@@ -431,7 +431,7 @@ assert!(received_second.is_ok());
 //! [shape_desired_test]: https://github.com/evannetwork/didcomm-rs/blob/main/tests/shape.rs#L21
 //! [signer]: https://github.com/evannetwork/didcomm-rs/blob/master/src/crypto/mod.rs#L39
 extern crate env_logger;
-#[macro_use]
+#[cfg_attr(feature = "raw-crypto", macro_use)]
 extern crate log;
 
 #[macro_use]
