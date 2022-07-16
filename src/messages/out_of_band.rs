@@ -14,8 +14,11 @@ impl Message {
         attachments: Option<Vec<AttachmentBuilder>>,
     ) -> Self {
         self.jwm_header.typ = MessageType::DidCommRaw;
-        self.didcomm_header.m_type =
-            serde_json::to_string(&MessageType::DidCommInvitation).unwrap();
+        self.didcomm_header.m_type = serde_json::to_value(&MessageType::DidCommInvitation)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
         if let Some(attachments) = attachments {
             for attachment in attachments {
                 self.append_attachment(attachment);
