@@ -51,7 +51,9 @@ base58 = "0.2.0"
 utilities = { path = "./utilities" }
 quickcheck = "1"
 quickcheck_macros = "1"
+fix-default-features-compilation
 fake = { version = "2.5", features = ["uuid"] }
+
 
 [dev-dependencies.cargo-husky]
 version = "1"
