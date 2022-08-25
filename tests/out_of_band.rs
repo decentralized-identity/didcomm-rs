@@ -7,7 +7,7 @@ use serde_json::Value;
 #[cfg(feature = "out-of-band")]
 fn sets_m_type_correctly_for_out_of_band_invitation_message() -> Result<(), Error> {
     let message = Message::new()
-        .as_out_of_band_invitation("{}", None)
+        .as_out_of_band_invitation("{}", None)?
         .as_raw_json()
         .unwrap();
 

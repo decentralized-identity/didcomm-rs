@@ -3,7 +3,7 @@ use std::{convert::TryFrom, str::FromStr};
 use crate::Error as CrateError;
 
 /// header used for [DID rotation](https://identity.foundation/didcomm-messaging/spec/#did-rotation)
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct PriorClaims {
     sub: Option<String>,
 

@@ -20,7 +20,8 @@ fn send_receive_raw() {
             "did::xyz:34r3cu403hnth03r49g03",
             "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
         ])
-        .body(sample_dids::TEST_DID_ENCRYPT_1);
+        .body(sample_dids::TEST_DID_ENCRYPT_1)
+        .expect("failed to set body");
 
     // Act
     let ready_to_send = m.clone().as_raw_json().unwrap();
@@ -57,7 +58,8 @@ fn send_receive_encrypted_xc20p_json_test() {
             "did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp",
             "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
         ]) // setting to
-        .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
+        .body(sample_dids::TEST_DID_SIGN_1)
+        .expect("failed to set body") // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec())) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
@@ -101,7 +103,8 @@ fn send_receive_mediated_encrypted_xc20p_json_test() {
     let sealed = Message::new()
         .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
         .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-        .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
+        .body(sample_dids::TEST_DID_SIGN_1)
+        .expect("failed to add body") // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another coustom header
@@ -155,7 +158,8 @@ fn send_receive_signed_json_test() {
             "did::xyz:34r3cu403hnth03r49g03",
             "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
         ]) // setting to
-        .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
+        .body(sample_dids::TEST_DID_SIGN_1)
+        .expect("failed to set body") // packing in some payload
         .as_jws(&SignatureAlgorithm::EdDsa)
         .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes());
 
@@ -197,7 +201,8 @@ fn send_receive_direct_signed_and_encrypted_xc20p_test() {
             "did::xyz:34r3cu403hnth03r49g03",
             "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
         ]) // setting to
-        .body(sample_dids::TEST_DID_SIGN_1) // packing in some payload
+        .body(sample_dids::TEST_DID_SIGN_1)
+        .expect("failed to set body") // packing in some payload
         .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec())) // set JOSE header for XC20P algorithm
         .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
         .add_header_field("another_key".into(), "another_value".into()) // another custom header
