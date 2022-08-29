@@ -1,11 +1,10 @@
-extern crate didcomm_rs;
-
 use didcomm_rs::{Error, Message};
-use serde_json::Value;
 
 #[test]
 #[cfg(feature = "out-of-band")]
 fn sets_m_type_correctly_for_out_of_band_invitation_message() -> Result<(), Error> {
+    use serde_json::Value;
+
     let message = Message::new()
         .as_out_of_band_invitation("{}", None)?
         .as_raw_json()

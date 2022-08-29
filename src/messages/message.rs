@@ -16,10 +16,10 @@ use crate::Result;
 
 #[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
-use crate::{
-    helpers::{encrypt_cek, get_crypter_from_header, get_message_type, receive_jwe, receive_jws},
-    Error, Jwe, MessageType, PriorClaims, Recipient,
+use crate::helpers::{
+    encrypt_cek, get_crypter_from_header, get_message_type, receive_jwe, receive_jws,
 };
+use crate::{Error, Jwe, MessageType, PriorClaims, Recipient};
 
 /// DIDComm message structure.
 ///

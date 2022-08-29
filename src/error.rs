@@ -45,6 +45,8 @@ pub enum Error {
     SystemTimeError(#[from] std::time::SystemTimeError),
     #[error(transparent)]
     Base64DecodeError(#[from] base64_url::base64::DecodeError),
+    #[error("invalid attachment{0}")]
+    AttachmentError(String),
     #[error(transparent)]
     Other(Box<dyn std::error::Error>),
 }
