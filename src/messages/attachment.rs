@@ -1,6 +1,8 @@
+use std::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 
-use crate::Message;
+use crate::{Error, Message};
 
 /// Attachment holding structure
 ///
@@ -250,6 +252,21 @@ impl AttachmentBuilder {
     }
 }
 
+impl<T> TryFrom<(&str, T)> for AttachmentBuilder
+where
+    T: Serialize,
+{
+    type Error = Error;
+    fn try_from((format, data): (&str, T)) -> Result<Self, Self::Error> {
+        let serialized = serde_json::to_string(&data)?;
+        let builder = AttachmentBuilder::new(true)
+            .with_media_type("application/json")
+            .with_format(format)
+            .with_data(AttachmentDataBuilder::new().with_json(&serialized));
+        Ok(builder)
+    }
+}
+
 impl Message {
     /// Appends attachment into `attachments` field.
     /// Consumes instance of `AttachmentBuilder` to do so.
@@ -267,5 +284,28 @@ impl Message {
     ///
     pub fn get_attachments(&self) -> impl DoubleEndedIterator<Item = &Attachment> {
         self.attachments.iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serialize;
+
+    #[derive(Serialize, Debug)]
+    struct Data;
+
+    #[test]
+    fn try_from_successfully_creates_builder() {
+        for (&format, data) in [
+            "dif/presentation-exchange/definitions@v1.0",
+            "dif/presentation-exchange/submission@v1.0",
+        ]
+        .iter()
+        .zip([Data, Data])
+        {
+            let builder = AttachmentBuilder::try_from((format, data));
+            assert!(builder.is_ok(), "failed to create builder");
+        }
     }
 }
