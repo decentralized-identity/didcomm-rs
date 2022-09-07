@@ -30,6 +30,7 @@ pub struct AttachmentData {
     pub jws: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
