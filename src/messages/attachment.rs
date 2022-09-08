@@ -4,7 +4,7 @@ use crate::Message;
 
 /// Attachment holding structure
 ///
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Attachment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -24,12 +24,13 @@ pub struct Attachment {
 }
 
 /// Attachment Data holding structure
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct AttachmentData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

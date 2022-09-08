@@ -28,8 +28,7 @@ impl Cypher for CryptoAlgorithm {
                     check_nonce(nonce, 24)?;
                     use chacha20poly1305::{
                         aead::{Aead, NewAead, Payload},
-                        XChaCha20Poly1305,
-                        XNonce,
+                        XChaCha20Poly1305, XNonce,
                     };
                     let nonce = XNonce::from_slice(nonce);
                     let aead = XChaCha20Poly1305::new(key.into());
@@ -78,8 +77,7 @@ impl Cypher for CryptoAlgorithm {
                     check_nonce(nonce, 24)?;
                     use chacha20poly1305::{
                         aead::{Aead, NewAead, Payload},
-                        XChaCha20Poly1305,
-                        XNonce,
+                        XChaCha20Poly1305, XNonce,
                     };
                     let aead = XChaCha20Poly1305::new(key.into());
                     let nonce = XNonce::from_slice(nonce);
@@ -152,7 +150,7 @@ mod batteries_tests {
         let payload = r#"{"test":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::XC20P, None) // Set jwe header manually - should be preceded by key properties
-            .body(payload);
+            .body(payload)?;
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
@@ -179,14 +177,14 @@ mod batteries_tests {
         let payload = r#"{"example":"message's body - can be anything..."}"#;
         let m = Message::new()
             .as_jwe(&CryptoAlgorithm::A256GCM, None) // Set jwe header manually - should be preceded by key properties
-            .body(payload);
+            .body(payload)?;
         let original_header = m.jwm_header.clone();
         let key = b"super duper key 32 bytes long!!!";
         // Act
         let jwe = m.encrypt(CryptoAlgorithm::A256GCM.encryptor(), key);
         assert!(&jwe.is_ok());
         let s = Message::decrypt(
-            jwe.unwrap().as_bytes(),
+            jwe.expect("failed to get JWE").as_bytes(),
             CryptoAlgorithm::A256GCM.decrypter(),
             key,
         )?;

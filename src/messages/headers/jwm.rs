@@ -1,8 +1,5 @@
-use crate::{
-    crypto::{CryptoAlgorithm, SignatureAlgorithm},
-    Jwk,
-    MessageType,
-};
+use crate::crypto::{CryptoAlgorithm, SignatureAlgorithm};
+use crate::{Jwk, MessageType};
 
 /// JWM Header as specified in [RFC](https://tools.ietf.org/html/draft-looker-jwm-01#section-2.3)
 /// With single deviation - allows raw text JWM to support DIDComm spec
@@ -11,7 +8,7 @@ use crate::{
 ///
 /// `iv` property is not explicitly listed in the registered properties on the RFC but is present
 ///     within example lists - used here as DIDComm crypto nonce sharing property.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct JwmHeader {
     pub typ: MessageType,
 

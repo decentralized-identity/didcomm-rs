@@ -117,8 +117,10 @@ fn es256k_test() {
     // Act
     let signer = SignatureAlgorithm::Es256k.signer();
     let validator = SignatureAlgorithm::Es256k.validator();
-    let signature = signer(&sk.to_bytes(), m);
-    let validation = validator(&vk.to_bytes(), m, &signature.unwrap());
+    let sk: Vec<u8> = sk.to_bytes().to_vec();
+    let vk = vk.to_bytes().to_vec();
+    let signature = signer(&sk, m);
+    let validation = validator(&vk, m, &signature.unwrap());
     // Assert
     assert!(&validation.is_ok());
     assert!(validation.unwrap());
