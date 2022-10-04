@@ -1,4 +1,5 @@
 use super::{AttachmentBuilder, Message, MessageType};
+use crate::Result;
 
 impl Message {
     /// Transforms given `Message` into out_of_band invitation
@@ -12,7 +13,7 @@ impl Message {
         mut self,
         body: impl AsRef<[u8]>,
         attachments: Option<Vec<AttachmentBuilder>>,
-    ) -> Self {
+    ) -> Result<Self> {
         self.jwm_header.typ = MessageType::DidCommRaw;
         self.didcomm_header.m_type = serde_json::to_value(&MessageType::DidCommInvitation)
             .unwrap()

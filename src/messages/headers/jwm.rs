@@ -9,7 +9,7 @@ use crate::{Jwk, MessageType};
 ///
 /// `iv` property is not explicitly listed in the registered properties on the RFC but is present
 ///     within example lists - used here as DIDComm crypto nonce sharing property.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct JwmHeader {
     pub typ: MessageType,
 

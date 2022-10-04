@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// Encryption public key
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct Epk {
     pub kty: String,
 
@@ -14,7 +14,7 @@ pub struct Epk {
 }
 
 /// Json Web Keys structure defined by [RFC](https://tools.ietf.org/html/rfc7517)
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
 pub struct Jwk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kty: Option<String>,
@@ -59,7 +59,7 @@ impl Jwk {
 }
 
 // WARN: Does not support other key operation types ATM.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum KeyOps {
     Sign,
@@ -75,7 +75,7 @@ pub enum KeyOps {
 
 /// `alg` field values provided by [RFC](https://tools.ietf.org/html/rfc7518)
 ///
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum KeyAlgorithm {
     HS256,
     HS384,

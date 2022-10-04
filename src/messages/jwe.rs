@@ -3,15 +3,14 @@ use rand::{prelude::SliceRandom, Rng};
 
 use crate::{
     messages::helpers::{create_fallback_getter, serialization_base64_jwm_header},
-    Jwk,
-    JwmHeader,
+    Jwk, JwmHeader,
 };
 
 /// This struct presents single recipient of JWE `recipients` collection.
 /// Each recipient should have same body cypher key encrypted with shared secret.
 /// [Spec](https://tools.ietf.org/html/rfc7516#section-7.2.1)
 ///
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Recipient {
     pub header: Jwk,
 

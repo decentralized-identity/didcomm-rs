@@ -42,7 +42,7 @@
 //!         "did:xyz:30489jnutnjqhiu0uh540u8hunoe",
 //!     ])
 //!     // populating body with some data - `Vec<bytes>`
-//!     .body(TEST_DID);
+//!     .body(TEST_DID).unwrap();
 //!
 //! // Serialize message into JWM json (SENDER action)
 //! let ready_to_send = m.clone().as_raw_json().unwrap();
@@ -92,7 +92,7 @@
 //!         "did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG",
 //!     ])
 //!     // packing in some payload (can be anything really)
-//!     .body(TEST_DID)
+//!     .body(TEST_DID).unwrap()
 //!     // decide which [Algorithm](crypto::encryptor::CryptoAlgorithm) is used (based on key)
 //!     .as_jwe(
 //!         &CryptoAlgorithm::XC20P,
@@ -145,7 +145,7 @@
 //! let message = Message::new() // creating message
 //!     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
 //!     .to(&["did::xyz:34r3cu403hnth03r49g03", "did:xyz:30489jnutnjqhiu0uh540u8hunoe"]) // setting to
-//!     .body(TEST_DID) // packing in some payload
+//!     .body(TEST_DID).unwrap() // packing in some payload
 //!     .as_jws(&SignatureAlgorithm::EdDsa)
 //!     .sign(SignatureAlgorithm::EdDsa.signer(), &sign_keypair.to_bytes()).unwrap();
 //!
@@ -181,7 +181,7 @@
 //!     // setting to
 //!     .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
 //!     // packing in some payload
-//!     .body(r#"{"foo":"bar"}"#)
+//!     .body(r#"{"foo":"bar"}"#).unwrap()
 //!     // set JOSE header for XC20P algorithm
 //!     .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
 //!     // custom header
@@ -274,7 +274,7 @@
 //! let message = Message::new() // creating message
 //!     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
 //!     .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
-//!     .body(TEST_DID) // packing in some payload
+//!     .body(TEST_DID).unwrap() // packing in some payload
 //!     .as_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec())) // set JOSE header for XC20P algorithm
 //!     .add_header_field("my_custom_key".into(), "my_custom_value".into()) // custom header
 //!     .add_header_field("another_key".into(), "another_value".into()) // another custom header
@@ -413,7 +413,7 @@ assert!(received_second.is_ok());
 //! let message = Message::new() // creating message
 //!     .from("did:xyz:ulapcuhsatnpuhza930hpu34n_") // setting from
 //!     .to(&["did::xyz:34r3cu403hnth03r49g03"]) // setting to
-//!     .body(&body); // packing in some payload
+//!     .body(&body).unwrap(); // packing in some payload
 //! let received_typed_body = DesiredShape::shape(&message).unwrap(); // Where m = Message
 //! ```
 //!
@@ -437,11 +437,12 @@ extern crate log;
 #[macro_use]
 extern crate serde;
 extern crate base64_url;
-mod error;
-mod messages;
-
 #[cfg(feature = "raw-crypto")]
 pub mod crypto;
+mod error;
+mod messages;
+mod result;
 
 pub use error::*;
 pub use messages::*;
+pub use result::Result;

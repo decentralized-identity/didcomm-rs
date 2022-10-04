@@ -18,6 +18,7 @@ use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use crate::Result;
 
 /// DIDComm message structure.
 ///
@@ -35,7 +36,7 @@ use serde_json::{json, Value};
 /// For examples have a look [here][`crate`].
 ///
 /// [Specification](https://identity.foundation/didcomm-messaging/spec/#message-structure)
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Message {
     /// JOSE header, which is sent as public part with JWE.
     #[serde(flatten)]
@@ -193,9 +194,9 @@ impl Message {
 
     /// Setter of the `body`.
     /// Note, that given text has to be a valid JSON string to be a valid body value.
-    pub fn body(mut self, body: &str) -> Self {
-        self.body = serde_json::from_str(body).unwrap();
-        self
+    pub fn body(mut self, body: &str) -> Result<Self> {
+        self.body = serde_json::from_str(body)?;
+        Ok(self)
     }
 
     /// Setter of `didcomm_header`.
@@ -213,7 +214,7 @@ impl Message {
     }
 
     /// Getter of the `body` as String.
-    pub fn get_body(&self) -> Result<String, Error> {
+    pub fn get_body(&self) -> Result<String> {
         Ok(serde_json::to_string(&self.body)?)
     }
 
@@ -229,7 +230,7 @@ impl Message {
 
     /// If message `is_rotation()` true - returns from_prion claims.
     /// Errors otherwise with `Error::NoRotationData`
-    pub fn get_prior(&self) -> Result<PriorClaims, Error> {
+    pub fn get_prior(&self) -> Result<PriorClaims> {
         if self.is_rotation() {
             Ok(self
                 .didcomm_header
@@ -345,7 +346,7 @@ impl Message {
 impl Message {
     /// Serializes current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
-    pub fn as_raw_json(self) -> Result<String, Error> {
+    pub fn as_raw_json(self) -> Result<String> {
         Ok(serde_json::to_string(&self)?)
     }
 
@@ -354,7 +355,7 @@ impl Message {
     /// # Returns
     /// Tuple of bytes where .0 is IV and .1 is payload for encryption
     ///
-    pub fn export_for_encryption(&self) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    pub fn export_for_encryption(&self) -> Result<(Vec<u8>, Vec<u8>)> {
         Ok((
             decode(&Jwe::generate_iv())?,
             serde_json::to_string(&self)?.as_bytes().to_vec(),
@@ -370,7 +371,7 @@ impl Message {
     ///
     /// Returns serialized JSON JWE message, which is ready to be sent to receipent
     ///
-    pub fn seal_pre_encrypted(self, cyphertext: impl AsRef<[u8]>) -> Result<String, Error> {
+    pub fn seal_pre_encrypted(self, cyphertext: impl AsRef<[u8]>) -> Result<String> {
         let d_header = self.get_didcomm_header();
 
         let mut unprotected = JwmHeader {
@@ -411,7 +412,7 @@ impl Message {
         encryption_recipient_private_key: Option<&[u8]>,
         encryption_sender_public_key: Option<Vec<u8>>,
         signing_sender_public_key: Option<&[u8]>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let mut current_message: String = incoming.to_string();
 
         if get_message_type(&current_message)? == MessageType::DidCommJwe {
@@ -456,7 +457,7 @@ impl Message {
         recipient_public_keys: Option<Vec<Option<Vec<u8>>>>,
         mediator_did: &str,
         mediator_public_key: Option<Vec<u8>>,
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         let from = &self.didcomm_header.from.clone().unwrap_or_default();
         let alg = get_crypter_from_header(&self.jwm_header)?;
         let body = Mediated::new(self.didcomm_header.to[0].clone()).with_payload(
@@ -469,7 +470,7 @@ impl Message {
             .from(from)
             .as_jwe(&alg, mediator_public_key.clone())
             .typ(MessageType::DidCommForward)
-            .body(&serde_json::to_string(&body)?)
+            .body(&serde_json::to_string(&body)?)?
             .seal(sender_private_key, Some(vec![mediator_public_key]))
     }
 
@@ -485,7 +486,7 @@ impl Message {
         mut self,
         sender_private_key: impl AsRef<[u8]>,
         recipient_public_keys: Option<Vec<Option<Vec<u8>>>>,
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         if sender_private_key.as_ref().len() != 32 {
             return Err(Error::InvalidKeySize("!32".into()));
         }
@@ -541,7 +542,7 @@ impl Message {
     /// Both regular JSON and Compact representations are accepted.
     /// Returns `Error` on failure.
     /// TODO: Add examples
-    pub fn get_iv(received: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn get_iv(received: &[u8]) -> Result<Vec<u8>> {
         // parse from compact
         let as_str = String::from_utf8(received.to_vec())?;
         let json: serde_json::Value = if let Some(header_end) = as_str.find('.') {
@@ -598,7 +599,7 @@ impl Message {
     /// * `decrypted` - result of decrypting of Jwe payload retreived after
     ///  decrypting content of `as_jwe` function call output.
     ///
-    pub fn receive_external_crypto(decrypted: impl AsRef<[u8]>) -> Result<Self, Error> {
+    pub fn receive_external_crypto(decrypted: impl AsRef<[u8]>) -> Result<Self> {
         Ok(serde_json::from_slice(decrypted.as_ref())?)
     }
 
@@ -623,7 +624,7 @@ impl Message {
         encryption_recipient_public_keys: Option<Vec<Option<Vec<u8>>>>,
         signing_algorithm: SignatureAlgorithm,
         signing_sender_private_key: &[u8],
-    ) -> Result<String, Error> {
+    ) -> Result<String> {
         let mut to = self.clone();
         let signed = self
             .as_jws(&signing_algorithm)
@@ -958,7 +959,7 @@ mod crypto_tests {
     }
 
     #[test]
-    fn can_pass_explicit_signing_verification_keys() -> Result<(), Error> {
+    fn can_pass_explicit_signing_verification_keys() -> Result<()> {
         let KeyPairSet {
             alice_private,
             alice_public,
@@ -971,7 +972,7 @@ mod crypto_tests {
         let message = Message::new()
             .from("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
             .to(&["did:key:z6MkjchhfUsD6mmvni8mCdXHw216Xrm9bQe2mBH1P5RDjVJG"])
-            .body(body) // packing in some payload
+            .body(body)? // packing in some payload
             .as_flat_jwe(&CryptoAlgorithm::XC20P, Some(bobs_public.to_vec()))
             .kid(&hex::encode(vec![1; 32])); // invalid key, passing no key will not succeed
 

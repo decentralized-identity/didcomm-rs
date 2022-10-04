@@ -1,10 +1,12 @@
+use std::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 
-use crate::Message;
+use crate::{Error, Message, Result};
 
 /// Attachment holding structure
 ///
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Attachment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -24,12 +26,13 @@ pub struct Attachment {
 }
 
 /// Attachment Data holding structure
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct AttachmentData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -249,6 +252,21 @@ impl AttachmentBuilder {
     }
 }
 
+impl<T> TryFrom<(&str, T)> for AttachmentBuilder
+where
+    T: Serialize,
+{
+    type Error = Error;
+    fn try_from((format, data): (&str, T)) -> std::result::Result<Self, Self::Error> {
+        let serialized = serde_json::to_string(&data)?;
+        let builder = AttachmentBuilder::new(true)
+            .with_media_type("application/json")
+            .with_format(format)
+            .with_data(AttachmentDataBuilder::new().with_json(&serialized));
+        Ok(builder)
+    }
+}
+
 impl Message {
     /// Appends attachment into `attachments` field.
     /// Consumes instance of `AttachmentBuilder` to do so.
@@ -261,10 +279,88 @@ impl Message {
         self.attachments.push(builder.finalize());
     }
 
-    /// Returns iterator of all attachments, if any.
-    /// If no attachment present - empty iterator will be returned.
-    ///
-    pub fn get_attachments(&self) -> impl DoubleEndedIterator<Item = &Attachment> {
+    /// Returns iterator of all attachments.
+    pub fn attachment_iter(&self) -> impl DoubleEndedIterator<Item = &Attachment> {
         self.attachments.iter()
+    }
+
+    /// Deserializes a the attachements with media-type `fmt` into `Vec<T>`.
+    ///
+    /// # Error:
+    /// It returns an error if media type is not `application/json` or if the media is invalid JSON document.
+    pub fn deserialize_attachments<'de, T>(&'de self, fmt: &str) -> Result<Vec<T>>
+    where
+        T: Deserialize<'de>,
+    {
+        if fmt != "application/json" {
+            return Err(Error::AttachmentError("unsupported media type".into()));
+        }
+
+        self.attachments
+            .iter()
+            .filter(|&att| att.format == Some(fmt.into()))
+            .map(|attachment| match attachment.media_type {
+                Some(ref media_type) if media_type == "application/json" => {
+                    match &attachment.data.json {
+                        Some(json) => serde_json::from_str(json).map_err(Error::SerdeError),
+                        None if attachment.id.is_some() => Err(Error::AttachmentError(format!(
+                            "attachment with id {} contains invalid JSON data",
+                            attachment.id.clone().unwrap()
+                        ))),
+                        _ => Err(Error::AttachmentError("NO ATTACHMENT ID".into())),
+                    }
+                }
+                _ => Err(Error::AttachmentError("unsupported media type".into()))?,
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::{Deserialize, Serialize};
+
+    use super::Message;
+    use super::*;
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct Data;
+
+    #[test]
+    fn try_from_successfully_creates_builder() {
+        for (&format, data) in [
+            "dif/presentation-exchange/definitions@v1.0",
+            "dif/presentation-exchange/submission@v1.0",
+        ]
+        .iter()
+        .zip([Data, Data])
+        {
+            let builder = AttachmentBuilder::try_from((format, data));
+            assert!(builder.is_ok(), "failed to create builder");
+        }
+    }
+
+    #[test]
+    fn deserialize_json_formatteed_attachments_successfully() {
+        let mut message = Message::new();
+        let builder = AttachmentBuilder::try_from(("application/json", Data))
+            .expect("failed to create builder");
+        message.append_attachment(builder);
+        let data: Vec<Data> = message
+            .deserialize_attachments("application/json")
+            .expect("failed to get attachments");
+        assert_eq!(data.len(), 1)
+    }
+
+    #[test]
+    #[should_panic(expected = "unsupported media type")]
+    fn cannot_deserialize_attachments_with_invalid_format() {
+        let mut message = Message::new();
+        let builder = AttachmentBuilder::try_from(("application/json", Data))
+            .expect("failed to create builder");
+        message.append_attachment(builder);
+        message
+            .deserialize_attachments::<Data>("application/yaml")
+            .unwrap();
     }
 }
