@@ -131,9 +131,9 @@ mod tests {
         // Arrange
         // keys
         let KeyPairSet {
-            alice_public,
+            alice_public: _,
             alice_private,
-            bobs_private,
+            bobs_private: _,
             bobs_public,
             mediators_public: carol_public,
             ..
@@ -156,7 +156,7 @@ mod tests {
 
         // Act
         // Send
-        let ready_to_send = message
+        message
             .seal_signed(
                 &alice_private,
                 Some(vec![
