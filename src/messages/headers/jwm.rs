@@ -1,3 +1,4 @@
+#[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, SignatureAlgorithm};
 use crate::{Jwk, MessageType};
 
@@ -53,6 +54,7 @@ pub struct JwmHeader {
 impl JwmHeader {
     /// Setter of JOSE header properties to identify which signature alg used.
     /// Modifies `typ` and `alg` headers.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_signed(&mut self, alg: &SignatureAlgorithm) {
         self.typ = MessageType::DidCommJws;
         match alg {
@@ -70,6 +72,7 @@ impl JwmHeader {
 
     /// Setter of JOSE header properties to identify which crypto alg and key type used.
     /// Modifies `enc`, `typ` and `alg` headers.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_encrypted(&mut self, alg: &CryptoAlgorithm) {
         self.typ = MessageType::DidCommJwe;
         match alg {

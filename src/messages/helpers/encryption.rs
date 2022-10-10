@@ -12,7 +12,6 @@ use rand::{prelude::SliceRandom, Rng};
 use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-#[cfg(feature = "raw-crypto")]
 use crate::crypto::CryptoAlgorithm;
 use crate::{Error, Jwe, Jwk, JwmHeader, KeyAlgorithm, Message, Recipient};
 

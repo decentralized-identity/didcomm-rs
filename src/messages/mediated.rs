@@ -1,5 +1,4 @@
-use super::{Message, Shape};
-use crate::Error;
+use crate::{messages::Shape, Error, Message};
 
 /// Mediated Message value
 #[derive(Serialize, Deserialize, Debug)]

@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use x25519_dalek::{PublicKey, StaticSecret};
 
-#[cfg(feature = "raw-crypto")]
 use crate::crypto::{CryptoAlgorithm, Cypher};
 use crate::{
     helpers::{decrypt_cek, get_signing_sender_public_key},

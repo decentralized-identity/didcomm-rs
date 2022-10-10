@@ -1,3 +1,4 @@
+#[cfg(feature = "out-of-band")]
 use didcomm_rs::{Error, Message};
 
 #[test]

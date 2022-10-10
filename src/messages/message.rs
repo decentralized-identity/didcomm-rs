@@ -1,25 +1,24 @@
 #![allow(dead_code)]
 use std::time::SystemTime;
 
+#[cfg(feature = "raw-crypto")]
+use crate::{
+    crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer},
+    helpers::{encrypt_cek, get_crypter_from_header, get_message_type, receive_jwe, receive_jws},
+    Jwe, Mediated,
+};
+use crate::{Attachment, DidCommHeader, Error, JwmHeader, MessageType, PriorClaims, Recipient};
+#[cfg(feature = "raw-crypto")]
 use base64_url::decode;
-#[cfg(feature = "resolve")]
+#[cfg(all(feature = "resolve", feature = "raw-crypto"))]
 use ddoresolver_rs::*;
+#[cfg(feature = "raw-crypto")]
 use rand::{RngCore, SeedableRng};
+#[cfg(feature = "raw-crypto")]
 use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-
-use super::headers::{DidCommHeader, JwmHeader};
-use super::mediated::Mediated;
-use super::Attachment;
 use crate::Result;
-
-#[cfg(feature = "raw-crypto")]
-use crate::crypto::{CryptoAlgorithm, Cypher, SignatureAlgorithm, Signer};
-use crate::helpers::{
-    encrypt_cek, get_crypter_from_header, get_message_type, receive_jwe, receive_jws,
-};
-use crate::{Error, Jwe, MessageType, PriorClaims, Recipient};
 
 /// DIDComm message structure.
 ///
@@ -100,6 +99,7 @@ impl Message {
 
     /// Sets message to be serialized as flat JWE JSON.
     /// If this message has multiple targets, `seal`ing it will result in an Error.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_flat_jwe(
         mut self,
         alg: &CryptoAlgorithm,
@@ -111,6 +111,7 @@ impl Message {
 
     /// Sets message to be serialized as flat JWS JSON and then calls `as_jws`.
     /// If this message has multiple targets, `seal`ing it will result in an Error.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_flat_jws(mut self, alg: &SignatureAlgorithm) -> Self {
         self.serialize_flat_jws = true;
         self.as_jws(alg)
@@ -155,6 +156,7 @@ impl Message {
     ///
     /// For `resolve` feature will set `kid` header automatically
     ///     based on the did document resolved.
+    #[cfg(feature = "raw-crypto")]
     pub fn as_jwe(mut self, alg: &CryptoAlgorithm, recipient_public_key: Option<Vec<u8>>) -> Self {
         self.jwm_header.as_encrypted(alg);
         if let Some(key) = recipient_public_key {
@@ -184,6 +186,7 @@ impl Message {
     /// Modifies JWM related header portion to match
     ///     encryption implementation and leaves other
     ///     parts unchanged.  TODO + FIXME: complete implementation
+    #[cfg(feature = "raw-crypto")]
     pub fn as_jws(mut self, alg: &SignatureAlgorithm) -> Self {
         self.jwm_header.as_signed(alg);
         self
@@ -339,6 +342,7 @@ impl Message {
 }
 
 // Interactions with messages (sending, receiving, etc.)
+#[cfg(feature = "raw-crypto")]
 impl Message {
     /// Serializes current state of the message into json.
     /// Consumes original message - use as raw sealing of envelope.
@@ -565,6 +569,7 @@ impl Message {
             Err(Error::Generic("iv is not found in JOSE header".into()))
         }
     }
+
     /// Transforms incomming into `Jwe` if it is one
     /// Also checks if `skid` field is present or returns `None` othervise
     /// Key resolution and validation fall onto caller of this method
@@ -575,6 +580,7 @@ impl Message {
     ///
     /// Returns `Option<Jwe>` where `.header.skid` is skid and `.payload()` is cyphertext
     ///
+    #[cfg(feature = "raw-crypto")]
     pub fn received_as_jwe(incomming: impl AsRef<[u8]>) -> Option<Jwe> {
         if let Ok(jwe) = serde_json::from_slice::<Jwe>(incomming.as_ref()) {
             if jwe.get_skid().is_some() {
@@ -611,6 +617,7 @@ impl Message {
     /// * `signing_algorithm` - encryption algorithm used
     ///
     /// * `signing_sender_private_key` - signing key for enveloped message JWS encryption
+    #[cfg(feature = "raw-crypto")]
     pub fn seal_signed(
         self,
         encryption_sender_private_key: &[u8],
@@ -664,6 +671,7 @@ mod parse_tests {
             &String::from_utf8(iv.unwrap()).unwrap()
         );
     }
+
     #[test]
     fn iv_from_compact_json_test() {
         // Arrange
@@ -680,7 +688,7 @@ mod parse_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "raw-crypto"))]
 mod crypto_tests {
     extern crate chacha20poly1305;
     extern crate sodiumoxide;
